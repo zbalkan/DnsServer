@@ -26,6 +26,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using TechnitiumLibrary.Net.Dns;
@@ -62,7 +63,7 @@ namespace AdvancedBlocking
         public async Task InitializeAsync(IDnsServer dnsServer, string configJson)
         {
             _dnsServer = dnsServer;
-            _config = JsonSerializer.Deserialize<AppConfig>(configJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            _config = JsonSerializer.Deserialize<AppConfig>(configJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } });
             _activeProfiles = new ConcurrentDictionary<IPAddress, ClientProfile>();
 
             string appFolder = _dnsServer.ApplicationFolder;

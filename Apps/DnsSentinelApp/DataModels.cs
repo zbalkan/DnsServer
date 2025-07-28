@@ -13,7 +13,7 @@ namespace DnsSentinelApp
 
     public class AppConfig
     {
-        public int InitialTrainingPeriodDays { get; set; } = 7; // New property
+        public int InitialTrainingPeriodDays { get; set; } = 7;
         public int RetrainingPeriodDays { get; set; } = 7;
         public ThreatLevelConfig ThreatLevels { get; set; } = new ThreatLevelConfig();
     }
