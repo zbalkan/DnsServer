@@ -9,8 +9,10 @@ using System.Threading.Tasks;
 
 namespace DnsSentinelApp.Service
 {
-    public sealed class FileBlocklistManager : IBlocklistManager
+    public sealed class FileBlocklistManager : IBlocklistManager, IDisposable
     {
+        private const string _domainBlocklistFile = "blocklist_domains.txt";
+        private const string _ipBlocklistFile = "blocklist_ips.txt";
         private readonly string _domainBlocklistPath;
         private readonly string _ipBlocklistPath;
         private FrozenSet<string> _domainBlocklist = FrozenSet<string>.Empty;
@@ -19,8 +21,8 @@ namespace DnsSentinelApp.Service
 
         public FileBlocklistManager(string appFolder)
         {
-            _domainBlocklistPath = Path.Combine(appFolder, "blocklist_domains.txt");
-            _ipBlocklistPath = Path.Combine(appFolder, "blocklist_ips.txt");
+            _domainBlocklistPath = Path.Combine(appFolder, _domainBlocklistFile);
+            _ipBlocklistPath = Path.Combine(appFolder, _ipBlocklistFile);
         }
 
         public async Task LoadBlocklistAsync()
@@ -124,6 +126,11 @@ namespace DnsSentinelApp.Service
         public bool IsIpBlocked(string ip)
         {
             return _ipBlocklist.Contains(ip);
+        }
+
+        public void Dispose()
+        {
+            _fileLock.Dispose();
         }
     }
 }
