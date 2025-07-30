@@ -47,7 +47,7 @@ namespace DnsSentinelApp.Service
             return _predictionEngine.Predict(behavioralData);
         }
 
-        public async Task TrainModelAsync(IEnumerable<DnsBehavioralInput> trainingData)
+        public Task TrainModelAsync(IEnumerable<DnsBehavioralInput> trainingData)
         {
             if (!trainingData.Any())
             {
@@ -88,7 +88,7 @@ namespace DnsSentinelApp.Service
             // After saving, immediately reload the new model into the active prediction engine.
             LoadModel();
 
-            await Task.CompletedTask;
+            return Task.CompletedTask;
         }
 
         public void Dispose()
