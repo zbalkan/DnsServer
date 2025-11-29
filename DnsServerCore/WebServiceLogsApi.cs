@@ -41,6 +41,7 @@ namespace DnsServerCore
             #region variables
 
             readonly DnsWebService _dnsWebService;
+            const int BufferSize = 4096;
 
             #endregion
 
@@ -321,11 +322,11 @@ namespace DnsServerCore
 
                 DnsLogPage page;
                 long pageNumber = 1;
-                string tmpFile = Path.GetTempFileName();
+                string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
                 try
                 {
-                    using (FileStream csvFileStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                    using (FileStream csvFileStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                     {
                         StreamWriter sW = new StreamWriter(csvFileStream, Encoding.UTF8);
 

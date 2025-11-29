@@ -80,7 +80,7 @@ namespace DnsServerCore.Cluster
         bool _pendingSave;
         readonly Timer _saveTimer;
         const int SAVE_TIMER_INITIAL_INTERVAL = 5000;
-
+        const int BufferSize = 4096;
         volatile int _recordUpdateForMemberZonesId;
 
         #endregion
@@ -1604,10 +1604,10 @@ namespace DnsServerCore.Cluster
 
         public async Task SyncConfigFromAsync(HttpApiClient primaryNodeApiClient, IReadOnlyCollection<string> includeZones = null, CancellationToken cancellationToken = default)
         {
-            string tmpFile = Path.GetTempFileName();
+            string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             try
             {
-                await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                 {
                     //get config from primary node
                     (Stream, DateTime) response = await primaryNodeApiClient.TransferConfigFromPrimaryNodeAsync(_configLastSynced, includeZones, cancellationToken);

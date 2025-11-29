@@ -38,6 +38,7 @@ namespace DnsServerCore.Dns.Applications
 
         readonly Dictionary<string, IntPtr> _loadedUnmanagedDlls = new Dictionary<string, IntPtr>();
         readonly List<string> _dllTempPaths = new List<string>();
+        const int BufferSize = 4096;
 
         #endregion
 
@@ -219,11 +220,11 @@ namespace DnsServerCore.Dns.Applications
 
         private string GetTempDllFile(string dllFile)
         {
-            string tempPath = Path.GetTempFileName();
+            string tempPath = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
 
-            using (FileStream srcFile = new FileStream(dllFile, FileMode.Open, FileAccess.Read))
+            using (FileStream srcFile = new FileStream(dllFile, FileMode.Open, FileAccess.Read, FileShare.None, BufferSize, FileOptions.None))
             {
-                using (FileStream dstFile = new FileStream(tempPath, FileMode.Create, FileAccess.Write))
+                using (FileStream dstFile = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, FileOptions.None))
                 {
                     srcFile.CopyTo(dstFile);
                 }

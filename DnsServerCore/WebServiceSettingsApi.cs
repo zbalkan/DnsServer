@@ -47,6 +47,7 @@ namespace DnsServerCore
             #region variables
 
             readonly DnsWebService _dnsWebService;
+            const int BufferSize = 4096;
 
             #endregion
 
@@ -1636,10 +1637,10 @@ namespace DnsServerCore
                 bool stats = request.GetQueryOrForm("stats", bool.Parse, false);
                 bool logs = request.GetQueryOrForm("logs", bool.Parse, false);
 
-                string tmpFile = Path.GetTempFileName();
+                string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 try
                 {
-                    await using (FileStream backupZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                    await using (FileStream backupZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                     {
                         //create backup zip
                         await _dnsWebService.BackupConfigAsync(backupZipStream, authConfig, clusterConfig, webServiceSettings, dnsSettings, logSettings, zones, allowedZones, blockedZones, blockLists, apps, scopes, stats, logs);
@@ -1708,7 +1709,7 @@ namespace DnsServerCore
                 try
                 {
                     //write to temp file
-                    string tmpFile = Path.GetTempFileName();
+                    string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                     try
                     {
                         await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))

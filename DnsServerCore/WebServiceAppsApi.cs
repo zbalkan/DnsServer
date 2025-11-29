@@ -37,6 +37,7 @@ namespace DnsServerCore
             #region variables
 
             readonly DnsWebService _dnsWebService;
+            const int BufferSize = 4096;
 
             #endregion
 
@@ -348,10 +349,10 @@ namespace DnsServerCore
                 if (!request.HasFormContentType || (request.Form.Files.Count == 0))
                     throw new DnsWebServiceException("DNS application zip file is missing.");
 
-                string tmpFile = Path.GetTempFileName();
+                string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 try
                 {
-                    await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                    await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                     {
                         //write to temp file
                         await request.Form.Files[0].CopyToAsync(fS);
@@ -399,7 +400,7 @@ namespace DnsServerCore
                 if (!request.HasFormContentType || (request.Form.Files.Count == 0))
                     throw new DnsWebServiceException("DNS application zip file is missing.");
 
-                string tmpFile = Path.GetTempFileName();
+                string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 try
                 {
                     await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))

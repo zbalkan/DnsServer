@@ -58,6 +58,7 @@ namespace DnsServerCore.Dns.Applications
         Timer _appUpdateTimer;
         const int APP_UPDATE_TIMER_INITIAL_INTERVAL = 10000;
         const int APP_UPDATE_TIMER_PERIODIC_INTERVAL = 86400000;
+        const int BufferSize = 4096;
 
         #endregion
 
@@ -471,10 +472,10 @@ namespace DnsServerCore.Dns.Applications
 
         public async Task<DnsApplication> DownloadAndInstallAppAsync(string applicationName, Uri uri)
         {
-            string tmpFile = Path.GetTempFileName();
+            string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             try
             {
-                await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                 {
                     //download to temp file
                     HttpClientNetworkHandler handler = new HttpClientNetworkHandler();
@@ -510,7 +511,7 @@ namespace DnsServerCore.Dns.Applications
 
         public async Task<DnsApplication> DownloadAndUpdateAppAsync(string applicationName, Uri uri)
         {
-            string tmpFile = Path.GetTempFileName();
+            string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             try
             {
                 await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))

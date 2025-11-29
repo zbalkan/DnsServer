@@ -42,6 +42,7 @@ namespace DnsServerCore
             #region variables
 
             readonly DnsWebService _dnsWebService;
+            const int BufferSize = 4096;
 
             #endregion
 
@@ -385,10 +386,10 @@ namespace DnsServerCore
                 DateTime ifModifiedSince = string.IsNullOrEmpty(ifModifiedSinceValue) ? DateTime.UnixEpoch : DateTime.ParseExact(ifModifiedSinceValue, "R", CultureInfo.InvariantCulture);
                 string[] includeZones = string.IsNullOrEmpty(includeZonesValue) ? null : includeZonesValue.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
-                string tmpFile = Path.GetTempFileName();
+                string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 try
                 {
-                    await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                    await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                     {
                         //create config zip file
                         await _dnsWebService._clusterManager.TransferConfigAsync(configZipStream, ifModifiedSince, includeZones);
