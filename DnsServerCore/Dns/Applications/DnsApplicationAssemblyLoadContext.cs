@@ -224,7 +224,7 @@ namespace DnsServerCore.Dns.Applications
 
             using (FileStream srcFile = new FileStream(dllFile, FileMode.Open, FileAccess.Read, FileShare.None, BufferSize, FileOptions.None))
             {
-                using (FileStream dstFile = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None, BufferSize, FileOptions.None))
+                using (FileStream dstFile = new FileStream(tempPath, FileMode.CreateNew, FileAccess.Write, FileShare.None, BufferSize, FileOptions.None))
                 {
                     srcFile.CopyTo(dstFile);
                 }

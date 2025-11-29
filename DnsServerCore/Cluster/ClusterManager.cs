@@ -1607,7 +1607,7 @@ namespace DnsServerCore.Cluster
             string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             try
             {
-                await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
+                await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                 {
                     //get config from primary node
                     (Stream, DateTime) response = await primaryNodeApiClient.TransferConfigFromPrimaryNodeAsync(_configLastSynced, includeZones, cancellationToken);

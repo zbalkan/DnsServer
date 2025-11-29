@@ -475,7 +475,7 @@ namespace DnsServerCore.Dns.Applications
             string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             try
             {
-                await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
+                await using (FileStream fS = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                 {
                     //download to temp file
                     HttpClientNetworkHandler handler = new HttpClientNetworkHandler();
@@ -514,7 +514,7 @@ namespace DnsServerCore.Dns.Applications
             string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
             try
             {
-                await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                await using (FileStream fS = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.ReadWrite))
                 {
                     //download to temp file
                     HttpClientNetworkHandler handler = new HttpClientNetworkHandler();

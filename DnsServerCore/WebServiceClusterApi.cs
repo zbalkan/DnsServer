@@ -389,7 +389,7 @@ namespace DnsServerCore
                 string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 try
                 {
-                    await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
+                    await using (FileStream configZipStream = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                     {
                         //create config zip file
                         await _dnsWebService._clusterManager.TransferConfigAsync(configZipStream, ifModifiedSince, includeZones);

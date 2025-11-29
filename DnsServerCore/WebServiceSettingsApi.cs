@@ -1640,7 +1640,7 @@ namespace DnsServerCore
                 string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                 try
                 {
-                    await using (FileStream backupZipStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
+                    await using (FileStream backupZipStream = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                     {
                         //create backup zip
                         await _dnsWebService.BackupConfigAsync(backupZipStream, authConfig, clusterConfig, webServiceSettings, dnsSettings, logSettings, zones, allowedZones, blockedZones, blockLists, apps, scopes, stats, logs);
@@ -1712,7 +1712,7 @@ namespace DnsServerCore
                     string tmpFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
                     try
                     {
-                        await using (FileStream fS = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite))
+                        await using (FileStream fS = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.ReadWrite))
                         {
                             await request.Form.Files[0].CopyToAsync(fS);
 

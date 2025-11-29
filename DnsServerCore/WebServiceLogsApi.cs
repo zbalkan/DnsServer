@@ -326,7 +326,7 @@ namespace DnsServerCore
 
                 try
                 {
-                    using (FileStream csvFileStream = new FileStream(tmpFile, FileMode.Create, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
+                    using (FileStream csvFileStream = new FileStream(tmpFile, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None, BufferSize, FileOptions.DeleteOnClose))
                     {
                         StreamWriter sW = new StreamWriter(csvFileStream, Encoding.UTF8);
 
