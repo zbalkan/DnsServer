@@ -15,7 +15,7 @@ namespace DnsSentinelApp
                 return 0;
             }
 
-            System.Collections.Generic.Dictionary<char, int> characterCounts = text.GroupBy(c => c)
+            Dictionary<char, int> characterCounts = text.GroupBy(c => c)
                                       .ToDictionary(g => g.Key, g => g.Count());
 
             double entropy = characterCounts.Values.Sum(count =>
@@ -60,6 +60,7 @@ namespace DnsSentinelApp
                 StdDev = 0;
             }
         }
+
         public static IatStat CalculateIatStats(List<DateTime> timestamps)
         {
             if (timestamps.Count < 2) return default;
@@ -70,7 +71,7 @@ namespace DnsSentinelApp
                 iatMilliseconds.Add((timestamps[i] - timestamps[i - 1]).TotalMilliseconds);
             }
 
-            if (!iatMilliseconds.Any()) return default;
+            if (iatMilliseconds.Count == 0) return default;
 
             double avg = iatMilliseconds.Average();
             double sumOfSquares = iatMilliseconds.Sum(val => (val - avg) * (val - avg));

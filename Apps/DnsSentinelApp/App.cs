@@ -1,6 +1,7 @@
 ﻿/*
 Technitium DNS Server
 Copyright (C) 2024  Shreyas Zare (shreyas@technitium.com)
+Copyright (C) 20245 Zafer Balkan (zafer@zaferbalkan.com)
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,11 +18,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
-using DnsSentinelApp;
+using DnsSentinelApp.Anomaly;
+using DnsSentinelApp.Service;
 using DnsServerCore.ApplicationCommon;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -31,39 +34,42 @@ using System.Threading;
 using System.Threading.Tasks;
 using TechnitiumLibrary.Net.Dns;
 
-namespace AdvancedBlocking
+namespace DnsSentinelApp
 {
     public sealed class App : IDnsApplication
     {
-        #region Variables
+        #region variables
 
-        private IDnsServer _dnsServer;
-        private AppConfig _config;
-        private AppState _appState;
-        private string _stateFilePath;
+        IDnsServer _dnsServer;
+        Config _config;
+        AppState _appState;
+        string _stateFilePath;
 
         // --- Services ---
-        private IRepository _repository;
 
-        private IAnomalyDetectionService _mlService;
-        private IBlocklistManager _blocklistManager;
-        private ThreatClassifier _threatClassifier;
+        IAnomalyDetectionService _mlService;
+        IBlocklistManager _blocklistManager;
+        ThreatClassifier _threatClassifier;
 
         // --- Real-Time State ---
-        private ConcurrentDictionary<IPAddress, ClientProfile> _activeProfiles;
+        ConcurrentDictionary<IPAddress, ClientProfile> _activeProfiles;
 
-        private CancellationTokenSource _appShutdownCts;
+        CancellationTokenSource _appShutdownCts;
 
-        #endregion Variables
+        readonly JsonSerializerOptions _jsonSerializerOptions = new JsonSerializerOptions() { WriteIndented = true, Converters = { new JsonStringEnumConverter() } };
 
-        #region IDnsApplication Implementation
+        #endregion variables
+
+        #region public
 
         public string Description => "A real-time DNS anomaly detection engine with a permanent blocking policy.";
 
         public async Task InitializeAsync(IDnsServer dnsServer, string configJson)
         {
             _dnsServer = dnsServer;
-            _config = JsonSerializer.Deserialize<AppConfig>(configJson, new JsonSerializerOptions { PropertyNameCaseInsensitive = true, Converters = { new JsonStringEnumConverter() } });
+
+            _config = ParseConfig(configJson);
+
             _activeProfiles = new ConcurrentDictionary<IPAddress, ClientProfile>();
 
             string appFolder = _dnsServer.ApplicationFolder;
@@ -75,7 +81,7 @@ namespace AdvancedBlocking
             _repository = new SqliteRepository(Path.Combine(appFolder, "sentinel_data.db"));
             await _repository.InitializeAsync();
 
-            _mlService = new IsolationForestService(Path.Combine(appFolder, "dns_anomaly_model.zip"));
+            _mlService = new RandomizedPcaService(Path.Combine(appFolder, "dns_anomaly_model.zip"));
             _mlService.LoadModel();
 
             _blocklistManager = new FileBlocklistManager(appFolder);
@@ -85,7 +91,7 @@ namespace AdvancedBlocking
 
             // --- Start Background Planes ---
             _appShutdownCts = new CancellationTokenSource();
-            if (_appState.CurrentPhase == "Active")
+            if (_appState.CurrentPhase == AppPhase.Active)
             {
                 // If we are already active, start all planes immediately.
                 _ = StartAnalysisPlaneAsync(_appShutdownCts.Token);
@@ -98,6 +104,22 @@ namespace AdvancedBlocking
             }
 
             _dnsServer.WriteLog("DnsSentinelApp: Initialization complete. All three operational planes are active.");
+        }
+
+        private Config ParseConfig(string configJson)
+        {
+            Config cfg = JsonSerializer.Deserialize<Config>(configJson, _jsonSerializerOptions)
+                     ?? throw new InvalidOperationException("Failed to deserialize configuration.");
+            try
+            {
+                cfg.Validate();
+            }
+            catch (ValidationException vex)
+            {
+                _dnsServer.WriteLog($"Configuration error: {vex.Message}");
+                throw;
+            }
+            return cfg;
         }
 
         public Task<DnsDatagram> ProcessRequestAsync(DnsDatagram request, IPEndPoint remoteEP)
@@ -125,6 +147,9 @@ namespace AdvancedBlocking
 
             return Task.FromResult<DnsDatagram>(null);
         }
+        #endregion public
+
+        #region IDisposable
 
         public void Dispose()
         {
@@ -133,10 +158,9 @@ namespace AdvancedBlocking
             _repository?.Dispose();
             _mlService?.Dispose();
         }
+        #endregion IDisposable
 
-        #endregion IDnsApplication Implementation
-
-        #region Background Planes & Core Logic
+        #region private
 
         // The implementation of the background planes (StartAnalysisPlaneAsync, StartTrainingPlaneAsync)
         // and the core logic methods (CollectAndAnalyzeProfilesAsync, RetrainModelAsync)
@@ -187,17 +211,17 @@ namespace AdvancedBlocking
             {
                 _appState = new AppState
                 {
-                    CurrentPhase = "Bootstrapping",
+                    CurrentPhase = AppPhase.Bootstrapping,
                     BootstrapStartTimeUtc = DateTime.UtcNow
                 };
                 await SaveStateAsync();
             }
         }
 
-        private async Task SaveStateAsync()
+        private Task SaveStateAsync()
         {
-            string json = JsonSerializer.Serialize(_appState, new JsonSerializerOptions { WriteIndented = true });
-            await File.WriteAllTextAsync(_stateFilePath, json);
+            string json = JsonSerializer.Serialize(_appState, _jsonSerializerOptions);
+            return File.WriteAllTextAsync(_stateFilePath, json);
         }
 
         private async Task StartLifecycleManagerAsync(CancellationToken cancellationToken)
@@ -205,13 +229,13 @@ namespace AdvancedBlocking
             // This loop manages the transition from Bootstrapping -> Training -> Active
             while (!cancellationToken.IsCancellationRequested)
             {
-                if (_appState.CurrentPhase == "Bootstrapping")
+                if (_appState.CurrentPhase == AppPhase.Bootstrapping)
                 {
                     TimeSpan elapsedTime = DateTime.UtcNow - _appState.BootstrapStartTimeUtc;
                     if (elapsedTime >= TimeSpan.FromDays(_config.InitialTrainingPeriodDays))
                     {
                         _dnsServer.WriteLog("DnsSentinelApp: Initial training period complete. Transitioning to Training phase.");
-                        _appState.CurrentPhase = "Training";
+                        _appState.CurrentPhase = AppPhase.Training;
                         await SaveStateAsync();
 
                         // Trigger the first training immediately
@@ -219,7 +243,7 @@ namespace AdvancedBlocking
 
                         // Now transition to Active
                         _dnsServer.WriteLog("DnsSentinelApp: Initial training complete. Transitioning to Active phase.");
-                        _appState.CurrentPhase = "Active";
+                        _appState.CurrentPhase = AppPhase.Active;
                         await SaveStateAsync();
 
                         // Start the normal operational planes and exit this manager.
@@ -253,7 +277,7 @@ namespace AdvancedBlocking
                     DnsThreatAlert alert = _threatClassifier.Classify(prediction, behavioralData, kvp.Value.GetIocEvidence());
                     if (alert != null)
                     {
-                        string alertJson = JsonSerializer.Serialize(alert, new JsonSerializerOptions { WriteIndented = true });
+                        string alertJson = JsonSerializer.Serialize(alert, _jsonSerializerOptions);
                         _dnsServer.WriteLog(alertJson);
 
                         if (alert.ActionTaken == PolicyAction.Block)
@@ -264,7 +288,7 @@ namespace AdvancedBlocking
                 }
             }
 
-            if (behavioralDataList.Any())
+            if (behavioralDataList.Count != 0)
             {
                 await _repository.SaveBehavioralDataAsync(behavioralDataList);
             }
@@ -287,6 +311,6 @@ namespace AdvancedBlocking
             _dnsServer.WriteLog("DnsSentinelApp: Training Plane cycle complete. A new model has been deployed.");
         }
 
-        #endregion Background Planes & Core Logic
+        #endregion private
     }
 }
