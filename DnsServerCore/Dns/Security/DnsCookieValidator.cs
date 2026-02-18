@@ -30,7 +30,7 @@ namespace DnsServerCore.Dns.Security
         #region variables
 
         readonly DnsCookieSecretManager _secretManager;
-        const int SERVER_COOKIE_LENGTH = 16; // RFC 9018 recommends 16 bytes
+        // RFC 9018 server cookie structure: Version(1) + Reserved(1) + Timestamp(4) + Hash(8) = 14 bytes
 
         #endregion
 
