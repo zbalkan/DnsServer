@@ -1,0 +1,229 @@
+diff --git a/TechnitiumLibrary.Net/Dns/EDnsOptions/EDnsCookieOptionData.cs b/TechnitiumLibrary.Net/Dns/EDnsOptions/EDnsCookieOptionData.cs
+new file mode 100644
+index 0000000..690d09f
+--- /dev/null
++++ b/TechnitiumLibrary.Net/Dns/EDnsOptions/EDnsCookieOptionData.cs
+@@ -0,0 +1,208 @@
++/*
++Technitium Library
++Copyright (C) 2025  Shreyas Zare (shreyas@technitium.com)
++
++This program is free software: you can redistribute it and/or modify
++it under the terms of the GNU General Public License as published by
++the Free Software Foundation, either version 3 of the License, or
++(at your option) any later version.
++
++This program is distributed in the hope that it will be useful,
++but WITHOUT ANY WARRANTY; without even the implied warranty of
++MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++GNU General Public License for more details.
++
++You should have received a copy of the GNU General Public License
++along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++*/
++
++using System;
++using System.IO;
++using System.Text.Json;
++
++namespace TechnitiumLibrary.Net.Dns.EDnsOptions
++{
++    // DNS Cookies
++    // https://datatracker.ietf.org/doc/html/rfc7873
++    // https://datatracker.ietf.org/doc/html/rfc9018
++
++    public class EDnsCookieOptionData : EDnsOptionData
++    {
++        #region variables
++
++        byte[] _clientCookie;
++        byte[] _serverCookie;
++
++        #endregion
++
++        #region constructor
++
++        public EDnsCookieOptionData(byte[] clientCookie, byte[] serverCookie = null)
++        {
++            if (clientCookie is null)
++                throw new ArgumentNullException(nameof(clientCookie));
++
++            if (clientCookie.Length != 8)
++                throw new ArgumentException("Client cookie must be exactly 8 bytes.", nameof(clientCookie));
++
++            if (serverCookie is not null)
++            {
++                if (serverCookie.Length < 8 || serverCookie.Length > 32)
++                    throw new ArgumentException("Server cookie must be between 8 and 32 bytes.", nameof(serverCookie));
++            }
++
++            _clientCookie = clientCookie;
++            _serverCookie = serverCookie;
++        }
++
++        public EDnsCookieOptionData(Stream s)
++            : base(s)
++        { }
++
++        #endregion
++
++        #region protected
++
++        protected override void ReadOptionData(Stream s)
++        {
++            if (_length < 8)
++                throw new InvalidDataException("DNS Cookie option data must be at least 8 bytes.");
++
++            if (_length > 40)
++                throw new InvalidDataException("DNS Cookie option data must not exceed 40 bytes (8 bytes client cookie + 32 bytes server cookie).");
++
++            // Read client cookie (first 8 bytes)
++            _clientCookie = new byte[8];
++            s.ReadExactly(_clientCookie);
++
++            // Read server cookie if present (remaining bytes)
++            int serverCookieLength = _length - 8;
++            if (serverCookieLength > 0)
++            {
++                if (serverCookieLength < 8 || serverCookieLength > 32)
++                    throw new InvalidDataException("Server cookie must be between 8 and 32 bytes.");
++
++                _serverCookie = new byte[serverCookieLength];
++                s.ReadExactly(_serverCookie);
++            }
++        }
++
++        protected override void WriteOptionData(Stream s)
++        {
++            // Write client cookie (8 bytes)
++            s.Write(_clientCookie);
++
++            // Write server cookie if present
++            if (_serverCookie is not null)
++                s.Write(_serverCookie);
++        }
++
++        #endregion
++
++        #region public
++
++        public override bool Equals(object obj)
++        {
++            if (obj is null)
++                return false;
++
++            if (ReferenceEquals(this, obj))
++                return true;
++
++            if (obj is EDnsCookieOptionData other)
++            {
++                if (!CompareBytes(_clientCookie, other._clientCookie))
++                    return false;
++
++                if (!CompareBytes(_serverCookie, other._serverCookie))
++                    return false;
++
++                return true;
++            }
++
++            return false;
++        }
++
++        public override int GetHashCode()
++        {
++            HashCode hashCode = new HashCode();
++            
++            if (_clientCookie is not null)
++            {
++                foreach (byte b in _clientCookie)
++                    hashCode.Add(b);
++            }
++
++            if (_serverCookie is not null)
++            {
++                foreach (byte b in _serverCookie)
++                    hashCode.Add(b);
++            }
++
++            return hashCode.ToHashCode();
++        }
++
++        public override string ToString()
++        {
++            string clientCookieHex = BitConverter.ToString(_clientCookie).Replace("-", "");
++            
++            if (_serverCookie is null)
++                return "[Client Cookie: " + clientCookieHex + "]";
++            
++            string serverCookieHex = BitConverter.ToString(_serverCookie).Replace("-", "");
++            return "[Client Cookie: " + clientCookieHex + ", Server Cookie: " + serverCookieHex + "]";
++        }
++
++        public override void SerializeTo(Utf8JsonWriter jsonWriter)
++        {
++            jsonWriter.WriteStartObject();
++
++            jsonWriter.WriteString("ClientCookie", BitConverter.ToString(_clientCookie).Replace("-", ""));
++
++            if (_serverCookie is not null)
++                jsonWriter.WriteString("ServerCookie", BitConverter.ToString(_serverCookie).Replace("-", ""));
++
++            jsonWriter.WriteEndObject();
++        }
++
++        #endregion
++
++        #region private
++
++        private static bool CompareBytes(byte[] a, byte[] b)
++        {
++            if (a is null && b is null)
++                return true;
++
++            if (a is null || b is null)
++                return false;
++
++            if (a.Length != b.Length)
++                return false;
++
++            for (int i = 0; i < a.Length; i++)
++            {
++                if (a[i] != b[i])
++                    return false;
++            }
++
++            return true;
++        }
++
++        #endregion
++
++        #region properties
++
++        public byte[] ClientCookie
++        { get { return _clientCookie; } }
++
++        public byte[] ServerCookie
++        { get { return _serverCookie; } }
++
++        public override int UncompressedLength
++        { get { return 8 + (_serverCookie is null ? 0 : _serverCookie.Length); } }
++
++        #endregion
++    }
++}
+diff --git a/TechnitiumLibrary.Net/Dns/EDnsOptions/EDnsOption.cs b/TechnitiumLibrary.Net/Dns/EDnsOptions/EDnsOption.cs
+index e22b7d5..bd62665 100644
+--- a/TechnitiumLibrary.Net/Dns/EDnsOptions/EDnsOption.cs
++++ b/TechnitiumLibrary.Net/Dns/EDnsOptions/EDnsOption.cs
+@@ -74,6 +74,10 @@ namespace TechnitiumLibrary.Net.Dns.EDnsOptions
+                     _data = new EDnsClientSubnetOptionData(s);
+                     break;
+ 
++                case EDnsOptionCode.COOKIE:
++                    _data = new EDnsCookieOptionData(s);
++                    break;
++
+                 case EDnsOptionCode.EXTENDED_DNS_ERROR:
+                     _data = new EDnsExtendedDnsErrorOptionData(s);
+                     break;
