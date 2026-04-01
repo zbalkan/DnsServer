@@ -1,0 +1,68 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mb-3" />
+
+        <MudText Typo="Typo.caption" Class="mb-1">Members</MudText>
+        <MudTextField @bind-Value="_members" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Lines="6"
+                      HelperText="One username per line" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="SaveAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Save
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public GroupInfo Group { get; set; } = null!;
+
+    private string  _description = string.Empty;
+    private string  _members     = string.Empty;
+    private string? _error;
+    private bool    _busy;
+
+    protected override void OnParametersSet()
+    {
+        _description = Group.Description ?? string.Empty;
+        _members     = string.Join("\n", Group.Members ?? []);
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        var memberList = _members
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToList();
+
+        var form = new Dictionary<string, string>
+        {
+            ["group"]       = Group.Name ?? "",
+            ["description"] = _description,
+            ["members"]     = string.Join(",", memberList),
+        };
+        var result = await Api.PostAsync<object>("api/user/group/update", form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("Group updated.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

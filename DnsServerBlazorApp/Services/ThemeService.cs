@@ -1,0 +1,80 @@
+using DnsServerBlazorApp.Styles;
+using Microsoft.JSInterop;
+using MudBlazor;
+
+namespace DnsServerBlazorApp.Services;
+
+/// <summary>
+/// Manages dark/light theme toggling, mirroring the original
+/// <c>toggleTheme()</c> / <c>applyTheme()</c> functions from main.js.
+/// Theme preference is stored in localStorage under the key "theme".
+/// </summary>
+public sealed class ThemeService
+{
+    private const string StorageKey = "theme";
+    private const string DarkValue  = "dark";
+
+    private readonly IJSRuntime _js;
+
+    public ThemeService(IJSRuntime js) => _js = js;
+
+    // ── State ─────────────────────────────────────────────────────────
+
+    public MudTheme  Theme     { get; } = DnsStyling.BuildTheme();
+    public bool      IsDarkMode { get; private set; }
+
+    public event Action? OnChange;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────
+
+    /// <summary>Restore theme from localStorage on first render.</summary>
+    public async Task InitAsync()
+    {
+        try
+        {
+            var stored = await _js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
+            IsDarkMode = stored == DarkValue;
+            await ApplyBodyClassAsync();
+        }
+        catch { /* SSR / pre-render guard */ }
+    }
+
+    /// <summary>Toggle between dark and light mode (mirrors original JS).</summary>
+    public async Task ToggleAsync()
+    {
+        IsDarkMode = !IsDarkMode;
+        await PersistAsync();
+        await ApplyBodyClassAsync();
+        OnChange?.Invoke();
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+
+    private async Task PersistAsync()
+    {
+        try
+        {
+            var value = IsDarkMode ? DarkValue : "light";
+            await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, value);
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// The original CSS uses body.dark-mode class for overrides.
+    /// We keep that so any remaining CSS rules continue to apply.
+    /// </summary>
+    private async Task ApplyBodyClassAsync()
+    {
+        try
+        {
+            if (IsDarkMode)
+                await _js.InvokeVoidAsync("eval",
+                    "document.body.classList.add('dark-mode')");
+            else
+                await _js.InvokeVoidAsync("eval",
+                    "document.body.classList.remove('dark-mode')");
+        }
+        catch { /* best-effort */ }
+    }
+}

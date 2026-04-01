@@ -1,0 +1,64 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+        <MudTextField @bind-Value="_username" Label="Username" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mb-2" />
+        <MudTextField @bind-Value="_displayName" Label="Display Name" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mb-2" />
+        <MudTextField @bind-Value="_password" Label="Password" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" InputType="InputType.Password" Class="mb-2" />
+        <MudTextField @bind-Value="_confirm" Label="Confirm Password" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" InputType="InputType.Password"
+                      OnKeyUp="@(e => { if(e.Key=="Enter") _ = SaveAsync(); })" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="SaveAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string  _username    = string.Empty;
+    private string  _displayName = string.Empty;
+    private string  _password    = string.Empty;
+    private string  _confirm     = string.Empty;
+    private string? _error;
+    private bool    _busy;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_username)) { _error = "Username required."; return; }
+        if (_password != _confirm) { _error = "Passwords do not match."; return; }
+
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["user"]        = _username,
+            ["displayName"] = _displayName,
+            ["pass"]        = _password,
+        };
+        var result = await Api.PostAsync<object>("api/user/create", form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add($"User '{_username}' created.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

@@ -1,0 +1,208 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject IDialogService DialogService
+@inject ISnackbar      Snackbar
+
+@if (_editingZone is null)
+{
+    @* ── Zone list view ── *@
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+        <MudTextField @bind-Value="_search" Label="Search zones" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Style="max-width:300px;"
+                      Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                      Immediate="true" DebounceInterval="300"
+                      OnDebounceIntervalElapsed="@(() => _page = 1)" />
+
+        <MudSelect T="string" @bind-Value="_typeFilter" Label="Type" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" Style="max-width:180px;">
+            <MudSelectItem Value="@("")">All Types</MudSelectItem>
+            @foreach (var t in _zoneTypes)
+            { <MudSelectItem Value="@t">@t</MudSelectItem> }
+        </MudSelect>
+
+        <ClusterNodeSelect @bind-Value="_node" ValueChanged="@((_) => _ = LoadZonesAsync())" />
+
+        <MudSpacer />
+
+        @if (SessionService.CanModify("Zones"))
+        {
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       StartIcon="@Icons.Material.Filled.Add"
+                       OnClick="AddZoneAsync">Add Zone</MudButton>
+        }
+    </div>
+
+    @if (_loading)
+    {
+        <div style="display:flex;justify-content:center;padding:60px;">
+            <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+        </div>
+    }
+    else
+    {
+        <MudTable Items="@PagedZones" Dense="true" Hover="true" Elevation="1"
+                  FixedHeader="true" Height="calc(100vh - 260px)">
+            <HeaderContent>
+                <MudTh><MudTableSortLabel SortBy="new Func<ZoneInfo,object>(z=>z.Name)">Zone</MudTableSortLabel></MudTh>
+                <MudTh>Type</MudTh>
+                <MudTh>Status</MudTh>
+                <MudTh Style="text-align:right">Records</MudTh>
+                <MudTh></MudTh>
+            </HeaderContent>
+            <RowTemplate>
+                <MudTd DataLabel="Zone">
+                    <MudLink OnClick="@(() => OpenEditZone(context))" Style="cursor:pointer">
+                        @context.Name
+                    </MudLink>
+                </MudTd>
+                <MudTd DataLabel="Type">
+                    <MudChip T="string" Size="Size.Small"
+                             Color="@DnsStyling.ZoneTypeColor(context.Type)"
+                             Variant="Variant.Filled">@context.Type</MudChip>
+                </MudTd>
+                <MudTd DataLabel="Status">
+                    @if (context.Disabled)
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Disabled</MudChip>
+                    }
+                    else
+                    {
+                        <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Enabled</MudChip>
+                    }
+                </MudTd>
+                <MudTd DataLabel="Records" Style="text-align:right">@context.DnssecStatus</MudTd>
+                <MudTd Style="text-align:right">
+                    <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                   OnClick="@(() => OpenEditZone(context))"
+                                   Title="Edit zone" />
+                    @if (SessionService.CanModify("Zones"))
+                    {
+                        <MudIconButton Icon="@(context.Disabled ? Icons.Material.Filled.PlayArrow : Icons.Material.Filled.Pause)"
+                                       Size="Size.Small"
+                                       OnClick="@(() => ToggleZoneAsync(context))"
+                                       Title="@(context.Disabled ? "Enable" : "Disable")" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                       Color="Color.Error"
+                                       OnClick="@(() => DeleteZoneAsync(context))"
+                                       Title="Delete zone" />
+                    }
+                </MudTd>
+            </RowTemplate>
+        </MudTable>
+
+        @* Pagination *@
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;flex-wrap:wrap;gap:8px;">
+            <MudText Typo="Typo.caption">
+                @_filtered.Count zone(s)
+                @if (!string.IsNullOrEmpty(_search) || !string.IsNullOrEmpty(_typeFilter))
+                { <span> (filtered from @_zones.Count)</span> }
+            </MudText>
+            <MudPagination Count="@PageCount" @bind-Selected="_page"
+                           BoundaryCount="1" MiddleCount="5" />
+        </div>
+    }
+}
+else
+{
+    @* ── Edit zone view (inline) ── *@
+    <EditZoneView Zone="@_editingZone" Node="@_node"
+                  OnClose="@CloseEditZone" />
+}
+
+@code {
+    private static readonly string[] _zoneTypes =
+        ["Primary", "Secondary", "Stub", "Forwarder", "SecondaryForwarder",
+         "SecondaryRoot", "SecondaryCatalog", "Internal", "Catalog"];
+
+    private string       _search     = string.Empty;
+    private string       _typeFilter = string.Empty;
+    private string       _node       = "cluster";
+    private bool         _loading    = true;
+    private int          _page       = 1;
+    private const int    _pageSize   = 25;
+
+    private List<ZoneInfo> _zones    = [];
+    private ZoneInfo?      _editingZone;
+
+    private List<ZoneInfo> _filtered => _zones
+        .Where(z => (string.IsNullOrEmpty(_search) ||
+                     z.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)) &&
+                    (string.IsNullOrEmpty(_typeFilter) || z.Type == _typeFilter))
+        .ToList();
+
+    private IEnumerable<ZoneInfo> PagedZones =>
+        _filtered.Skip((_page - 1) * _pageSize).Take(_pageSize);
+
+    private int PageCount => Math.Max(1, (int)Math.Ceiling(_filtered.Count / (double)_pageSize));
+
+    protected override async Task OnInitializedAsync() => await LoadZonesAsync();
+
+    private async Task LoadZonesAsync()
+    {
+        _loading = true;
+        var result = await Api.GetAsync<ZoneListResponse>(
+            $"api/zones/list?node={Uri.EscapeDataString(_node)}");
+        _loading = false;
+
+        if (result.IsOk && result.Data?.Zones is { } list)
+            _zones = list;
+        else if (result.IsInvalidToken)
+            await (Task)typeof(SessionService).GetMethod("ClearSessionAsync")!.Invoke(SessionService, null)!;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private void OpenEditZone(ZoneInfo zone) => _editingZone = zone;
+    private async Task CloseEditZone() { _editingZone = null; await LoadZonesAsync(); }
+
+    private async Task AddZoneAsync()
+    {
+        var result = await DialogService.ShowAsync<Dialogs.AddZoneDialog>("Add Zone",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await result.Result;
+        if (r is { Canceled: false })
+            await LoadZonesAsync();
+    }
+
+    private async Task ToggleZoneAsync(ZoneInfo zone)
+    {
+        var action = zone.Disabled ? "enable" : "disable";
+        var form = new Dictionary<string, string>
+        {
+            ["zone"] = zone.Name,
+            ["node"] = _node,
+        };
+        var url = $"api/zones/{action}";
+        var res = zone.Disabled
+            ? await Api.PostAsync<object>(url, form)
+            : await Api.PostAsync<object>(url, form);
+
+        if (res.IsOk)
+        {
+            zone.Disabled = !zone.Disabled;
+            Snackbar.Add($"Zone '{zone.Name}' {action}d.", Severity.Success);
+            StateHasChanged();
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task DeleteZoneAsync(ZoneInfo zone)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Delete Zone",
+            $"Delete zone '{zone.Name}'? This cannot be undone.",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirm is not true) return;
+
+        var form = new Dictionary<string, string> { ["zone"] = zone.Name, ["node"] = _node };
+        var res = await Api.PostAsync<object>("api/zones/delete", form);
+        if (res.IsOk)
+        {
+            _zones.Remove(zone);
+            Snackbar.Add($"Zone '{zone.Name}' deleted.", Severity.Success);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+}

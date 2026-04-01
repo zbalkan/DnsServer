@@ -1,0 +1,259 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject IDialogService DialogService
+@inject ISnackbar      Snackbar
+
+<MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
+         PanelClass="pt-2" SliderColor="Color.Primary">
+
+    @* ── Leases ── *@
+    <MudTabPanel Text="Leases">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+            <MudTextField @bind-Value="_leaseSearch" Label="Filter" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Style="max-width:260px;"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" />
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                           OnClick="LoadLeasesAsync" Title="Refresh" />
+        </div>
+
+        @if (_loadingLeases)
+        {
+            <div style="display:flex;justify-content:center;padding:40px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@FilteredLeases" Dense="true" Hover="true" Elevation="1"
+                      FixedHeader="true" Height="calc(100vh - 300px)">
+                <HeaderContent>
+                    <MudTh>Client IP</MudTh>
+                    <MudTh>Hostname</MudTh>
+                    <MudTh>MAC Address</MudTh>
+                    <MudTh>Scope</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Expires</MudTh>
+                    @if (SessionService.CanModify("DhcpServer"))
+                    { <MudTh></MudTh> }
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="IP">@context.Address</MudTd>
+                    <MudTd DataLabel="Hostname">@context.HostName</MudTd>
+                    <MudTd DataLabel="MAC">@context.HardwareAddress</MudTd>
+                    <MudTd DataLabel="Scope">@context.Scope</MudTd>
+                    <MudTd DataLabel="Type">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(context.Type=="Reserved" ? Color.Info : Color.Default)"
+                                 Variant="Variant.Outlined">@context.Type</MudChip>
+                    </MudTd>
+                    <MudTd DataLabel="Expires">
+                        @context.LeaseObtained.ToLocalTime().ToString("g")
+                    </MudTd>
+                    @if (SessionService.CanModify("DhcpServer"))
+                    {
+                        <MudTd Style="text-align:right;">
+                            <MudIconButton Icon="@Icons.Material.Filled.BookmarkAdd" Size="Size.Small"
+                                           Title="Convert to reservation"
+                                           OnClick="@(() => ConvertLeaseAsync(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error" Title="Remove lease"
+                                           OnClick="@(() => RemoveLeaseAsync(context))" />
+                        </MudTd>
+                    }
+                </RowTemplate>
+            </MudTable>
+            <MudText Typo="Typo.caption" Class="mt-1">@FilteredLeases.Count() lease(s)</MudText>
+        }
+    </MudTabPanel>
+
+    @* ── Scopes ── *@
+    <MudTabPanel Text="Scopes">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <MudSpacer />
+            @if (SessionService.CanModify("DhcpServer"))
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.Add"
+                           OnClick="AddScopeAsync">Add Scope</MudButton>
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                           OnClick="LoadScopesAsync" Title="Refresh" />
+        </div>
+
+        @if (_loadingScopes)
+        {
+            <div style="display:flex;justify-content:center;padding:40px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@_scopes" Dense="true" Hover="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh>Network</MudTh>
+                    <MudTh>Range</MudTh>
+                    <MudTh>Status</MudTh>
+                    @if (SessionService.CanModify("DhcpServer"))
+                    { <MudTh></MudTh> }
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Network">@context.SubnetMask</MudTd>
+                    <MudTd DataLabel="Range">@context.StartingAddress – @context.EndingAddress</MudTd>
+                    <MudTd DataLabel="Status">
+                        @if (context.Enabled)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Active</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Disabled</MudChip>
+                        }
+                    </MudTd>
+                    @if (SessionService.CanModify("DhcpServer"))
+                    {
+                        <MudTd Style="text-align:right;">
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                           OnClick="@(() => EditScopeAsync(context))" />
+                            <MudIconButton Icon="@(context.Enabled ? Icons.Material.Filled.Pause : Icons.Material.Filled.PlayArrow)"
+                                           Size="Size.Small"
+                                           OnClick="@(() => ToggleScopeAsync(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteScopeAsync(context))" />
+                        </MudTd>
+                    }
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    // ── Leases ────────────────────────────────────────────────────────
+    private bool            _loadingLeases = true;
+    private string          _leaseSearch   = string.Empty;
+    private List<DhcpLease> _leases        = [];
+
+    private IEnumerable<DhcpLease> FilteredLeases => _leases
+        .Where(l => string.IsNullOrEmpty(_leaseSearch) ||
+                    (l.Address?.Contains(_leaseSearch, StringComparison.OrdinalIgnoreCase) == true) ||
+                    (l.HostName?.Contains(_leaseSearch, StringComparison.OrdinalIgnoreCase) == true) ||
+                    (l.HardwareAddress?.Contains(_leaseSearch, StringComparison.OrdinalIgnoreCase) == true));
+
+    // ── Scopes ────────────────────────────────────────────────────────
+    private bool             _loadingScopes = true;
+    private List<DhcpScope>  _scopes        = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadLeasesAsync(), LoadScopesAsync());
+    }
+
+    private async Task LoadLeasesAsync()
+    {
+        _loadingLeases = true;
+        var result = await Api.GetAsync<DhcpLeasesResponse>("api/dhcp/leases/list");
+        _loadingLeases = false;
+
+        if (result.IsOk && result.Data?.Leases is { } list)
+            _leases = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task LoadScopesAsync()
+    {
+        _loadingScopes = true;
+        var result = await Api.GetAsync<DhcpScopesResponse>("api/dhcp/scope/list");
+        _loadingScopes = false;
+
+        if (result.IsOk && result.Data?.Scopes is { } list)
+            _scopes = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task ConvertLeaseAsync(DhcpLease lease)
+    {
+        var form = new Dictionary<string, string>
+        {
+            ["clientIpAddress"] = lease.Address ?? "",
+            ["hostName"]        = lease.HostName ?? "",
+        };
+        var res = await Api.PostAsync<object>("api/dhcp/leases/convertToReservation", form);
+        if (res.IsOk)
+        {
+            Snackbar.Add("Lease converted to reservation.", Severity.Success);
+            await LoadLeasesAsync();
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task RemoveLeaseAsync(DhcpLease lease)
+    {
+        var form = new Dictionary<string, string> { ["clientIpAddress"] = lease.Address ?? "" };
+        var res = await Api.PostAsync<object>("api/dhcp/leases/remove", form);
+        if (res.IsOk)
+        {
+            _leases.Remove(lease);
+            Snackbar.Add("Lease removed.", Severity.Success);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task AddScopeAsync()
+    {
+        var d = await DialogService.ShowAsync<Dialogs.EditDhcpScopeDialog>("Add DHCP Scope",
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadScopesAsync();
+    }
+
+    private async Task EditScopeAsync(DhcpScope scope)
+    {
+        var p = new DialogParameters { ["Scope"] = scope };
+        var d = await DialogService.ShowAsync<Dialogs.EditDhcpScopeDialog>($"Edit Scope: {scope.Name}", p,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadScopesAsync();
+    }
+
+    private async Task ToggleScopeAsync(DhcpScope scope)
+    {
+        var action = scope.Enabled ? "disable" : "enable";
+        var form = new Dictionary<string, string> { ["name"] = scope.Name ?? "" };
+        var res = await Api.PostAsync<object>($"api/dhcp/scope/{action}", form);
+        if (res.IsOk)
+        {
+            scope.Enabled = !scope.Enabled;
+            Snackbar.Add($"Scope '{scope.Name}' {action}d.", Severity.Success);
+            StateHasChanged();
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task DeleteScopeAsync(DhcpScope scope)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Delete Scope", $"Delete scope '{scope.Name}'?",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirm is not true) return;
+
+        var form = new Dictionary<string, string> { ["name"] = scope.Name ?? "" };
+        var res = await Api.PostAsync<object>("api/dhcp/scope/delete", form);
+        if (res.IsOk)
+        {
+            _scopes.Remove(scope);
+            Snackbar.Add($"Scope '{scope.Name}' deleted.", Severity.Success);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+}

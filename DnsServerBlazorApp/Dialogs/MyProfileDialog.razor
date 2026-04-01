@@ -1,0 +1,65 @@
+@inject SessionService SessionService
+@inject ApiService     Api
+@inject ISnackbar      Snackbar
+
+<MudDialog>
+    <DialogContent>
+        <MudSimpleTable Dense="true" Hover="false" Bordered="false" Elevation="0">
+            <tbody>
+                <tr><td><strong>Username</strong></td><td>@SessionService.Username</td></tr>
+                <tr><td><strong>Display Name</strong></td><td>@SessionService.DisplayName</td></tr>
+                <tr><td><strong>2FA</strong></td><td>@(SessionService.TotpEnabled ? "Enabled" : "Disabled")</td></tr>
+            </tbody>
+        </MudSimpleTable>
+
+        @if (_saveError is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mt-2">@_saveError</MudAlert>
+        }
+
+        <MudDivider Class="my-3" />
+        <MudText Typo="Typo.caption">Update Display Name</MudText>
+        <div style="display:flex;gap:8px;align-items:flex-end;margin-top:4px;">
+            <MudTextField @bind-Value="_displayName" Label="Display Name"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1;" />
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
+                       Disabled="@_busy" OnClick="SaveDisplayNameAsync">Save</MudButton>
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string  _displayName = string.Empty;
+    private string? _saveError;
+    private bool    _busy;
+
+    protected override void OnInitialized()
+    {
+        _displayName = SessionService.DisplayName;
+    }
+
+    private async Task SaveDisplayNameAsync()
+    {
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["user"]        = SessionService.Username,
+            ["displayName"] = _displayName,
+        };
+        var result = await Api.PostAsync<object>("api/user/update", form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("Display name updated.", Severity.Success);
+            MudDialog.Close();
+        }
+        else
+            _saveError = result.DisplayError;
+    }
+}

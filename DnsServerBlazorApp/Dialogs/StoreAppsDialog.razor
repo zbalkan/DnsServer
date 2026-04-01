@@ -1,0 +1,111 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div style="display:flex;justify-content:center;padding:40px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+        else
+        {
+            <MudTextField @bind-Value="_search" Label="Search" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Class="mb-3"
+                          Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
+                          Immediate="true" />
+
+            <MudTable Items="@FilteredApps" Dense="true" Hover="true" Elevation="0"
+                      FixedHeader="true" Height="480px">
+                <HeaderContent>
+                    <MudTh>App</MudTh>
+                    <MudTh>Version</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="App">
+                        <div>
+                            <MudText Typo="Typo.body2"><strong>@context.Name</strong></MudText>
+                            @if (!string.IsNullOrEmpty(context.Description))
+                            {
+                                <MudText Typo="Typo.caption">@context.Description</MudText>
+                            }
+                        </div>
+                    </MudTd>
+                    <MudTd DataLabel="Version">@context.Version</MudTd>
+                    <MudTd Style="text-align:right;">
+                        <MudButton Size="Size.Small" Variant="Variant.Filled" Color="Color.Primary"
+                                   Disabled="@_installing.Contains(context.Name)"
+                                   OnClick="@(() => InstallAsync(context))">
+                            @if (_installing.Contains(context.Name))
+                            {
+                                <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-1" />
+                            }
+                            Install
+                        </MudButton>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="@(() => MudDialog.Close(_installed ? DialogResult.Ok(true) : DialogResult.Cancel()))">
+            Close
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string Node { get; set; } = "cluster";
+
+    private bool              _loading    = true;
+    private string?           _error;
+    private string            _search     = string.Empty;
+    private bool              _installed;
+    private List<StoreApp>    _apps       = [];
+    private HashSet<string>   _installing = [];
+
+    private IEnumerable<StoreApp> FilteredApps => string.IsNullOrEmpty(_search)
+        ? _apps
+        : _apps.Where(a => a.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                           (a.Description?.Contains(_search, StringComparison.OrdinalIgnoreCase) == true));
+
+    protected override async Task OnInitializedAsync()
+    {
+        var result = await Api.GetAsync<StoreAppsListResponse>(
+            $"api/apps/store/list?node={Uri.EscapeDataString(Node)}");
+        _loading = false;
+
+        if (result.IsOk && result.Data?.StoreApps is { } list)
+            _apps = list;
+        else
+            _error = result.DisplayError;
+    }
+
+    private async Task InstallAsync(StoreApp app)
+    {
+        _installing.Add(app.Name);
+        var form = new Dictionary<string, string>
+        {
+            ["name"] = app.Name,
+            ["url"]  = app.Url ?? string.Empty,
+            ["node"] = Node,
+        };
+        var result = await Api.PostAsync<object>("api/apps/downloadAndInstall", form);
+        _installing.Remove(app.Name);
+
+        if (result.IsOk)
+        {
+            _installed = true;
+            Snackbar.Add($"'{app.Name}' installed.", Severity.Success);
+        }
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+}

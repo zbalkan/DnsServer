@@ -1,0 +1,11 @@
+@* One item in the zone-stats row below the dashboard charts. *@
+
+<div class="dns-zone-stat-card" title="@Title">
+    <div class="zone-stat-number">@Value.ToString("N0")</div>
+    <div class="zone-stat-title">@Title</div>
+</div>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public long   Value { get; set; }
+}

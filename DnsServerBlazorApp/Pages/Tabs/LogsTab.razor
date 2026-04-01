@@ -1,0 +1,263 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject ISnackbar      Snackbar
+
+<MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
+         PanelClass="pt-2" SliderColor="Color.Primary">
+
+    @* ── Log Files tab ── *@
+    <MudTabPanel Text="Log Files">
+        <div style="display:flex;gap:12px;height:calc(100vh - 260px);">
+
+            @* Left: file list *@
+            <MudPaper Elevation="1" Style="width:260px;min-width:180px;display:flex;flex-direction:column;">
+                <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
+                    <MudText Typo="Typo.subtitle2" Style="flex:1">Log Files</MudText>
+                    @if (SessionService.CanModify("Logs"))
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small"
+                                       Color="Color.Error" Title="Delete all logs"
+                                       OnClick="DeleteAllLogsAsync" />
+                    }
+                    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                                   OnClick="LoadFileListAsync" Title="Refresh" />
+                </div>
+                <div style="overflow-y:auto;flex:1;">
+                    @if (_loadingFiles)
+                    {
+                        <div style="display:flex;justify-content:center;padding:20px;">
+                            <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                        </div>
+                    }
+                    else
+                    {
+                        @foreach (var f in _logFiles)
+                        {
+                            <div style="display:flex;align-items:center;padding:3px 8px;cursor:pointer;
+                                        background:@(_selectedFile == f.FileName ? "rgba(102,153,255,.15)" : "transparent");"
+                                 @onclick="@(() => SelectFileAsync(f.FileName))">
+                                <MudText Typo="Typo.body2" Style="flex:1;word-break:break-all;">@f.FileName</MudText>
+                                @if (SessionService.CanModify("Logs"))
+                                {
+                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                   Color="Color.Error"
+                                                   OnClick="@(() => DeleteLogAsync(f.FileName))" />
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+            </MudPaper>
+
+            @* Right: log viewer *@
+            <MudPaper Elevation="1" Style="flex:1;display:flex;flex-direction:column;min-width:0;">
+                <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
+                    <MudText Typo="Typo.subtitle2" Style="flex:1">@(_selectedFile ?? "Select a log file")</MudText>
+                    @if (_selectedFile is not null)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small"
+                                       Title="Download" OnClick="DownloadLog" />
+                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                                       Title="Reload" OnClick="@(() => SelectFileAsync(_selectedFile!))" />
+                    }
+                </div>
+                <div style="flex:1;overflow:auto;padding:8px;">
+                    @if (_loadingView)
+                    {
+                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                    }
+                    else if (!string.IsNullOrEmpty(_logText))
+                    {
+                        <pre style="font-family:monospace;font-size:11px;white-space:pre;margin:0;">@_logText</pre>
+                    }
+                </div>
+                @if (_logTotal > 0)
+                {
+                    <div style="border-top:1px solid rgba(0,0,0,.12);padding:4px 8px;display:flex;align-items:center;gap:8px;">
+                        <MudText Typo="Typo.caption">Lines @_logFrom–@_logTo of @_logTotal</MudText>
+                        <MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" Size="Size.Small"
+                                       Disabled="@(_logFrom <= 1)" OnClick="LogPagePrevAsync" />
+                        <MudIconButton Icon="@Icons.Material.Filled.NavigateNext" Size="Size.Small"
+                                       Disabled="@(_logTo >= _logTotal)" OnClick="LogPageNextAsync" />
+                    </div>
+                }
+            </MudPaper>
+        </div>
+    </MudTabPanel>
+
+    @* ── Query Logs tab ── *@
+    <MudTabPanel Text="Query Logs" @ref="_queryLogsPanel">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
+            <MudTextField @bind-Value="_qSearch" Label="Domain filter" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Style="max-width:280px;" />
+            <MudTextField @bind-Value="_qClient" Label="Client IP filter" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Style="max-width:200px;" />
+            <MudSelect T="string" @bind-Value="_qProtocol" Label="Protocol" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Style="max-width:120px;">
+                <MudSelectItem Value="@("")">All</MudSelectItem>
+                <MudSelectItem Value="@("UDP")">UDP</MudSelectItem>
+                <MudSelectItem Value="@("TCP")">TCP</MudSelectItem>
+                <MudSelectItem Value="@("HTTPS")">HTTPS</MudSelectItem>
+                <MudSelectItem Value="@("TLS")">TLS</MudSelectItem>
+                <MudSelectItem Value="@("QUIC")">QUIC</MudSelectItem>
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@_qLoading" OnClick="QueryLogsAsync">Search</MudButton>
+        </div>
+
+        @if (_qLoading)
+        {
+            <div style="display:flex;justify-content:center;padding:40px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_qLogs.Count > 0)
+        {
+            <MudTable Items="@_qLogs" Dense="true" Hover="true" Elevation="1"
+                      FixedHeader="true" Height="calc(100vh - 340px)">
+                <HeaderContent>
+                    <MudTh>Time</MudTh>
+                    <MudTh>Client</MudTh>
+                    <MudTh>Protocol</MudTh>
+                    <MudTh>Domain</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Response</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Time">@context.Timestamp.ToLocalTime().ToString("HH:mm:ss")</MudTd>
+                    <MudTd DataLabel="Client">@context.RemoteEndPoint</MudTd>
+                    <MudTd DataLabel="Protocol">@context.Protocol</MudTd>
+                    <MudTd DataLabel="Domain">@context.QuestionName</MudTd>
+                    <MudTd DataLabel="Type">@context.QuestionType</MudTd>
+                    <MudTd DataLabel="Response">
+                        <MudChip T="string" Size="Size.Small"
+                                 Color="@(context.Answer == "NOERROR" ? Color.Success : Color.Error)"
+                                 Variant="Variant.Filled">@context.Answer</MudChip>
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+</MudTabs>
+
+@code {
+    // ── Log files ──────────────────────────────────────────────────────
+    private bool          _loadingFiles = true;
+    private bool          _loadingView;
+    private string?       _selectedFile;
+    private List<LogFile> _logFiles     = [];
+    private string        _logText      = string.Empty;
+    private long          _logFrom, _logTo, _logTotal;
+    private const int     _logPageSize  = 500;
+
+    // ── Query logs ─────────────────────────────────────────────────────
+    private MudTabPanel? _queryLogsPanel;
+    private bool         _qLoading;
+    private string       _qSearch   = string.Empty;
+    private string       _qClient   = string.Empty;
+    private string       _qProtocol = string.Empty;
+    private List<QueryLogEntry> _qLogs = [];
+
+    protected override async Task OnInitializedAsync() => await LoadFileListAsync();
+
+    private async Task LoadFileListAsync()
+    {
+        _loadingFiles = true;
+        var result = await Api.GetAsync<LogFilesResponse>("api/log/list");
+        _loadingFiles = false;
+
+        if (result.IsOk && result.Data?.LogFiles is { } list)
+            _logFiles = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task SelectFileAsync(string fileName)
+    {
+        _selectedFile = fileName;
+        _logFrom = 1;
+        await LoadLogViewAsync();
+    }
+
+    private async Task LoadLogViewAsync()
+    {
+        if (_selectedFile is null) return;
+        _loadingView = true;
+        var url = $"api/log/view?fileName={Uri.EscapeDataString(_selectedFile)}" +
+                  $"&offset={_logFrom - 1}&limit={_logPageSize}";
+        var result = await Api.GetAsync<LogViewResponse>(url);
+        _loadingView = false;
+
+        if (result.IsOk && result.Data is not null)
+        {
+            _logText  = result.Data.Text ?? string.Empty;
+            _logTotal = result.Data.Total;
+            _logTo    = Math.Min(_logFrom + _logPageSize - 1, _logTotal);
+        }
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task LogPagePrevAsync()
+    {
+        _logFrom = Math.Max(1, _logFrom - _logPageSize);
+        await LoadLogViewAsync();
+    }
+
+    private async Task LogPageNextAsync()
+    {
+        _logFrom = _logTo + 1;
+        await LoadLogViewAsync();
+    }
+
+    private async Task DeleteLogAsync(string fileName)
+    {
+        var form = new Dictionary<string, string> { ["fileName"] = fileName };
+        var res = await Api.PostAsync<object>("api/log/delete", form);
+        if (res.IsOk)
+        {
+            if (_selectedFile == fileName) { _selectedFile = null; _logText = string.Empty; }
+            await LoadFileListAsync();
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task DeleteAllLogsAsync()
+    {
+        var res = await Api.PostAsync<object>("api/log/deleteAll", new Dictionary<string, string>());
+        if (res.IsOk)
+        {
+            _selectedFile = null; _logText = string.Empty; _logFiles.Clear();
+            Snackbar.Add("All logs deleted.", Severity.Success);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private void DownloadLog()
+    {
+        if (_selectedFile is null) return;
+        var url = Api.BuildDownloadUrl($"api/log/download?fileName={Uri.EscapeDataString(_selectedFile)}");
+        Snackbar.Add("Download URL: " + url, Severity.Info);
+    }
+
+    // ── Query Logs ─────────────────────────────────────────────────────
+    private async Task QueryLogsAsync()
+    {
+        _qLoading = true;
+        var url = "api/log/query?" +
+            (string.IsNullOrEmpty(_qSearch)   ? "" : $"domain={Uri.EscapeDataString(_qSearch)}&") +
+            (string.IsNullOrEmpty(_qClient)   ? "" : $"clientIpAddress={Uri.EscapeDataString(_qClient)}&") +
+            (string.IsNullOrEmpty(_qProtocol) ? "" : $"protocol={_qProtocol}&") +
+            "limit=200";
+
+        var result = await Api.GetAsync<QueryLogsResponse>(url);
+        _qLoading = false;
+
+        if (result.IsOk && result.Data?.Log is { } list)
+            _qLogs = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+}

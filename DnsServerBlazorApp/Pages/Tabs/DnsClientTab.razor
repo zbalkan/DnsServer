@@ -1,0 +1,157 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<div style="max-width:800px;">
+    @* ── Query form ── *@
+    <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+            <MudTextField @bind-Value="_server" Label="DNS Server" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Style="flex:2;min-width:200px;"
+                          HelperText="e.g. 8.8.8.8, dns.quad9.net:853, https://cloudflare-dns.com/dns-query" />
+            <MudTextField @bind-Value="_domain" Label="Domain" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" Style="flex:2;min-width:180px;"
+                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = QueryAsync(); })" />
+            <MudSelect T="string" @bind-Value="_type" Label="Type" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Style="min-width:100px;">
+                @foreach (var t in _recordTypes)
+                { <MudSelectItem Value="@t">@t</MudSelectItem> }
+            </MudSelect>
+            <MudSelect T="string" @bind-Value="_protocol" Label="Protocol" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Style="min-width:100px;">
+                <MudSelectItem Value="@("UDP")">UDP</MudSelectItem>
+                <MudSelectItem Value="@("TCP")">TCP</MudSelectItem>
+                <MudSelectItem Value="@("TLS")">TLS</MudSelectItem>
+                <MudSelectItem Value="@("HTTPS")">HTTPS</MudSelectItem>
+                <MudSelectItem Value="@("QUIC")">QUIC</MudSelectItem>
+            </MudSelect>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@_querying" OnClick="QueryAsync">
+                @if (_querying) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Query
+            </MudButton>
+        </div>
+
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;">
+            <MudCheckBox @bind-Value="_dnssec" Label="DNSSEC" Dense="true" />
+            <MudCheckBox @bind-Value="_eDnsClientSubnet" Label="EDNS Client Subnet" Dense="true" />
+            <MudCheckBox @bind-Value="_recursion" Label="Recursion Desired" Dense="true" />
+        </div>
+    </MudPaper>
+
+    @* ── Result ── *@
+    @if (_result is not null)
+    {
+        <MudPaper Elevation="1" Class="pa-3">
+            <div style="display:flex;align-items:center;margin-bottom:8px;gap:8px;">
+                <MudText Typo="Typo.subtitle2" Style="flex:1">
+                    Response — @_result.Status
+                    @if (_result.RCode is not null) { <span> (@_result.RCode)</span> }
+                </MudText>
+                @if (_result.TimeTaken.HasValue)
+                {
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
+                        @_result.TimeTaken.Value ms
+                    </MudChip>
+                }
+            </div>
+
+            @* Answer section *@
+            @if (_result.Answer?.Count > 0)
+            {
+                <MudText Typo="Typo.caption" Class="mb-1"><strong>Answer</strong></MudText>
+                <MudTable Items="@_result.Answer" Dense="true" Hover="false" Elevation="0" Class="mb-3">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh><MudTh>Type</MudTh><MudTh>TTL</MudTh><MudTh>Data</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.Type</MudTd>
+                        <MudTd>@context.Ttl</MudTd>
+                        <MudTd Style="word-break:break-all;">@context.RData</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @* Authority section *@
+            @if (_result.Authority?.Count > 0)
+            {
+                <MudText Typo="Typo.caption" Class="mb-1"><strong>Authority</strong></MudText>
+                <MudTable Items="@_result.Authority" Dense="true" Hover="false" Elevation="0" Class="mb-3">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh><MudTh>Type</MudTh><MudTh>TTL</MudTh><MudTh>Data</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.Type</MudTd>
+                        <MudTd>@context.Ttl</MudTd>
+                        <MudTd Style="word-break:break-all;">@context.RData</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @* Additional section *@
+            @if (_result.Additional?.Count > 0)
+            {
+                <MudText Typo="Typo.caption" Class="mb-1"><strong>Additional</strong></MudText>
+                <MudTable Items="@_result.Additional" Dense="true" Hover="false" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh><MudTh>Type</MudTh><MudTh>TTL</MudTh><MudTh>Data</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.Type</MudTd>
+                        <MudTd>@context.Ttl</MudTd>
+                        <MudTd Style="word-break:break-all;">@context.RData</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+
+            @if (_result.Answer?.Count == 0 && _result.Authority?.Count == 0)
+            {
+                <MudText Typo="Typo.caption">No records returned.</MudText>
+            }
+        </MudPaper>
+    }
+</div>
+
+@code {
+    private static readonly string[] _recordTypes =
+        ["A", "AAAA", "NS", "CNAME", "SOA", "PTR", "MX", "TXT", "AAAA",
+         "SRV", "NAPTR", "CAA", "TLSA", "SSHFP", "DS", "DNSKEY", "ANY"];
+
+    private string _server   = "This Server";
+    private string _domain   = string.Empty;
+    private string _type     = "A";
+    private string _protocol = "UDP";
+    private bool   _dnssec;
+    private bool   _eDnsClientSubnet;
+    private bool   _recursion = true;
+    private bool   _querying;
+
+    private DnsClientResult? _result;
+
+    private async Task QueryAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_domain)) return;
+
+        _querying = true;
+        _result   = null;
+
+        var url = $"api/dnsClient/resolve" +
+                  $"?server={Uri.EscapeDataString(_server)}" +
+                  $"&domain={Uri.EscapeDataString(_domain)}" +
+                  $"&type={_type}" +
+                  $"&protocol={_protocol}" +
+                  $"&dnssec={_dnssec.ToString().ToLower()}" +
+                  $"&ednsClientSubnet={_eDnsClientSubnet.ToString().ToLower()}" +
+                  $"&rd={_recursion.ToString().ToLower()}";
+
+        var res = await Api.GetAsync<DnsClientResponse>(url);
+        _querying = false;
+
+        if (res.IsOk && res.Data is not null)
+            _result = res.Data.Result;
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+}

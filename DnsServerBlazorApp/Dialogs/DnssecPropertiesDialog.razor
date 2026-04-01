@@ -1,0 +1,160 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div style="display:flex;justify-content:center;padding:32px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+        else
+        {
+            @if (_isSigned)
+            {
+                <MudAlert Severity="Severity.Success" Class="mb-3">Zone is DNSSEC-signed.</MudAlert>
+
+                @if (_keys.Count > 0)
+                {
+                    <MudTable Items="@_keys" Dense="true" Hover="false" Elevation="0">
+                        <HeaderContent>
+                            <MudTh>Key Tag</MudTh>
+                            <MudTh>Algorithm</MudTh>
+                            <MudTh>Type</MudTh>
+                            <MudTh>Status</MudTh>
+                        </HeaderContent>
+                        <RowTemplate>
+                            <MudTd>@context.KeyTag</MudTd>
+                            <MudTd>@context.Algorithm</MudTd>
+                            <MudTd>@(context.IsKsk ? "KSK" : "ZSK")</MudTd>
+                            <MudTd>@context.KeyState</MudTd>
+                        </RowTemplate>
+                    </MudTable>
+                }
+
+                <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                               OnClick="RefreshRrsigAsync">Refresh RRSIG</MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                               Color="Color.Warning" OnClick="RolloverKskAsync">Rollover KSK</MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                               Color="Color.Error" OnClick="UnsignAsync">Unsign Zone</MudButton>
+                </div>
+            }
+            else
+            {
+                <MudAlert Severity="Severity.Info" Class="mb-3">Zone is not signed.</MudAlert>
+
+                <MudSelect T="string" @bind-Value="_algorithm" Label="Algorithm"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("RSA_SHA256")">RSA/SHA-256</MudSelectItem>
+                    <MudSelectItem Value="@("RSA_SHA512")">RSA/SHA-512</MudSelectItem>
+                    <MudSelectItem Value="@("ECDSA_P256_SHA256")">ECDSA P-256/SHA-256</MudSelectItem>
+                    <MudSelectItem Value="@("ECDSA_P384_SHA384")">ECDSA P-384/SHA-384</MudSelectItem>
+                    <MudSelectItem Value="@("ED25519")">Ed25519</MudSelectItem>
+                    <MudSelectItem Value="@("ED448")">Ed448</MudSelectItem>
+                </MudSelect>
+
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="@_saving" OnClick="SignAsync">
+                    @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                    Sign Zone
+                </MudButton>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public string Zone { get; set; } = null!;
+    [Parameter] public string Node { get; set; } = "cluster";
+
+    private bool              _loading  = true;
+    private bool              _saving;
+    private bool              _isSigned;
+    private string?           _error;
+    private string            _algorithm = "ECDSA_P256_SHA256";
+    private List<DnssecKey>   _keys      = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var url = $"api/zones/dnssec/getProperties?zone={Uri.EscapeDataString(Zone)}&node={Uri.EscapeDataString(Node)}";
+        var result = await Api.GetAsync<DnssecPropertiesResponse>(url);
+        _loading = false;
+
+        if (result.IsOk && result.Data is not null)
+        {
+            _isSigned = result.Data.IsSigned;
+            _keys     = result.Data.Keys ?? [];
+        }
+        else
+            _error = result.DisplayError;
+    }
+
+    private async Task SignAsync()
+    {
+        _saving = true;
+        var form = new Dictionary<string, string>
+        {
+            ["zone"]      = Zone,
+            ["algorithm"] = _algorithm,
+            ["node"]      = Node,
+        };
+        var res = await Api.PostAsync<object>("api/zones/dnssec/sign", form);
+        _saving = false;
+
+        if (res.IsOk)
+        {
+            Snackbar.Add("Zone signed.", Severity.Success);
+            await LoadAsync();
+        }
+        else
+            _error = res.DisplayError;
+    }
+
+    private async Task UnsignAsync()
+    {
+        var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
+        var res = await Api.PostAsync<object>("api/zones/dnssec/unsign", form);
+        if (res.IsOk)
+        {
+            Snackbar.Add("Zone unsigned.", Severity.Success);
+            await LoadAsync();
+        }
+        else
+            _error = res.DisplayError;
+    }
+
+    private async Task RefreshRrsigAsync()
+    {
+        var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
+        var res = await Api.PostAsync<object>("api/zones/dnssec/refreshRrSig", form);
+        if (res.IsOk) Snackbar.Add("RRSIG refreshed.", Severity.Success);
+        else          _error = res.DisplayError;
+    }
+
+    private async Task RolloverKskAsync()
+    {
+        var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
+        var res = await Api.PostAsync<object>("api/zones/dnssec/rolloverKsk", form);
+        if (res.IsOk)
+        {
+            Snackbar.Add("KSK rollover initiated.", Severity.Success);
+            await LoadAsync();
+        }
+        else
+            _error = res.DisplayError;
+    }
+}

@@ -1,0 +1,111 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div style="display:flex;justify-content:center;padding:32px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+        else if (_opts is not null)
+        {
+            <MudCheckBox @bind-Value="_opts.Disabled" Label="Zone Disabled" Dense="true" Class="mb-2" />
+
+            @if (_opts.Type is "Primary" or "Forwarder")
+            {
+                <MudCheckBox @bind-Value="_opts.DnssecValidation" Label="DNSSEC Validation" Dense="true" Class="mb-2" />
+            }
+
+            @if (_opts.Type is "Secondary" or "Stub" or "SecondaryForwarder" or "SecondaryCatalog")
+            {
+                <MudTextField @bind-Value="_primaryAddresses" Label="Primary Name Server Addresses"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" Lines="3" />
+                <MudSelect T="string" @bind-Value="_opts.ZoneTransferProtocol" Label="Transfer Protocol"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("Tcp")">TCP</MudSelectItem>
+                    <MudSelectItem Value="@("Tls")">TLS</MudSelectItem>
+                    <MudSelectItem Value="@("Quic")">QUIC</MudSelectItem>
+                </MudSelect>
+            }
+
+            @if (_opts.NotifyFailed)
+            {
+                <MudAlert Severity="Severity.Warning" Class="mb-2">Notify failed for last transfer.</MudAlert>
+            }
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        @if (_opts is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       Disabled="@_saving" OnClick="SaveAsync">
+                @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Save
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public string Zone { get; set; } = null!;
+    [Parameter] public string Node { get; set; } = "cluster";
+
+    private bool         _loading = true;
+    private bool         _saving;
+    private string?      _error;
+    private ZoneOptions? _opts;
+    private string       _primaryAddresses = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var url = $"api/zones/options/get?zone={Uri.EscapeDataString(Zone)}&node={Uri.EscapeDataString(Node)}";
+        var result = await Api.GetAsync<ZoneOptions>(url);
+        _loading = false;
+
+        if (result.IsOk && result.Data is not null)
+        {
+            _opts = result.Data;
+            _primaryAddresses = string.Join("\n", _opts.PrimaryNameServerAddresses ?? []);
+        }
+        else
+            _error = result.DisplayError;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_opts is null) return;
+        _saving = true;
+
+        var form = new Dictionary<string, string>
+        {
+            ["zone"]     = Zone,
+            ["node"]     = Node,
+            ["disabled"] = _opts.Disabled.ToString().ToLower(),
+        };
+        if (!string.IsNullOrWhiteSpace(_primaryAddresses))
+            form["primaryNameServerAddresses"] = string.Join(",",
+                _primaryAddresses.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+        if (_opts.ZoneTransferProtocol is not null)
+            form["zoneTransferProtocol"] = _opts.ZoneTransferProtocol;
+
+        var result = await Api.PostAsync<object>("api/zones/options/set", form);
+        _saving = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("Zone options saved.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

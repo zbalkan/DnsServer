@@ -1,0 +1,60 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+@inject IJSRuntime JS
+
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.body2" Class="mb-3">
+            Select the components to include in the backup.
+        </MudText>
+        <MudCheckBox @bind-Value="_blockLists"    Label="Block Lists"      Dense="true" />
+        <MudCheckBox @bind-Value="_logs"          Label="Log Files"        Dense="true" />
+        <MudCheckBox @bind-Value="_scopes"        Label="DHCP Scopes"      Dense="true" />
+        <MudCheckBox @bind-Value="_apps"          Label="DNS Apps"         Dense="true" />
+        <MudCheckBox @bind-Value="_stats"         Label="Statistics"       Dense="true" />
+        <MudCheckBox @bind-Value="_zones"         Label="Zones"            Dense="true" />
+        <MudCheckBox @bind-Value="_allowedZones"  Label="Allowed Zones"    Dense="true" />
+        <MudCheckBox @bind-Value="_blockedZones"  Label="Blocked Zones"    Dense="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="DownloadAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Download Backup
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private bool _blockLists   = true;
+    private bool _logs         = false;
+    private bool _scopes       = true;
+    private bool _apps         = true;
+    private bool _stats        = false;
+    private bool _zones        = true;
+    private bool _allowedZones = true;
+    private bool _blockedZones = true;
+    private bool _busy;
+
+    private async Task DownloadAsync()
+    {
+        _busy = true;
+        var url = "api/settings/backup?" +
+                  $"blockLists={_blockLists.ToString().ToLower()}&" +
+                  $"logs={_logs.ToString().ToLower()}&" +
+                  $"scopes={_scopes.ToString().ToLower()}&" +
+                  $"apps={_apps.ToString().ToLower()}&" +
+                  $"stats={_stats.ToString().ToLower()}&" +
+                  $"zones={_zones.ToString().ToLower()}&" +
+                  $"allowedZones={_allowedZones.ToString().ToLower()}&" +
+                  $"blockedZones={_blockedZones.ToString().ToLower()}";
+
+        var fullUrl = Api.BuildDownloadUrl(url);
+        await JS.InvokeVoidAsync("open", fullUrl, "_blank");
+        _busy = false;
+        MudDialog.Close();
+    }
+}

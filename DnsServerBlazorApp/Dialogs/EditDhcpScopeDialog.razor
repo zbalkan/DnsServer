@@ -1,0 +1,123 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog Style="max-height:90vh;overflow-y:auto;">
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+
+        <MudText Typo="Typo.subtitle2" Class="mb-2">Basic Settings</MudText>
+        <MudTextField @bind-Value="_scope.Name" Label="Scope Name"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
+                      Disabled="@IsEdit" />
+        <div style="display:flex;gap:8px;">
+            <MudTextField @bind-Value="_scope.StartingAddress" Label="Start IP"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1;" Class="mb-2" />
+            <MudTextField @bind-Value="_scope.EndingAddress" Label="End IP"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1;" Class="mb-2" />
+        </div>
+        <MudTextField @bind-Value="_scope.SubnetMask" Label="Subnet Mask"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+
+        <MudDivider Class="my-2" />
+        <MudText Typo="Typo.subtitle2" Class="mb-2">DHCP Options</MudText>
+        <MudTextField @bind-Value="_scope.Router" Label="Default Gateway"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <MudTextField @bind-Value="_scope.DomainName" Label="Domain Name"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <MudTextField @bind-Value="_dnsServers" Label="DNS Servers (comma-separated)"
+                      Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+        <div style="display:flex;gap:8px;">
+            <MudTextField @bind-Value="_scope.LeaseTimeDays" Label="Lease Days"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          InputType="InputType.Number" Style="flex:1;" />
+            <MudTextField @bind-Value="_scope.LeaseTimeHours" Label="Hours"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          InputType="InputType.Number" Style="flex:1;" />
+            <MudTextField @bind-Value="_scope.LeaseTimeMinutes" Label="Minutes"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          InputType="InputType.Number" Style="flex:1;" />
+        </div>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="SaveAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            @(IsEdit ? "Save" : "Create")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public DhcpScope? Scope { get; set; }
+
+    private bool IsEdit => Scope is not null;
+
+    private DhcpScope _scope = new();
+    private string    _dnsServers = string.Empty;
+    private string?   _error;
+    private bool      _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Scope is not null)
+        {
+            // shallow clone for editing
+            _scope = new DhcpScope
+            {
+                Name           = Scope.Name,
+                StartingAddress = Scope.StartingAddress,
+                EndingAddress   = Scope.EndingAddress,
+                SubnetMask      = Scope.SubnetMask,
+                NetworkAddress  = Scope.NetworkAddress,
+                Router          = Scope.Router,
+                DomainName      = Scope.DomainName,
+                LeaseTimeDays    = Scope.LeaseTimeDays,
+                LeaseTimeHours   = Scope.LeaseTimeHours,
+                LeaseTimeMinutes = Scope.LeaseTimeMinutes,
+                Enabled         = Scope.Enabled,
+            };
+            _dnsServers = string.Join(", ", Scope.DnsServers ?? []);
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_scope.Name)) { _error = "Scope name required."; return; }
+
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["name"]             = _scope.Name ?? "",
+            ["startingAddress"]  = _scope.StartingAddress ?? "",
+            ["endingAddress"]    = _scope.EndingAddress   ?? "",
+            ["subnetMask"]       = _scope.SubnetMask      ?? "",
+            ["leaseTimeDays"]    = _scope.LeaseTimeDays.ToString(),
+            ["leaseTimeHours"]   = _scope.LeaseTimeHours.ToString(),
+            ["leaseTimeMinutes"] = _scope.LeaseTimeMinutes.ToString(),
+        };
+        if (!string.IsNullOrWhiteSpace(_scope.Router))
+            form["router"] = _scope.Router;
+        if (!string.IsNullOrWhiteSpace(_scope.DomainName))
+            form["domainName"] = _scope.DomainName;
+        if (!string.IsNullOrWhiteSpace(_dnsServers))
+            form["dnsServers"] = _dnsServers;
+
+        var url = IsEdit ? "api/dhcp/scope/update" : "api/dhcp/scope/add";
+        var result = await Api.PostAsync<object>(url, form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add(IsEdit ? "Scope updated." : "Scope created.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

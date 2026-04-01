@@ -1,0 +1,215 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+
+        <MudTextField @bind-Value="_name" Label="Name" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mb-2"
+                      HelperText="Leave blank for zone apex (@)" />
+
+        <div style="display:flex;gap:8px;">
+            <MudSelect T="string" @bind-Value="_type" Label="Type"
+                       Variant="Variant.Outlined" Margin="Margin.Dense"
+                       Style="flex:1;" Class="mb-2"
+                       Disabled="@IsEdit">
+                @foreach (var t in _recordTypes)
+                { <MudSelectItem Value="@t">@t</MudSelectItem> }
+            </MudSelect>
+            <MudTextField @bind-Value="_ttl" Label="TTL" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" InputType="InputType.Number"
+                          Style="max-width:120px;" Class="mb-2" />
+        </div>
+
+        @* Type-specific rdata fields *@
+        @switch (_type)
+        {
+            case "A":
+            case "AAAA":
+                <MudTextField @bind-Value="_rdata" Label="IP Address"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                break;
+
+            case "CNAME":
+            case "ANAME":
+            case "NS":
+            case "PTR":
+                <MudTextField @bind-Value="_rdata" Label="Target"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                break;
+
+            case "MX":
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_rdataExtra" Label="Priority"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="max-width:120px;" />
+                    <MudTextField @bind-Value="_rdata" Label="Exchange"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1;" />
+                </div>
+                break;
+
+            case "TXT":
+                <MudTextField @bind-Value="_rdata" Label="Text"
+                              Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="3" Class="mb-2" />
+                break;
+
+            case "SRV":
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <MudTextField @bind-Value="_rdataExtra" Label="Priority"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="max-width:100px;" />
+                    <MudTextField @bind-Value="_rdataExtra2" Label="Weight"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="max-width:100px;" />
+                    <MudTextField @bind-Value="_rdataExtra3" Label="Port"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="max-width:100px;" />
+                    <MudTextField @bind-Value="_rdata" Label="Target"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1;" />
+                </div>
+                break;
+
+            case "CAA":
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_rdataExtra" Label="Flags"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="max-width:100px;" />
+                    <MudTextField @bind-Value="_rdataExtra2" Label="Tag"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Style="max-width:140px;" />
+                    <MudTextField @bind-Value="_rdata" Label="Value"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Style="flex:1;" />
+                </div>
+                break;
+
+            case "FWD":
+                <MudSelect T="string" @bind-Value="_rdataExtra" Label="Protocol"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("Udp")">UDP</MudSelectItem>
+                    <MudSelectItem Value="@("Tcp")">TCP</MudSelectItem>
+                    <MudSelectItem Value="@("Tls")">TLS</MudSelectItem>
+                    <MudSelectItem Value="@("Https")">HTTPS</MudSelectItem>
+                    <MudSelectItem Value="@("Quic")">QUIC</MudSelectItem>
+                </MudSelect>
+                <MudTextField @bind-Value="_rdata" Label="Forwarder"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                break;
+
+            default:
+                <MudTextField @bind-Value="_rdata" Label="Record Data"
+                              Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="3" Class="mb-2"
+                              HelperText="Raw RDATA value" />
+                break;
+        }
+
+        <MudCheckBox @bind-Value="_disabled" Label="Disabled" Dense="true" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="SaveAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            @(IsEdit ? "Update" : "Add")
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    private static readonly string[] _recordTypes =
+        ["A", "AAAA", "NS", "CNAME", "SOA", "MX", "TXT", "PTR", "HINFO",
+         "SRV", "NAPTR", "CAA", "ANAME", "FWD", "APP", "HTTPS", "SVCB",
+         "TLSA", "SSHFP", "DS"];
+
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public string Zone { get; set; } = null!;
+    [Parameter] public string     Node   { get; set; } = "cluster";
+    [Parameter] public ZoneRecord? Record { get; set; }
+
+    private bool IsEdit => Record is not null;
+
+    private string _name        = string.Empty;
+    private string _type        = "A";
+    private int    _ttl         = 3600;
+    private string _rdata       = string.Empty;
+    private string _rdataExtra  = string.Empty;
+    private string _rdataExtra2 = string.Empty;
+    private string _rdataExtra3 = string.Empty;
+    private bool   _disabled;
+    private string? _error;
+    private bool    _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (Record is { } r)
+        {
+            _name     = r.Name == Zone ? "" : r.Name;
+            _type     = r.Type;
+            _ttl      = r.TtlValue;
+            _disabled = r.Disabled;
+            // populate rdata from record
+            _rdata = r.RData?.ToString() ?? string.Empty;
+        }
+    }
+
+    private async Task SaveAsync()
+    {
+        _busy = true;
+        var form = BuildForm();
+        var url  = IsEdit ? "api/zones/records/update" : "api/zones/records/add";
+        var result = await Api.PostAsync<object>(url, form);
+        _busy = false;
+
+        if (result.IsOk)
+            MudDialog.Close(DialogResult.Ok(true));
+        else
+            _error = result.DisplayError;
+    }
+
+    private Dictionary<string, string> BuildForm()
+    {
+        var name = string.IsNullOrWhiteSpace(_name) ? Zone : $"{_name}.{Zone}";
+        var f = new Dictionary<string, string>
+        {
+            ["zone"]     = Zone,
+            ["domain"]   = name,
+            ["type"]     = _type,
+            ["ttl"]      = _ttl.ToString(),
+            ["disabled"] = _disabled ? "true" : "false",
+            ["node"]     = Node,
+        };
+
+        switch (_type)
+        {
+            case "A": case "AAAA":
+                f["ipAddress"] = _rdata; break;
+            case "NS": case "CNAME": case "ANAME": case "PTR":
+                f["nameServer"] = _rdata; break;
+            case "MX":
+                f["preference"] = _rdataExtra;
+                f["exchange"]   = _rdata; break;
+            case "TXT":
+                f["text"] = _rdata; break;
+            case "SRV":
+                f["priority"] = _rdataExtra;
+                f["weight"]   = _rdataExtra2;
+                f["port"]     = _rdataExtra3;
+                f["target"]   = _rdata; break;
+            case "CAA":
+                f["flags"] = _rdataExtra;
+                f["tag"]   = _rdataExtra2;
+                f["value"] = _rdata; break;
+            case "FWD":
+                f["protocol"]  = _rdataExtra;
+                f["forwarder"] = _rdata; break;
+            default:
+                f["rData"] = _rdata; break;
+        }
+        return f;
+    }
+}

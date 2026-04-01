@@ -1,0 +1,178 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject IDialogService DialogService
+@inject ISnackbar      Snackbar
+
+<div style="display:flex;gap:12px;height:calc(100vh - 200px);">
+
+    @* ── Left: zone list ── *@
+    <MudPaper Elevation="1" Style="width:320px;min-width:220px;display:flex;flex-direction:column;">
+        <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
+            <MudText Typo="Typo.subtitle2" Style="flex:1">Blocked Zones</MudText>
+            <ClusterNodeSelect @bind-Value="_node" ValueChanged="@((_) => _ = LoadZonesAsync())" />
+        </div>
+
+        @if (SessionService.CanModify("Blocked"))
+        {
+            <div class="pa-2" style="border-bottom:1px solid rgba(0,0,0,.12);">
+                <MudTextField @bind-Value="_newZone" Label="Add domain" Variant="Variant.Outlined"
+                              Margin="Margin.Dense" Class="mb-1"
+                              OnKeyUp="@(e => { if(e.Key=="Enter") _ = AddZoneAsync(); })" />
+                <div style="display:flex;gap:6px;">
+                    <MudButton Variant="Variant.Filled" Color="Color.Error" Size="Size.Small"
+                               FullWidth="true" OnClick="AddZoneAsync">Block</MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                               OnClick="ImportAsync" Title="Import">
+                        <MudIcon Icon="@Icons.Material.Filled.Upload" Size="Size.Small" />
+                    </MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                               OnClick="ExportAsync" Title="Export">
+                        <MudIcon Icon="@Icons.Material.Filled.Download" Size="Size.Small" />
+                    </MudButton>
+                </div>
+            </div>
+        }
+
+        <div style="overflow-y:auto;flex:1;">
+            @if (_loading)
+            {
+                <div style="display:flex;justify-content:center;padding:20px;">
+                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                </div>
+            }
+            else
+            {
+                @foreach (var z in _zones)
+                {
+                    <div style="display:flex;align-items:center;padding:3px 8px;cursor:pointer;
+                                background:@(_selected == z ? "rgba(220,53,69,.12)" : "transparent");"
+                         @onclick="@(() => SelectZone(z))">
+                        <MudText Typo="Typo.body2" Style="flex:1;">@z</MudText>
+                        @if (SessionService.CanModify("Blocked"))
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteZoneAsync(z))" />
+                        }
+                    </div>
+                }
+            }
+        </div>
+
+        <MudText Typo="Typo.caption" Class="pa-2">@_zones.Count zone(s)</MudText>
+    </MudPaper>
+
+    @* ── Right: record viewer ── *@
+    <MudPaper Elevation="1" Style="flex:1;display:flex;flex-direction:column;min-width:0;">
+        <div class="pa-2" style="border-bottom:1px solid rgba(0,0,0,.12);">
+            <MudText Typo="Typo.subtitle2">@(_selected ?? "Select a zone")</MudText>
+        </div>
+        <div style="flex:1;overflow:auto;padding:8px;">
+            @if (_loadingRecords)
+            {
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            }
+            else if (_records.Count > 0)
+            {
+                <MudTable Items="@_records" Dense="true" Hover="true" Elevation="0">
+                    <HeaderContent>
+                        <MudTh>Name</MudTh><MudTh>Type</MudTh><MudTh>TTL</MudTh><MudTh>Data</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.Type</MudTd>
+                        <MudTd>@context.TtlValue</MudTd>
+                        <MudTd>@context.RData?.ToString()</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+            else if (_selected is not null)
+            {
+                <MudText Typo="Typo.caption">No records found.</MudText>
+            }
+        </div>
+    </MudPaper>
+</div>
+
+@code {
+    private string       _node    = "cluster";
+    private string       _newZone = string.Empty;
+    private string?      _selected;
+    private bool         _loading;
+    private bool         _loadingRecords;
+    private List<string>     _zones   = [];
+    private List<ZoneRecord> _records = [];
+
+    protected override async Task OnInitializedAsync() => await LoadZonesAsync();
+
+    private async Task LoadZonesAsync()
+    {
+        _loading = true;
+        var result = await Api.GetAsync<ZoneListResponse>(
+            $"api/zones/blocked/list?node={Uri.EscapeDataString(_node)}");
+        _loading = false;
+
+        if (result.IsOk && result.Data?.Zones is { } list)
+            _zones = list.Select(z => z.Name).ToList();
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task SelectZone(string zone)
+    {
+        _selected = zone;
+        _loadingRecords = true;
+        var url = $"api/zones/records/get?zone={Uri.EscapeDataString(zone)}&node={Uri.EscapeDataString(_node)}";
+        var result = await Api.GetAsync<ZoneRecordListResponse>(url);
+        _loadingRecords = false;
+
+        _records = result.IsOk ? result.Data?.Records ?? [] : [];
+    }
+
+    private async Task AddZoneAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newZone)) return;
+        var form = new Dictionary<string, string>
+        {
+            ["domain"] = _newZone.Trim(),
+            ["node"]   = _node,
+        };
+        var res = await Api.PostAsync<object>("api/zones/blocked/add", form);
+        if (res.IsOk)
+        {
+            _newZone = string.Empty;
+            await LoadZonesAsync();
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task DeleteZoneAsync(string zone)
+    {
+        var form = new Dictionary<string, string> { ["domain"] = zone, ["node"] = _node };
+        var res = await Api.PostAsync<object>("api/zones/blocked/delete", form);
+        if (res.IsOk)
+        {
+            if (_selected == zone) { _selected = null; _records.Clear(); }
+            await LoadZonesAsync();
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task ImportAsync()
+    {
+        var p = new DialogParameters { ["ZoneType"] = "blocked", ["Node"] = _node };
+        var d = await DialogService.ShowAsync<Dialogs.ImportZoneListDialog>("Import Blocked Zones", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadZonesAsync();
+    }
+
+    private void ExportAsync()
+    {
+        var url = Api.BuildDownloadUrl(
+            $"api/zones/blocked/export?node={Uri.EscapeDataString(_node)}");
+        Snackbar.Add("Export URL: " + url, Severity.Info);
+    }
+}

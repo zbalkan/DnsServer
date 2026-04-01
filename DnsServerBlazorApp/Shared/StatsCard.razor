@@ -1,0 +1,28 @@
+@* Replicates one coloured box in the original .stats-panel strip. *@
+
+<div class="@DnsStyling.StatCardCss(StatKey)" title="@Title">
+    <div class="stat-number">@FormatNumber(Value)</div>
+    @if (ShowPercent)
+    {
+        <div class="stat-pct">@Percent.ToString("0.#")%</div>
+    }
+    else
+    {
+        <div class="stat-pct">&nbsp;</div>
+    }
+    <div class="stat-title">@Title</div>
+</div>
+
+@code {
+    /// <summary>Key into DnsStyling.StatCardClass (e.g. "TotalQueries").</summary>
+    [Parameter, EditorRequired] public string  StatKey     { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string  Title       { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public long    Value       { get; set; }
+    [Parameter]                 public bool    ShowPercent { get; set; }
+    [Parameter]                 public double  Percent     { get; set; }
+
+    private static string FormatNumber(long v) =>
+        v >= 1_000_000 ? $"{v / 1_000_000.0:0.#}M"
+      : v >= 1_000     ? $"{v / 1_000.0:0.#}K"
+      : v.ToString();
+}

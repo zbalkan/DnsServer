@@ -1,0 +1,347 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject IDialogService DialogService
+@inject ISnackbar      Snackbar
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:80px;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+    </div>
+}
+else if (_s is not null)
+{
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+
+        @* ── Left column ── *@
+        <div style="flex:1;min-width:320px;max-width:560px;">
+
+            @* General *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">General</MudText>
+                <MudTextField @bind-Value="_s.DnsServerDomain" Label="Server Domain"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                <MudTextField Value="@ListToLines(_s.DnsServerLocalEndPoints)"
+                              ValueChanged="@((string v) => _s.DnsServerLocalEndPoints = LinesToList(v))"
+                              Label="Listen Endpoints" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="2" Class="mb-2"
+                              HelperText="One per line. e.g. 0.0.0.0:53" />
+                <MudCheckBox @bind-Value="_s.PreferIPv6" Label="Prefer IPv6" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.DnssecValidation" Label="DNSSEC Validation" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.LogQueries" Label="Log Queries" Dense="true" />
+            </MudPaper>
+
+            @* Web Service *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Web Service</MudText>
+                <MudTextField Value="@ListToLines(_s.WebServiceLocalAddresses)"
+                              ValueChanged="@((string v) => _s.WebServiceLocalAddresses = LinesToList(v))"
+                              Label="Listen Addresses" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="2" Class="mb-2" />
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.WebServiceHttpPort" Label="HTTP Port"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
+                                  InputType="InputType.Number" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.WebServiceTlsPort" Label="HTTPS Port"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
+                                  InputType="InputType.Number" Style="flex:1;" />
+                </div>
+                <MudCheckBox @bind-Value="_s.WebServiceEnableTls" Label="Enable HTTPS (TLS)" Dense="true" Class="mb-1" />
+                @if (_s.WebServiceEnableTls)
+                {
+                    <MudTextField @bind-Value="_s.WebServiceTlsCertificatePath" Label="TLS Certificate Path"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="_s.WebServiceTlsCertificatePassword" Label="TLS Certificate Password"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Password" />
+                }
+            </MudPaper>
+
+            @* Optional Protocols *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Optional Protocols</MudText>
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp"  Label="DNS-over-HTTP (DoH)"   Dense="true" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverTls"   Label="DNS-over-TLS (DoT)"    Dense="true" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttps" Label="DNS-over-HTTPS (DoH3)" Dense="true" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverQuic"  Label="DNS-over-QUIC (DoQ)"   Dense="true" />
+            </MudPaper>
+
+            @* Forwarders *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Forwarders</MudText>
+                <MudSelect T="string" @bind-Value="_s.ForwarderProtocol" Label="Protocol"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("Udp")">UDP</MudSelectItem>
+                    <MudSelectItem Value="@("Tcp")">TCP</MudSelectItem>
+                    <MudSelectItem Value="@("Tls")">TLS</MudSelectItem>
+                    <MudSelectItem Value="@("Https")">HTTPS</MudSelectItem>
+                    <MudSelectItem Value="@("Quic")">QUIC</MudSelectItem>
+                </MudSelect>
+                <MudTextField Value="@ListToLines(_s.Forwarders)"
+                              ValueChanged="@((string v) => _s.Forwarders = LinesToList(v))"
+                              Label="Forwarders" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="4" Class="mb-2" HelperText="One per line" />
+                <MudCheckBox @bind-Value="_s.EnableConcurrentForwarding" Label="Concurrent Forwarding" Dense="true" />
+            </MudPaper>
+
+            @* Recursion *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Recursion</MudText>
+                <MudSelect T="string" @bind-Value="_s.Recursion" Label="Recursion"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("Allow")">Allow All</MudSelectItem>
+                    <MudSelectItem Value="@("Deny")">Deny All</MudSelectItem>
+                    <MudSelectItem Value="@("AllowOnlyForPrivateNetworks")">Private Networks Only</MudSelectItem>
+                    <MudSelectItem Value="@("UseSpecifiedNetworkACL")">Specified Networks</MudSelectItem>
+                </MudSelect>
+                <MudCheckBox @bind-Value="_s.QnameMinimization" Label="QNAME Minimization" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.RandomizeName"     Label="Randomize Name"      Dense="true" />
+            </MudPaper>
+        </div>
+
+        @* ── Right column ── *@
+        <div style="flex:1;min-width:320px;max-width:560px;">
+
+            @* Blocking *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Blocking</MudText>
+                <MudCheckBox @bind-Value="_s.EnableBlocking" Label="Enable Blocking" Dense="true" Class="mb-2" />
+                <MudSelect T="string" @bind-Value="_s.BlockingType" Label="Blocking Type"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("NxDomain")">NXDOMAIN</MudSelectItem>
+                    <MudSelectItem Value="@("Refused")">REFUSED</MudSelectItem>
+                    <MudSelectItem Value="@("Address")">Address</MudSelectItem>
+                </MudSelect>
+                <MudTextField Value="@ListToLines(_s.CustomBlockingAddresses)"
+                              ValueChanged="@((string v) => _s.CustomBlockingAddresses = LinesToList(v))"
+                              Label="Custom Blocking Addresses"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
+                              HelperText="One per line (for Address type)" />
+                <MudTextField Value="@ListToLines(_s.BlockListUrls)"
+                              ValueChanged="@((string v) => _s.BlockListUrls = LinesToList(v))"
+                              Label="Block List URLs"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" Class="mb-2"
+                              HelperText="One URL per line" />
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <MudTextField @bind-Value="_s.BlockListUpdateIntervalHours"
+                                  Label="Update Interval (hrs)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="max-width:180px;" />
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                               OnClick="UpdateBlockListAsync">Update Now</MudButton>
+                </div>
+            </MudPaper>
+
+            @* Cache *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Cache</MudText>
+                <MudTextField @bind-Value="_s.CacheMaximumEntries" Label="Maximum Entries"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
+                              InputType="InputType.Number" />
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.CacheMinimumRecordTtl" Label="Min TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="flex:1;" Class="mb-2" />
+                    <MudTextField @bind-Value="_s.CacheMaximumRecordTtl" Label="Max TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" Style="flex:1;" Class="mb-2" />
+                </div>
+                <MudCheckBox @bind-Value="_s.ServeStale" Label="Serve Stale" Dense="true" />
+            </MudPaper>
+
+            @* Logging *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Logging</MudText>
+                <MudSelect T="string" @bind-Value="_s.LoggingType" Label="Logging Type"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("File")">File</MudSelectItem>
+                    <MudSelectItem Value="@("Console")">Console</MudSelectItem>
+                </MudSelect>
+                <MudTextField @bind-Value="_s.LogFolder" Label="Log Folder"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                <MudTextField @bind-Value="_s.MaxLogFileDays" Label="Max Log Days (0=unlimited)"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
+                              InputType="InputType.Number" />
+                <MudCheckBox @bind-Value="_s.UseLocalTime" Label="Use Local Time" Dense="true" />
+            </MudPaper>
+
+            @* Proxy *@
+            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Proxy</MudText>
+                @{ var proxyType = _s.Proxy?.Type ?? "None"; }
+                <MudSelect T="string" Value="@proxyType"
+                           ValueChanged="@((string v) => SetProxyType(v))"
+                           Label="Proxy Type" Variant="Variant.Outlined"
+                           Margin="Margin.Dense" Class="mb-2">
+                    <MudSelectItem Value="@("None")">None</MudSelectItem>
+                    <MudSelectItem Value="@("Http")">HTTP</MudSelectItem>
+                    <MudSelectItem Value="@("Socks5")">SOCKS5</MudSelectItem>
+                </MudSelect>
+                @if (_s.Proxy is not null && _s.Proxy.Type != "None")
+                {
+                    <MudTextField @bind-Value="_s.Proxy.Address" Label="Proxy Address"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="_s.Proxy.Port" Label="Proxy Port"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Number" />
+                }
+            </MudPaper>
+
+            @* Backup / Restore *@
+            @if (SessionService.CanModify("Settings"))
+            {
+                <MudPaper Elevation="1" Class="pa-3 mb-3">
+                    <MudText Typo="Typo.subtitle2" Class="mb-2">Backup &amp; Restore</MudText>
+                    <div style="display:flex;gap:8px;">
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
+                                   OnClick="BackupAsync">Backup</MudButton>
+                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload"
+                                   OnClick="RestoreAsync">Restore</MudButton>
+                    </div>
+                </MudPaper>
+            }
+        </div>
+    </div>
+
+    @if (SessionService.CanModify("Settings"))
+    {
+        <div style="margin-top:8px;padding-bottom:16px;">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@_saving" OnClick="SaveAsync">
+                @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Save Settings
+            </MudButton>
+        </div>
+    }
+}
+
+@code {
+    private bool                 _loading = true;
+    private bool                 _saving;
+    private DnsSettingsResponse? _s;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await Api.GetAsync<DnsSettingsResponse>("api/settings/get");
+        _loading = false;
+
+        if (result.IsOk && result.Data is not null)
+            _s = result.Data;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private void SetProxyType(string type)
+    {
+        if (type == "None") { _s!.Proxy = null; return; }
+        _s!.Proxy ??= new ProxySettings();
+        _s.Proxy.Type = type;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (_s is null) return;
+        _saving = true;
+
+        var form = BuildForm(_s);
+        var result = await Api.PostAsync<object>("api/settings/set", form);
+        _saving = false;
+
+        if (result.IsOk)
+            Snackbar.Add("Settings saved.", Severity.Success);
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task UpdateBlockListAsync()
+    {
+        var res = await Api.PostAsync<object>("api/settings/updateBlockListUrls",
+            new Dictionary<string, string>());
+        if (res.IsOk) Snackbar.Add("Block list update triggered.", Severity.Success);
+        else          Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task BackupAsync()
+    {
+        await DialogService.ShowAsync<Dialogs.BackupSettingsDialog>("Backup Settings",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+    }
+
+    private async Task RestoreAsync()
+    {
+        var d = await DialogService.ShowAsync<Dialogs.RestoreSettingsDialog>("Restore Settings",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadAsync();
+    }
+
+    // ── Helpers ────────────────────────────────────────────────────────
+    private static string ListToLines(List<string>? list) =>
+        list is null ? "" : string.Join("\n", list);
+
+    private static List<string>? LinesToList(string text)
+    {
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        return lines.Length == 0 ? null : [.. lines];
+    }
+
+    private static Dictionary<string, string> BuildForm(DnsSettingsResponse s)
+    {
+        var f = new Dictionary<string, string>();
+        void Str(string k, string? v)       { if (v is not null) f[k] = v; }
+        void Int(string k, int v)           { f[k] = v.ToString(); }
+        void Bool(string k, bool v)         { f[k] = v ? "true" : "false"; }
+        void Lines(string k, List<string>? v) { if (v?.Count > 0) f[k] = string.Join(",", v); }
+
+        Str("dnsServerDomain",           s.DnsServerDomain);
+        Lines("dnsServerLocalEndPoints", s.DnsServerLocalEndPoints);
+        Bool("preferIPv6",               s.PreferIPv6);
+        Bool("dnssecValidation",         s.DnssecValidation);
+        Bool("logQueries",               s.LogQueries);
+        Lines("webServiceLocalAddresses",s.WebServiceLocalAddresses);
+        Int("webServiceHttpPort",        s.WebServiceHttpPort);
+        Int("webServiceTlsPort",         s.WebServiceTlsPort);
+        Bool("webServiceEnableTls",      s.WebServiceEnableTls);
+        Str("webServiceTlsCertificatePath",     s.WebServiceTlsCertificatePath);
+        Str("webServiceTlsCertificatePassword", s.WebServiceTlsCertificatePassword);
+        Bool("enableDnsOverHttp",        s.EnableDnsOverHttp);
+        Bool("enableDnsOverTls",         s.EnableDnsOverTls);
+        Bool("enableDnsOverHttps",       s.EnableDnsOverHttps);
+        Bool("enableDnsOverQuic",        s.EnableDnsOverQuic);
+        Str("forwarderProtocol",         s.ForwarderProtocol);
+        Lines("forwarders",              s.Forwarders);
+        Bool("enableConcurrentForwarding", s.EnableConcurrentForwarding);
+        Str("recursion",                 s.Recursion);
+        Bool("qnameMinimization",        s.QnameMinimization);
+        Bool("randomizeName",            s.RandomizeName);
+        Bool("enableBlocking",           s.EnableBlocking);
+        Str("blockingType",              s.BlockingType);
+        Lines("customBlockingAddresses", s.CustomBlockingAddresses);
+        Lines("blockListUrls",           s.BlockListUrls);
+        Int("blockListUpdateIntervalHours", s.BlockListUpdateIntervalHours);
+        Int("cacheMaximumEntries",       s.CacheMaximumEntries);
+        Int("cacheMinimumRecordTtl",     s.CacheMinimumRecordTtl);
+        Int("cacheMaximumRecordTtl",     s.CacheMaximumRecordTtl);
+        Bool("serveStale",               s.ServeStale);
+        Str("loggingType",               s.LoggingType);
+        Str("logFolder",                 s.LogFolder);
+        Int("maxLogFileDays",            s.MaxLogFileDays);
+        Bool("useLocalTime",             s.UseLocalTime);
+
+        if (s.Proxy is { } p && p.Type != "None")
+        {
+            f["proxyType"]    = p.Type;
+            f["proxyAddress"] = p.Address;
+            f["proxyPort"]    = p.Port.ToString();
+        }
+        else
+        {
+            f["proxyType"] = "None";
+        }
+
+        return f;
+    }
+}

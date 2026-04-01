@@ -1,0 +1,53 @@
+@inject SessionService SessionService
+@inject ApiService     Api
+@inject ISnackbar      Snackbar
+
+<MudPaper Elevation="1" Class="pa-4" Style="max-width:640px;">
+    <MudText Typo="Typo.h6" Class="mb-3">Technitium DNS Server</MudText>
+
+    @if (SessionService.Info is { } info)
+    {
+        <MudSimpleTable Dense="true" Hover="false" Bordered="false" Elevation="0">
+            <tbody>
+                <tr><td><strong>Version</strong></td><td>@info.Version</td></tr>
+                <tr><td><strong>Domain</strong></td><td>@info.DnsServerDomain</td></tr>
+                <tr>
+                    <td><strong>Uptime</strong></td>
+                    <td>@FormatUptime(info.Uptimestamp)</td>
+                </tr>
+            </tbody>
+        </MudSimpleTable>
+    }
+
+    <MudDivider Class="my-3" />
+
+    <MudText Typo="Typo.body2" Class="mb-1">
+        <MudLink Href="https://technitium.com/dns/" Target="_blank">Technitium DNS Server</MudLink>
+        &mdash; Open-source authoritative + recursive DNS server.
+    </MudText>
+    <MudText Typo="Typo.body2" Class="mb-1">
+        <MudLink Href="https://github.com/TechnitiumSoftware/DnsServer" Target="_blank">GitHub Repository</MudLink>
+    </MudText>
+    <MudText Typo="Typo.body2">
+        <MudLink Href="https://technitium.com/dns/changelog.html" Target="_blank">Changelog</MudLink>
+    </MudText>
+
+    <MudDivider Class="my-3" />
+
+    <MudText Typo="Typo.caption">
+        Copyright &copy; Technitium. Licensed under GPL v3.
+    </MudText>
+</MudPaper>
+
+@code {
+    private static string FormatUptime(long? uptimestamp)
+    {
+        if (uptimestamp is null or 0) return "—";
+        var ts = TimeSpan.FromSeconds(uptimestamp.Value);
+        if (ts.TotalDays >= 1)
+            return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
+        if (ts.TotalHours >= 1)
+            return $"{ts.Hours}h {ts.Minutes}m {ts.Seconds}s";
+        return $"{ts.Minutes}m {ts.Seconds}s";
+    }
+}

@@ -1,0 +1,61 @@
+@inject ApiService Api
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div style="display:flex;justify-content:center;padding:32px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+        else
+        {
+            <MudTable Items="@_items" Dense="true" Hover="true" Elevation="0"
+                      FixedHeader="true" Height="420px">
+                <HeaderContent>
+                    <MudTh>Name</MudTh>
+                    <MudTh Style="text-align:right">Hits</MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd DataLabel="Name">@context.Name</MudTd>
+                    <MudTd DataLabel="Hits" Style="text-align:right">@context.Hits.ToString("N0")</MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Close</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string StatsType { get; set; } = string.Empty;
+    [Parameter] public string Range     { get; set; } = "lastHour";
+    [Parameter] public string Node      { get; set; } = "cluster";
+
+    private bool                    _loading = true;
+    private string?                 _error;
+    private List<TopStatsEntry>     _items   = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var url = $"api/dashboard/stats/getTop?statsType={Uri.EscapeDataString(StatsType)}" +
+                  $"&type={Range}&limit=100&node={Uri.EscapeDataString(Node)}";
+        var result = await Api.GetAsync<TopStatsResponse>(url);
+        _loading = false;
+
+        if (result.IsOk && result.Data is not null)
+        {
+            _items = result.Data.Stats ?? [];
+        }
+        else
+        {
+            _error = result.DisplayError;
+        }
+    }
+}

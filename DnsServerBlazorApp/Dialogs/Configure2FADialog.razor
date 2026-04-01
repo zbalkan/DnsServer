@@ -1,0 +1,132 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject ISnackbar      Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+
+        @if (SessionService.TotpEnabled)
+        {
+            <MudAlert Severity="Severity.Info" Class="mb-3">
+                Two-factor authentication is currently <strong>enabled</strong>.
+            </MudAlert>
+            <MudTextField @bind-Value="_totp" Label="Enter TOTP code to disable 2FA"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = DisableAsync(); })" />
+        }
+        else if (_qrCodeUrl is null)
+        {
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Enable two-factor authentication using an authenticator app.
+            </MudText>
+            <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                       Disabled="@_busy" OnClick="SetupAsync">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Setup 2FA
+            </MudButton>
+        }
+        else
+        {
+            <MudText Typo="Typo.body2" Class="mb-2">
+                Scan this QR code with your authenticator app, then enter the code below to confirm.
+            </MudText>
+            <div style="text-align:center;margin:12px 0;">
+                <img src="@_qrCodeUrl" alt="QR Code" style="max-width:200px;" />
+            </div>
+            <MudTextField @bind-Value="_secret" Label="Secret Key" Variant="Variant.Outlined"
+                          Margin="Margin.Dense" ReadOnly="true" Class="mb-2" />
+            <MudTextField @bind-Value="_totp" Label="TOTP Code" Variant="Variant.Outlined"
+                          Margin="Margin.Dense"
+                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = EnableAsync(); })" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        @if (SessionService.TotpEnabled)
+        {
+            <MudButton Color="Color.Error" Variant="Variant.Filled"
+                       Disabled="@_busy" OnClick="DisableAsync">Disable 2FA</MudButton>
+        }
+        else if (_qrCodeUrl is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       Disabled="@_busy" OnClick="EnableAsync">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Enable 2FA
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string? _qrCodeUrl;
+    private string? _secret;
+    private string  _totp  = string.Empty;
+    private string? _error;
+    private bool    _busy;
+
+    private async Task SetupAsync()
+    {
+        _busy = true;
+        var result = await Api.GetAsync<Models.Auth.TotpSetupResponse>(
+            $"api/user/totp/setup?user={Uri.EscapeDataString(SessionService.Username)}");
+        _busy = false;
+
+        if (result.IsOk && result.Data is not null)
+        {
+            _secret    = result.Data.Secret;
+            _qrCodeUrl = result.Data.QrCodeUrl;
+        }
+        else
+            _error = result.DisplayError;
+    }
+
+    private async Task EnableAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_totp)) { _error = "Enter the TOTP code."; return; }
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["user"] = SessionService.Username,
+            ["code"] = _totp,
+        };
+        var result = await Api.PostAsync<object>("api/user/totp/enable", form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("2FA enabled.", Severity.Success);
+            MudDialog.Close();
+        }
+        else
+            _error = result.DisplayError;
+    }
+
+    private async Task DisableAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_totp)) { _error = "Enter the TOTP code."; return; }
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["user"] = SessionService.Username,
+            ["code"] = _totp,
+        };
+        var result = await Api.PostAsync<object>("api/user/totp/disable", form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("2FA disabled.", Severity.Success);
+            MudDialog.Close();
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

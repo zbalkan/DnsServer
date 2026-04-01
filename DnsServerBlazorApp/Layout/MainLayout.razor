@@ -1,0 +1,169 @@
+@inherits LayoutComponentBase
+@inject ThemeService ThemeService
+@inject SessionService SessionService
+@inject IDialogService DialogService
+@inject ISnackbar Snackbar
+@inject NavigationManager Nav
+
+<MudThemeProvider Theme="@ThemeService.Theme" IsDarkMode="@ThemeService.IsDarkMode" />
+<MudDialogProvider FullWidth="true" MaxWidth="MaxWidth.Medium"
+                   CloseButton="true" DisableBackdropClick="false"
+                   Position="DialogPosition.Center" />
+<MudSnackbarProvider />
+
+@* ── App bar ──────────────────────────────────────────────────────── *@
+<MudAppBar Elevation="2" Dense="true" Color="Color.Primary">
+    <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
+        <img src="img/logo25x25.png" alt="Technitium" style="height:20px;vertical-align:middle;" />
+        <MudText Typo="Typo.h6" Style="font-weight:600;font-family:Arial;font-size:20px;color:#fff;">
+            Technitium
+        </MudText>
+        @if (SessionService.Info is { } info)
+        {
+            <MudText Typo="Typo.body2" Style="color:rgba(255,255,255,.75);margin-left:4px;">
+                — @info.DnsServerDomain
+            </MudText>
+        }
+    </MudStack>
+
+    <MudSpacer />
+
+    @* Update badge *@
+    @if (_updateAvailable)
+    {
+        <MudLink Href="#" Color="Color.Error" Typo="Typo.body2"
+                 Style="margin-right:12px;color:#ff6b6b!important;font-weight:600;"
+                 @onclick="ShowUpdateModal" @onclick:preventDefault>
+            New Update Available!
+        </MudLink>
+    }
+
+    @* User menu — only when logged in *@
+    @if (SessionService.IsAuthenticated)
+    {
+        <MudMenu AnchorOrigin="Origin.BottomRight" TransformOrigin="Origin.TopRight"
+                 Icon="@Icons.Material.Filled.Person" Color="Color.Inherit"
+                 Label="@SessionService.DisplayName" EndIcon="@Icons.Material.Filled.ArrowDropDown"
+                 IconSize="Size.Small" Dense="true">
+            <MudMenuItem Icon="@Icons.Material.Outlined.AccountCircle"
+                         @onclick="@(() => ShowDialog<Dialogs.MyProfileDialog>())">
+                My Profile
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Key"
+                         @onclick="@(() => ShowDialog<Dialogs.CreateApiTokenDialog>())">
+                Create API Token
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Lock"
+                         @onclick="@(() => ShowDialog<Dialogs.ChangePasswordDialog>())">
+                Change Password
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.Security"
+                         @onclick="@(() => ShowDialog<Dialogs.Configure2FADialog>())">
+                Configure 2FA
+            </MudMenuItem>
+            <MudMenuItem Icon="@Icons.Material.Outlined.DarkMode"
+                         @onclick="ToggleThemeAsync">
+                Toggle Dark Mode
+            </MudMenuItem>
+            <MudDivider />
+            <MudMenuItem Icon="@Icons.Material.Outlined.Logout"
+                         @onclick="LogoutAsync">
+                Logout
+            </MudMenuItem>
+        </MudMenu>
+    }
+</MudAppBar>
+
+@* ── Fixed alert banner (replicates the original .AlertPlaceholder) ─ *@
+@if (_alertMessage is not null)
+{
+    <div class="dns-alert-placeholder">
+        <MudAlert Severity="@_alertSeverity" ShowCloseIcon="true"
+                  CloseIconClicked="ClearAlert"
+                  Elevation="4" Dense="false">
+            <strong>@_alertTitle</strong>&nbsp;@_alertMessage
+        </MudAlert>
+    </div>
+}
+
+@* ── Main body ────────────────────────────────────────────────────── *@
+<MudMainContent Style="padding-top:48px;">
+    @Body
+</MudMainContent>
+
+@* ── Footer ───────────────────────────────────────────────────────── *@
+<MudPaper Elevation="2" Square="true"
+          Style="@($"background:{(ThemeService.IsDarkMode ? "#252525" : "#f3f3f3")};padding:10px 0;text-align:center;")">
+    <MudText Typo="Typo.caption" Style="@($"color:{(ThemeService.IsDarkMode ? "#888" : "#777")};font-size:11px;font-weight:600;font-family:Arial,sans-serif;")">
+        <MudLink Href="https://technitium.com/" Target="_blank" Color="Color.Primary">Technitium</MudLink>
+        &nbsp;|&nbsp;
+        <MudLink Href="https://blog.technitium.com/" Target="_blank" Color="Color.Primary">Blog</MudLink>
+        &nbsp;|&nbsp;
+        <MudLink Href="https://go.technitium.com/?id=35" Target="_blank" Color="Color.Primary">Donate</MudLink>
+        &nbsp;|&nbsp;
+        <MudLink Href="https://dnsclient.net/" Target="_blank" Color="Color.Primary">DNS Client</MudLink>
+        &nbsp;|&nbsp;
+        <MudLink Href="https://github.com/TechnitiumSoftware/DnsServer" Target="_blank" Color="Color.Primary">
+            GitHub
+        </MudLink>
+    </MudText>
+</MudPaper>
+
+@code {
+    // ── Alert state ───────────────────────────────────────────────────
+    private string?       _alertMessage;
+    private string?       _alertTitle;
+    private Severity      _alertSeverity = Severity.Error;
+    private bool          _updateAvailable;
+
+    // ── Init ──────────────────────────────────────────────────────────
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ThemeService.InitAsync();
+            ThemeService.OnChange += StateHasChanged;
+            SessionService.OnChange += StateHasChanged;
+            StateHasChanged();
+        }
+    }
+
+    // ── Alert helpers (called by child components via CascadingValue) ──
+    public void ShowAlert(Severity severity, string title, string message)
+    {
+        _alertSeverity = severity;
+        _alertTitle    = title;
+        _alertMessage  = message;
+        InvokeAsync(StateHasChanged);
+
+        if (severity == Severity.Success)
+            _ = Task.Delay(5000).ContinueWith(_ =>
+                InvokeAsync(() => { ClearAlert(); StateHasChanged(); }));
+    }
+
+    public void ClearAlert()
+    {
+        _alertMessage = null;
+        _alertTitle   = null;
+    }
+
+    // ── User menu actions ─────────────────────────────────────────────
+    private async Task ToggleThemeAsync() => await ThemeService.ToggleAsync();
+
+    private async Task LogoutAsync()
+    {
+        // The actual API call is handled in SessionService via Index.razor
+        Nav.NavigateTo("/", forceLoad: false);
+        await SessionService.ClearSessionAsync();
+    }
+
+    private void ShowUpdateModal()
+    {
+        Snackbar.Add("A new version of Technitium DNS Server is available.", Severity.Info);
+    }
+
+    private Task ShowDialog<TDialog>() where TDialog : ComponentBase
+    {
+        return DialogService.ShowAsync<TDialog>(string.Empty);
+    }
+}

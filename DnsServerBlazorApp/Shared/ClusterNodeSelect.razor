@@ -1,0 +1,50 @@
+@* Dropdown for selecting a cluster node – shown next to each tab's toolbar.
+   Mirrors the .cluster-node-dropdown selects in the original HTML.         *@
+@inject SessionService SessionService
+
+@if (_items.Count > 1)
+{
+    <MudSelect T="string" @bind-Value="Value" ValueChanged="OnValueChanged"
+               Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
+               Style="max-width:220px;" Class="dns-cluster-select"
+               Label="Node">
+        @foreach (var item in _items)
+        {
+            <MudSelectItem Value="@item.Value">@item.Label</MudSelectItem>
+        }
+    </MudSelect>
+}
+
+@code {
+    /// <summary>Currently-selected node name or "cluster".</summary>
+    [Parameter] public string  Value        { get; set; } = string.Empty;
+    [Parameter] public bool    IncludeAll   { get; set; } = true;    // "cluster" option
+    [Parameter] public EventCallback<string> ValueChanged { get; set; }
+
+    private record NodeItem(string Value, string Label);
+    private List<NodeItem> _items = [];
+
+    protected override void OnInitialized() => Build();
+
+    protected override void OnParametersSet() => Build();
+
+    private void Build()
+    {
+        _items = [];
+        if (IncludeAll)
+            _items.Add(new("cluster", "All Nodes (cluster)"));
+
+        foreach (var n in SessionService.ClusterNodes)
+            _items.Add(new(n.Name, n.IsPrimary ? $"{n.Name} (primary)" : n.Name));
+
+        // Default to first item if current value is not in list
+        if (_items.Count > 0 && !_items.Any(i => i.Value == Value))
+            Value = _items[0].Value;
+    }
+
+    private Task OnValueChanged(string v)
+    {
+        Value = v;
+        return ValueChanged.InvokeAsync(v);
+    }
+}

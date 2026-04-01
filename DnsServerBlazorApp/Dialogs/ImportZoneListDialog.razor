@@ -1,0 +1,67 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+        <MudText Typo="Typo.body2" Class="mb-2">
+            Paste a list of domains (one per line) or upload a text file.
+        </MudText>
+        <MudTextField @bind-Value="_text" Label="Domains" Variant="Variant.Outlined"
+                      Lines="12" Margin="Margin.Dense" Class="mb-2"
+                      Style="font-family:monospace;font-size:12px;" />
+        <InputFile OnChange="OnFileSelected" accept=".txt" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="ImportAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Import
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string ZoneType { get; set; } = "blocked";  // "allowed" | "blocked"
+    [Parameter] public string Node     { get; set; } = "cluster";
+
+    private string  _text  = string.Empty;
+    private string? _error;
+    private bool    _busy;
+
+    private async void OnFileSelected(InputFileChangeEventArgs e)
+    {
+        using var reader = new System.IO.StreamReader(e.File.OpenReadStream());
+        _text = await reader.ReadToEndAsync();
+        StateHasChanged();
+    }
+
+    private async Task ImportAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_text)) { _error = "Nothing to import."; return; }
+        _busy = true;
+
+        var url  = $"api/zones/{ZoneType}/import";
+        var form = new Dictionary<string, string>
+        {
+            ["domains"] = _text,
+            ["node"]    = Node,
+        };
+        var result = await Api.PostAsync<object>(url, form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("Zones imported.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

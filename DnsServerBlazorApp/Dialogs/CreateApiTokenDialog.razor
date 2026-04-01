@@ -1,0 +1,78 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject ISnackbar      Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_token is not null)
+        {
+            <MudAlert Severity="Severity.Success" Class="mb-3">
+                API token created. Copy it now — it will not be shown again.
+            </MudAlert>
+            <MudTextField Value="@_token" Label="API Token" Variant="Variant.Outlined"
+                          ReadOnly="true" Adornment="Adornment.End"
+                          AdornmentIcon="@Icons.Material.Filled.ContentCopy"
+                          OnAdornmentClick="CopyToken" />
+        }
+        else
+        {
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                          CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+            }
+            <MudTextField @bind-Value="_tokenName" Label="Token Name"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="A memorable name for this token"
+                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = CreateAsync(); })" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Close</MudButton>
+        @if (_token is null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       Disabled="@_busy" OnClick="CreateAsync">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Create Token
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Inject] IJSRuntime JS { get; set; } = null!;
+
+    private string  _tokenName = string.Empty;
+    private string? _token;
+    private string? _error;
+    private bool    _busy;
+
+    private async Task CreateAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_tokenName)) { _error = "Token name required."; return; }
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["user"]      = SessionService.Username,
+            ["tokenName"] = _tokenName,
+        };
+        var result = await Api.PostAsync<Models.Auth.ApiTokenResponse>("api/user/session/createToken", form);
+        _busy = false;
+
+        if (result.IsOk)
+            _token = result.Data?.Token;
+        else
+            _error = result.DisplayError;
+    }
+
+    private async Task CopyToken()
+    {
+        if (_token is not null)
+        {
+            await JS.InvokeVoidAsync("navigator.clipboard.writeText", _token);
+            Snackbar.Add("Token copied to clipboard.", Severity.Success);
+        }
+    }
+}

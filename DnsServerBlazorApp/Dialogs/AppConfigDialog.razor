@@ -1,0 +1,79 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_loading)
+        {
+            <div style="display:flex;justify-content:center;padding:32px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error">@_error</MudAlert>
+        }
+        else
+        {
+            <MudTextField @bind-Value="_config" Lines="20"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          Style="font-family:monospace;font-size:13px;"
+                          FullWidth="true" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        @if (_config is not null)
+        {
+            <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                       Disabled="@_saving" OnClick="SaveAsync">
+                @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Save
+            </MudButton>
+        }
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter, EditorRequired] public DnsApp App  { get; set; } = null!;
+    [Parameter] public string Node { get; set; } = "cluster";
+
+    private bool    _loading = true;
+    private bool    _saving;
+    private string? _config;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var url = $"api/apps/config/get?name={Uri.EscapeDataString(App.Name)}&node={Uri.EscapeDataString(Node)}";
+        var result = await Api.GetAsync<AppConfigResponse>(url);
+        _loading = false;
+
+        if (result.IsOk)
+            _config = result.Data?.Config ?? string.Empty;
+        else
+            _error = result.DisplayError;
+    }
+
+    private async Task SaveAsync()
+    {
+        _saving = true;
+        var form = new Dictionary<string, string>
+        {
+            ["name"]   = App.Name,
+            ["config"] = _config ?? string.Empty,
+            ["node"]   = Node,
+        };
+        var result = await Api.PostAsync<object>("api/apps/config/set", form);
+        _saving = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("App configuration saved.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

@@ -1,0 +1,61 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+        <MudAlert Severity="Severity.Warning" Class="mb-3">
+            Restoring will overwrite current settings. This cannot be undone.
+        </MudAlert>
+        <MudText Typo="Typo.body2" Class="mb-2">Select a backup file (.zip) to restore.</MudText>
+        <InputFile OnChange="OnFileSelected" accept=".zip" />
+
+        @if (_file is not null)
+        {
+            <MudText Typo="Typo.caption" Class="mt-2">Selected: @_file.Name (@(_file.Size / 1024) KB)</MudText>
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Warning" Variant="Variant.Filled"
+                   Disabled="@(_busy || _file is null)" OnClick="RestoreAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Restore
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private IBrowserFile? _file;
+    private string?       _error;
+    private bool          _busy;
+
+    private void OnFileSelected(InputFileChangeEventArgs e) => _file = e.File;
+
+    private async Task RestoreAsync()
+    {
+        if (_file is null) return;
+        _busy = true;
+
+        var mp = new MultipartFormDataContent();
+        var stream = _file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+        mp.Add(new StreamContent(stream), "backup", _file.Name);
+
+        var result = await Api.PostMultipartAsync<object>("api/settings/restore", mp);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add("Settings restored. Server may restart.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}

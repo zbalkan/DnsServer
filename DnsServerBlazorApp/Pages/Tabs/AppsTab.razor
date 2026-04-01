@@ -1,0 +1,187 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject IDialogService DialogService
+@inject ISnackbar      Snackbar
+
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+    <MudText Typo="Typo.subtitle2" Style="flex:1">DNS Apps</MudText>
+    <ClusterNodeSelect @bind-Value="_node" ValueChanged="@((_) => _ = LoadAsync())" />
+    @if (SessionService.CanModify("Apps"))
+    {
+        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Store"
+                   OnClick="OpenStoreAsync">App Store</MudButton>
+        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                   StartIcon="@Icons.Material.Filled.Upload"
+                   OnClick="InstallLocalAsync">Install</MudButton>
+    }
+    <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                   OnClick="LoadAsync" Title="Refresh" />
+</div>
+
+@if (_loading)
+{
+    <div style="display:flex;justify-content:center;padding:60px;">
+        <MudProgressCircular Indeterminate="true" Color="Color.Primary" Size="Size.Large" />
+    </div>
+}
+else if (_apps.Count == 0)
+{
+    <MudAlert Severity="Severity.Info">No DNS apps installed.</MudAlert>
+}
+else
+{
+    <MudTable Items="@_apps" Dense="true" Hover="true" Elevation="1">
+        <HeaderContent>
+            <MudTh>App</MudTh>
+            <MudTh>Version</MudTh>
+            <MudTh>Classes</MudTh>
+            <MudTh></MudTh>
+        </HeaderContent>
+        <RowTemplate>
+            <MudTd DataLabel="App">
+                <div>
+                    <MudText Typo="Typo.body2"><strong>@context.Name</strong></MudText>
+                    @if (!string.IsNullOrEmpty(context.Description))
+                    {
+                        <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);">
+                            @context.Description
+                        </MudText>
+                    }
+                </div>
+            </MudTd>
+            <MudTd DataLabel="Version">
+                <MudText Typo="Typo.body2">@context.Version</MudText>
+                @if (context.UpdateVersion is not null)
+                {
+                    <MudChip T="string" Size="Size.Small" Color="Color.Warning" Variant="Variant.Filled">
+                        Update: @context.UpdateVersion
+                    </MudChip>
+                }
+            </MudTd>
+            <MudTd DataLabel="Classes">
+                <div style="display:flex;flex-wrap:wrap;gap:3px;">
+                    @foreach (var cls in context.DnsApps)
+                    {
+                        <MudTooltip Text="@BuildClassTooltip(cls)">
+                            <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
+                                     Color="Color.Default">@ShortClassName(cls.ClassPath)</MudChip>
+                        </MudTooltip>
+                    }
+                </div>
+            </MudTd>
+            <MudTd Style="text-align:right;white-space:nowrap;">
+                @if (SessionService.CanModify("Apps"))
+                {
+                    <MudIconButton Icon="@Icons.Material.Filled.Settings" Size="Size.Small"
+                                   Title="Configure" OnClick="@(() => ConfigureAsync(context))" />
+                    @if (context.UpdateVersion is not null)
+                    {
+                        <MudIconButton Icon="@Icons.Material.Filled.Update" Size="Size.Small"
+                                       Color="Color.Warning" Title="Update"
+                                       OnClick="@(() => UpdateAsync(context))" />
+                    }
+                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                   Color="Color.Error" Title="Uninstall"
+                                   OnClick="@(() => UninstallAsync(context))" />
+                }
+            </MudTd>
+        </RowTemplate>
+    </MudTable>
+}
+
+@code {
+    private string       _node    = "cluster";
+    private bool         _loading = true;
+    private List<DnsApp> _apps    = [];
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        var result = await Api.GetAsync<AppsListResponse>(
+            $"api/apps/list?node={Uri.EscapeDataString(_node)}");
+        _loading = false;
+
+        if (result.IsOk && result.Data?.Apps is { } list)
+            _apps = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task ConfigureAsync(DnsApp app)
+    {
+        var p = new DialogParameters { ["App"] = app, ["Node"] = _node };
+        await DialogService.ShowAsync<Dialogs.AppConfigDialog>($"{app.Name} — Config", p,
+            new DialogOptions { MaxWidth = MaxWidth.Medium, FullWidth = true });
+    }
+
+    private async Task UpdateAsync(DnsApp app)
+    {
+        var form = new Dictionary<string, string> { ["name"] = app.Name, ["node"] = _node };
+        var res = await Api.PostAsync<object>("api/apps/update", form);
+        if (res.IsOk)
+        {
+            Snackbar.Add($"'{app.Name}' updated.", Severity.Success);
+            await LoadAsync();
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task UninstallAsync(DnsApp app)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Uninstall App",
+            $"Uninstall '{app.Name}'?",
+            yesText: "Uninstall", cancelText: "Cancel");
+        if (confirm is not true) return;
+
+        var form = new Dictionary<string, string> { ["name"] = app.Name, ["node"] = _node };
+        var res = await Api.PostAsync<object>("api/apps/uninstall", form);
+        if (res.IsOk)
+        {
+            Snackbar.Add($"'{app.Name}' uninstalled.", Severity.Success);
+            _apps.Remove(app);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    private async Task OpenStoreAsync()
+    {
+        var p = new DialogParameters { ["Node"] = _node };
+        var d = await DialogService.ShowAsync<Dialogs.StoreAppsDialog>("App Store", p,
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadAsync();
+    }
+
+    private async Task InstallLocalAsync()
+    {
+        var p = new DialogParameters { ["Node"] = _node };
+        var d = await DialogService.ShowAsync<Dialogs.InstallAppDialog>("Install App", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadAsync();
+    }
+
+    private static string ShortClassName(string? classPath)
+    {
+        if (string.IsNullOrEmpty(classPath)) return "?";
+        var dot = classPath.LastIndexOf('.');
+        return dot >= 0 ? classPath[(dot + 1)..] : classPath;
+    }
+
+    private static string BuildClassTooltip(DnsAppClass cls)
+    {
+        var feats = new List<string>();
+        if (cls.IsRequestController)         feats.Add("Request Controller");
+        if (cls.IsRequestBlockingHandler)    feats.Add("Blocking Handler");
+        if (cls.IsAuthoritativeRequestHandler) feats.Add("Authoritative");
+        if (cls.IsQueryLogger)               feats.Add("Query Logger");
+        if (cls.IsPostProcessor)             feats.Add("Post Processor");
+        return feats.Count > 0 ? string.Join(", ", feats) : ShortClassName(cls.ClassPath);
+    }
+}

@@ -1,0 +1,359 @@
+@inject ApiService     Api
+@inject SessionService SessionService
+@inject IDialogService DialogService
+@inject ISnackbar      Snackbar
+
+<MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
+         PanelClass="pt-2" SliderColor="Color.Primary">
+
+    @* ── Sessions ── *@
+    <MudTabPanel Text="Sessions">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <MudSpacer />
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                           OnClick="LoadSessionsAsync" Title="Refresh" />
+        </div>
+
+        @if (_loadingSessions)
+        {
+            <div style="display:flex;justify-content:center;padding:40px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@_sessions" Dense="true" Hover="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Username</MudTh>
+                    <MudTh>Display Name</MudTh>
+                    <MudTh>Created</MudTh>
+                    <MudTh>Last Used</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Username</MudTd>
+                    <MudTd>@context.DisplayName</MudTd>
+                    <MudTd>@context.CreatedOn?.ToLocalTime().ToString("g")</MudTd>
+                    <MudTd>@context.LastSeen?.ToLocalTime().ToString("g")</MudTd>
+                    <MudTd>
+                        @if (context.Token != SessionService.Token)
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Logout" Size="Size.Small"
+                                           Color="Color.Error" Title="Revoke session"
+                                           OnClick="@(() => RevokeSessionAsync(context))" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    @* ── Users ── *@
+    <MudTabPanel Text="Users">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <MudSpacer />
+            @if (SessionService.CanModify("Administration"))
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.PersonAdd"
+                           OnClick="AddUserAsync">Add User</MudButton>
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                           OnClick="LoadUsersAsync" Title="Refresh" />
+        </div>
+
+        @if (_loadingUsers)
+        {
+            <div style="display:flex;justify-content:center;padding:40px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@_users" Dense="true" Hover="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Username</MudTh>
+                    <MudTh>Display Name</MudTh>
+                    <MudTh>Status</MudTh>
+                    <MudTh>Groups</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Username</MudTd>
+                    <MudTd>@context.DisplayName</MudTd>
+                    <MudTd>
+                        @if (context.Disabled)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Default" Variant="Variant.Outlined">Disabled</MudChip>
+                        }
+                        else
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Active</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@string.Join(", ", context.MemberOf ?? [])</MudTd>
+                    <MudTd>
+                        @if (SessionService.CanModify("Administration"))
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                           OnClick="@(() => EditUserAsync(context))" />
+                            @if (context.Username != SessionService.Username)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => DeleteUserAsync(context))" />
+                            }
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    @* ── Groups ── *@
+    <MudTabPanel Text="Groups">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <MudSpacer />
+            @if (SessionService.CanModify("Administration"))
+            {
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           StartIcon="@Icons.Material.Filled.GroupAdd"
+                           OnClick="AddGroupAsync">Add Group</MudButton>
+            }
+            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                           OnClick="LoadGroupsAsync" Title="Refresh" />
+        </div>
+
+        @if (_loadingGroups)
+        {
+            <div style="display:flex;justify-content:center;padding:40px;">
+                <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+            </div>
+        }
+        else
+        {
+            <MudTable Items="@_groups" Dense="true" Hover="true" Elevation="1">
+                <HeaderContent>
+                    <MudTh>Group Name</MudTh>
+                    <MudTh>Description</MudTh>
+                    <MudTh></MudTh>
+                </HeaderContent>
+                <RowTemplate>
+                    <MudTd>@context.Name</MudTd>
+                    <MudTd>@context.Description</MudTd>
+                    <MudTd>
+                        @if (SessionService.CanModify("Administration") &&
+                             context.Name != "administrators" && context.Name != "everyone")
+                        {
+                            <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
+                                           OnClick="@(() => EditGroupAsync(context))" />
+                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                           Color="Color.Error"
+                                           OnClick="@(() => DeleteGroupAsync(context))" />
+                        }
+                    </MudTd>
+                </RowTemplate>
+            </MudTable>
+        }
+    </MudTabPanel>
+
+    @* ── Cluster ── *@
+    @if (SessionService.CanView("Administration"))
+    {
+        <MudTabPanel Text="Cluster">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+                <MudSpacer />
+                <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                               OnClick="LoadClusterAsync" Title="Refresh" />
+            </div>
+
+            @if (_loadingCluster)
+            {
+                <div style="display:flex;justify-content:center;padding:40px;">
+                    <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
+                </div>
+            }
+            else if (_clusterNodes.Count == 0)
+            {
+                <MudAlert Severity="Severity.Info">No cluster nodes configured (standalone mode).</MudAlert>
+            }
+            else
+            {
+                <MudTable Items="@_clusterNodes" Dense="true" Hover="true" Elevation="1">
+                    <HeaderContent>
+                        <MudTh>Node</MudTh>
+                        <MudTh>Type</MudTh>
+                        <MudTh>Status</MudTh>
+                        <MudTh>Version</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@(context.IsPrimary ? "Primary" : "Secondary")</MudTd>
+                        <MudTd>
+                            <MudChip T="string" Size="Size.Small"
+                                     Color="@(context.Status=="Online" ? Color.Success : Color.Error)"
+                                     Variant="Variant.Filled">@context.Status</MudChip>
+                        </MudTd>
+                        <MudTd>@context.Version</MudTd>
+                    </RowTemplate>
+                </MudTable>
+            }
+        </MudTabPanel>
+    }
+</MudTabs>
+
+@code {
+    // Sessions
+    private bool              _loadingSessions = true;
+    private List<SessionInfo> _sessions        = [];
+
+    // Users
+    private bool           _loadingUsers = true;
+    private List<UserInfo> _users        = [];
+
+    // Groups
+    private bool            _loadingGroups = true;
+    private List<GroupInfo> _groups        = [];
+
+    // Cluster
+    private bool              _loadingCluster = true;
+    private List<ClusterNode> _clusterNodes   = [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadSessionsAsync(), LoadUsersAsync(), LoadGroupsAsync(), LoadClusterAsync());
+    }
+
+    // ── Sessions ──────────────────────────────────────────────────────
+    private async Task LoadSessionsAsync()
+    {
+        _loadingSessions = true;
+        var result = await Api.GetAsync<Models.Auth.SessionListResponse>("api/user/session/list");
+        _loadingSessions = false;
+
+        if (result.IsOk && result.Data?.Sessions is { } list)
+            _sessions = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task RevokeSessionAsync(SessionInfo session)
+    {
+        var form = new Dictionary<string, string> { ["token"] = session.Token ?? "" };
+        var res = await Api.PostAsync<object>("api/user/session/delete", form);
+        if (res.IsOk)
+        {
+            _sessions.Remove(session);
+            Snackbar.Add("Session revoked.", Severity.Success);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────
+    private async Task LoadUsersAsync()
+    {
+        _loadingUsers = true;
+        var result = await Api.GetAsync<Models.Auth.UserListResponse>("api/user/list");
+        _loadingUsers = false;
+
+        if (result.IsOk && result.Data?.Users is { } list)
+            _users = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task AddUserAsync()
+    {
+        var d = await DialogService.ShowAsync<Dialogs.AddUserDialog>("Add User",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadUsersAsync();
+    }
+
+    private async Task EditUserAsync(UserInfo user)
+    {
+        var p = new DialogParameters { ["User"] = user };
+        var d = await DialogService.ShowAsync<Dialogs.UserDetailsDialog>($"User: {user.Username}", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadUsersAsync();
+    }
+
+    private async Task DeleteUserAsync(UserInfo user)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Delete User", $"Delete user '{user.Username}'?",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirm is not true) return;
+
+        var form = new Dictionary<string, string> { ["user"] = user.Username ?? "" };
+        var res = await Api.PostAsync<object>("api/user/delete", form);
+        if (res.IsOk)
+        {
+            _users.Remove(user);
+            Snackbar.Add($"User '{user.Username}' deleted.", Severity.Success);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    // ── Groups ────────────────────────────────────────────────────────
+    private async Task LoadGroupsAsync()
+    {
+        _loadingGroups = true;
+        var result = await Api.GetAsync<Models.Auth.GroupListResponse>("api/user/group/list");
+        _loadingGroups = false;
+
+        if (result.IsOk && result.Data?.Groups is { } list)
+            _groups = list;
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private async Task AddGroupAsync()
+    {
+        var d = await DialogService.ShowAsync<Dialogs.AddGroupDialog>("Add Group",
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadGroupsAsync();
+    }
+
+    private async Task EditGroupAsync(GroupInfo group)
+    {
+        var p = new DialogParameters { ["Group"] = group };
+        var d = await DialogService.ShowAsync<Dialogs.GroupDetailsDialog>($"Group: {group.Name}", p,
+            new DialogOptions { MaxWidth = MaxWidth.Small, FullWidth = true });
+        var r = await d.Result;
+        if (r is { Canceled: false }) await LoadGroupsAsync();
+    }
+
+    private async Task DeleteGroupAsync(GroupInfo group)
+    {
+        var confirm = await DialogService.ShowMessageBox(
+            "Delete Group", $"Delete group '{group.Name}'?",
+            yesText: "Delete", cancelText: "Cancel");
+        if (confirm is not true) return;
+
+        var form = new Dictionary<string, string> { ["group"] = group.Name ?? "" };
+        var res = await Api.PostAsync<object>("api/user/group/delete", form);
+        if (res.IsOk)
+        {
+            _groups.Remove(group);
+            Snackbar.Add($"Group '{group.Name}' deleted.", Severity.Success);
+        }
+        else
+            Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    // ── Cluster ───────────────────────────────────────────────────────
+    private async Task LoadClusterAsync()
+    {
+        _loadingCluster = true;
+        var result = await Api.GetAsync<ClusterStateResponse>("api/cluster/getNodes");
+        _loadingCluster = false;
+
+        if (result.IsOk && result.Data?.Nodes is { } list)
+            _clusterNodes = list;
+    }
+}

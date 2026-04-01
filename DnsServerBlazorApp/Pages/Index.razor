@@ -1,0 +1,345 @@
+@page "/"
+@layout DnsServerBlazorApp.Layout.MainLayout
+@inject SessionService   SessionService
+@inject ApiService       Api
+@inject ISnackbar        Snackbar
+@inject IDialogService   DialogService
+@inject ThemeService     ThemeService
+
+<PageTitle>@_pageTitle</PageTitle>
+
+@* ══════════════════════════════════════════════════════════════════════
+   LOGIN VIEW
+   ══════════════════════════════════════════════════════════════════════ *@
+@if (!SessionService.IsAuthenticated)
+{
+    <div style="display:flex;justify-content:center;padding:120px 16px 0;">
+        <MudCard Style="width:460px;" Elevation="3">
+            <MudCardHeader>
+                <CardHeaderContent>
+                    <MudText Typo="Typo.h6">DNS Server</MudText>
+                </CardHeaderContent>
+            </MudCardHeader>
+            <MudCardContent>
+                @if (_loginError is not null)
+                {
+                    <MudAlert Severity="Severity.Error" Dense="true"
+                              ShowCloseIcon="true" CloseIconClicked="@(() => _loginError = null)"
+                              Class="mb-3">@_loginError</MudAlert>
+                }
+                <MudTextField @bind-Value="_loginUser" Label="Username"
+                              Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Class="mb-2" Disabled="@_loginBusy"
+                              OnKeyUp="@(e => { if(e.Key=="Enter") _ = DoLoginAsync(); })" />
+                <MudTextField @bind-Value="_loginPass" Label="Password"
+                              InputType="@(_showPass ? InputType.Text : InputType.Password)"
+                              Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Class="mb-2" Disabled="@(_loginBusy || _totp2FAVisible)"
+                              Adornment="Adornment.End"
+                              AdornmentIcon="@(_showPass ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
+                              OnAdornmentClick="@(() => _showPass = !_showPass)"
+                              OnKeyUp="@(e => { if(e.Key=="Enter") _ = DoLoginAsync(); })" />
+                @if (_totp2FAVisible)
+                {
+                    <MudTextField @bind-Value="_loginTotp" Label="Enter OTP (6-digit code)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Class="mb-2" Disabled="@_loginBusy"
+                                  MaxLength="6" InputType="InputType.Number"
+                                  HelperText="Enter the 6-digit code from your authenticator app."
+                                  OnKeyUp="@(e => { if(e.Key=="Enter") _ = DoLoginAsync(); })" />
+                }
+            </MudCardContent>
+            <MudCardActions Style="justify-content:space-between;padding:8px 16px 16px;">
+                <MudButton Variant="Variant.Filled" Color="Color.Primary"
+                           Disabled="@_loginBusy" OnClick="DoLoginAsync">
+                    @if (_loginBusy)
+                    { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                    Login
+                </MudButton>
+                <MudLink Href="#" @onclick="ShowForgotPasswordAsync" @onclick:preventDefault>
+                    Forgot Password?
+                </MudLink>
+            </MudCardActions>
+        </MudCard>
+    </div>
+}
+
+@* ══════════════════════════════════════════════════════════════════════
+   MAIN PANEL (authenticated)
+   ══════════════════════════════════════════════════════════════════════ *@
+else
+{
+    <div style="padding:8px 12px;">
+        @* Update badge row *@
+        @if (_updateInfo is not null)
+        {
+            <MudAlert Severity="Severity.Warning" Dense="true" Class="mb-2">
+                <strong>New Update Available!</strong>&nbsp;Version @_updateInfo is ready.
+            </MudAlert>
+        }
+
+        @* ── Main tab set ──────────────────────────────────────────── *@
+        <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
+                 PanelClass="pt-2" @ref="_tabs" ActivePanelIndexChanged="OnTabChanged"
+                 SliderColor="Color.Primary">
+
+            @if (SessionService.CanView("Dashboard"))
+            {
+                <MudTabPanel Text="Dashboard" ID="@("Dashboard")">
+                    <Pages.Tabs.DashboardTab @ref="_dashboardTab" />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Zones"))
+            {
+                <MudTabPanel Text="Zones" ID="@("Zones")">
+                    <Pages.Tabs.ZonesTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Cache"))
+            {
+                <MudTabPanel Text="Cache" ID="@("Cache")">
+                    <Pages.Tabs.CacheTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Allowed"))
+            {
+                <MudTabPanel Text="Allowed" ID="@("Allowed")">
+                    <Pages.Tabs.AllowedTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Blocked"))
+            {
+                <MudTabPanel Text="Blocked" ID="@("Blocked")">
+                    <Pages.Tabs.BlockedTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Apps"))
+            {
+                <MudTabPanel Text="Apps" ID="@("Apps")">
+                    <Pages.Tabs.AppsTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("DnsClient"))
+            {
+                <MudTabPanel Text="DNS Client" ID="@("DnsClient")">
+                    <Pages.Tabs.DnsClientTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Settings"))
+            {
+                <MudTabPanel Text="Settings" ID="@("Settings")">
+                    <Pages.Tabs.SettingsTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("DhcpServer"))
+            {
+                <MudTabPanel Text="DHCP" ID="@("Dhcp")">
+                    <Pages.Tabs.DhcpTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Administration"))
+            {
+                <MudTabPanel Text="Administration" ID="@("Admin")">
+                    <Pages.Tabs.AdminTab />
+                </MudTabPanel>
+            }
+
+            @if (SessionService.CanView("Logs"))
+            {
+                <MudTabPanel Text="Logs" ID="@("Logs")">
+                    <Pages.Tabs.LogsTab />
+                </MudTabPanel>
+            }
+
+            <MudTabPanel Text="About" ID="@("About")">
+                <Pages.Tabs.AboutTab />
+            </MudTabPanel>
+
+        </MudTabs>
+    </div>
+}
+
+@code {
+    // ── Page state ────────────────────────────────────────────────────
+    private string _pageTitle = "Technitium DNS Server";
+
+    // Login form
+    private string  _loginUser       = string.Empty;
+    private string  _loginPass       = string.Empty;
+    private string  _loginTotp       = string.Empty;
+    private string? _loginError;
+    private bool    _loginBusy;
+    private bool    _totp2FAVisible;
+    private bool    _showPass;
+
+    // Main panel
+    private string? _updateInfo;
+    private MudTabs? _tabs;
+    private Pages.Tabs.DashboardTab? _dashboardTab;
+
+    // Auto-refresh (mirrors the original setInterval every 60s)
+    private System.Threading.Timer? _refreshTimer;
+
+    // ── Lifecycle ─────────────────────────────────────────────────────
+    protected override async Task OnInitializedAsync()
+    {
+        SessionService.OnChange += StateHasChanged;
+
+        var storedToken = await SessionService.LoadStoredTokenAsync();
+        if (storedToken is { Length: > 0 })
+            await TryRestoreSessionAsync(storedToken);
+        else
+            await AttemptAutoLoginAsync();
+    }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender && SessionService.IsAuthenticated)
+            StartAutoRefresh();
+    }
+
+    // ── Session restore ───────────────────────────────────────────────
+    private async Task TryRestoreSessionAsync(string token)
+    {
+        var result = await Api.GetAsync<Models.Auth.SessionData>($"api/user/session/get?token={Uri.EscapeDataString(token)}");
+        if (result.IsOk && result.Envelope is not null)
+        {
+            var sd = BuildSessionData(result.Envelope);
+            await SessionService.SetSessionAsync(sd);
+            UpdatePageTitle();
+            StartAutoRefresh();
+        }
+        else
+        {
+            await SessionService.ClearSessionAsync();
+        }
+    }
+
+    // Original behaviour: attempt admin/admin on first load with no token
+    private async Task AttemptAutoLoginAsync()
+    {
+        var form = new Dictionary<string, string>
+        {
+            ["user"]        = "admin",
+            ["pass"]        = "admin",
+            ["includeInfo"] = "true"
+        };
+        var result = await Api.PostAsync<object>("api/user/login", form);
+        if (result.IsOk && result.Envelope is not null)
+        {
+            var sd = BuildSessionData(result.Envelope);
+            await SessionService.SetSessionAsync(sd);
+            UpdatePageTitle();
+            StartAutoRefresh();
+        }
+    }
+
+    // ── Login form ────────────────────────────────────────────────────
+    private async Task DoLoginAsync()
+    {
+        _loginError = null;
+
+        if (string.IsNullOrWhiteSpace(_loginUser))
+        { _loginError = "Please enter a username."; return; }
+        if (string.IsNullOrWhiteSpace(_loginPass))
+        { _loginError = "Please enter a password."; return; }
+        if (_totp2FAVisible && _loginTotp.Length != 6)
+        { _loginError = "Please enter the 6-digit OTP from your authenticator app."; return; }
+
+        _loginBusy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["user"]        = _loginUser.ToLower(),
+            ["pass"]        = _loginPass,
+            ["totp"]        = _loginTotp,
+            ["includeInfo"] = "true"
+        };
+
+        var result = await Api.PostAsync<object>("api/user/login", form);
+        _loginBusy = false;
+
+        if (result.IsOk && result.Envelope is not null)
+        {
+            _totp2FAVisible = false;
+            var sd = BuildSessionData(result.Envelope);
+            await SessionService.SetSessionAsync(sd);
+            UpdatePageTitle();
+            StartAutoRefresh();
+
+            // Prompt default password change (mirrors original JS)
+            if (!sd.TotpEnabled && _loginUser == "admin" && _loginPass == "admin")
+                await ShowChangePasswordAsync();
+        }
+        else if (result.Is2FARequired)
+        {
+            _totp2FAVisible = true;
+            _loginTotp      = string.Empty;
+        }
+        else
+        {
+            _loginError = result.DisplayError;
+            if (_totp2FAVisible) _loginTotp = string.Empty;
+        }
+    }
+
+    // ── Auto-refresh (dashboard + uptime, mirrors setInterval) ───────
+    private void StartAutoRefresh()
+    {
+        _refreshTimer?.Dispose();
+        _refreshTimer = new System.Threading.Timer(_ =>
+            InvokeAsync(async () =>
+            {
+                if (_dashboardTab is not null)
+                    await _dashboardTab.SilentRefreshAsync();
+                StateHasChanged();
+            }), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+    }
+
+    private void OnTabChanged(int idx)
+    {
+        // Trigger data load on first access for tabs that lazy-load
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────
+    private static Models.Auth.SessionData BuildSessionData(ApiResponse<object> env) => new()
+    {
+        Token       = env.Token ?? string.Empty,
+        Username    = env.Username ?? string.Empty,
+        DisplayName = env.DisplayName ?? string.Empty,
+        TotpEnabled = env.TotpEnabled,
+        Info        = env.Info ?? new(),
+    };
+
+    private void UpdatePageTitle()
+    {
+        var info = SessionService.Info;
+        if (info is not null)
+            _pageTitle = $"{info.DnsServerDomain} — Technitium DNS Server v{info.Version}";
+    }
+
+    private async Task ShowForgotPasswordAsync()
+    {
+        await DialogService.ShowAsync<Dialogs.ForgotPasswordDialog>("Forgot Password");
+    }
+
+    private async Task ShowChangePasswordAsync()
+    {
+        var p = new DialogParameters { ["ForceChange"] = true };
+        await DialogService.ShowAsync<Dialogs.ChangePasswordDialog>("Change Password", p);
+    }
+
+    public void Dispose()
+    {
+        SessionService.OnChange -= StateHasChanged;
+        _refreshTimer?.Dispose();
+    }
+}

@@ -1,0 +1,119 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+
+        <MudTextField @bind-Value="_zoneName" Label="Zone Name" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mb-3"
+                      Disabled="@(_type == "SecondaryRoot")"
+                      HelperText="e.g. example.com" />
+
+        <MudSelect T="string" @bind-Value="_type" Label="Zone Type" Variant="Variant.Outlined"
+                   Margin="Margin.Dense" Class="mb-3">
+            <MudSelectItem Value="@("Primary")">Primary</MudSelectItem>
+            <MudSelectItem Value="@("Secondary")">Secondary</MudSelectItem>
+            <MudSelectItem Value="@("Stub")">Stub</MudSelectItem>
+            <MudSelectItem Value="@("Forwarder")">Forwarder</MudSelectItem>
+            <MudSelectItem Value="@("SecondaryForwarder")">Secondary Forwarder</MudSelectItem>
+            <MudSelectItem Value="@("Catalog")">Catalog</MudSelectItem>
+            <MudSelectItem Value="@("SecondaryCatalog")">Secondary Catalog</MudSelectItem>
+            <MudSelectItem Value="@("SecondaryRoot")">Secondary Root</MudSelectItem>
+        </MudSelect>
+
+        @if (_type is "Secondary" or "Stub" or "SecondaryForwarder" or "SecondaryCatalog" or "SecondaryRoot")
+        {
+            <MudTextField @bind-Value="_primaryAddresses" Label="Primary Name Server Addresses"
+                          Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
+                          Lines="3" HelperText="One per line (optional for Secondary/Stub)" />
+            <MudSelect T="string" @bind-Value="_transferProtocol" Label="Zone Transfer Protocol"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                <MudSelectItem Value="@("Tcp")">TCP</MudSelectItem>
+                <MudSelectItem Value="@("Tls")">TLS</MudSelectItem>
+                <MudSelectItem Value="@("Quic")">QUIC</MudSelectItem>
+            </MudSelect>
+        }
+
+        @if (_type == "Forwarder")
+        {
+            <MudSelect T="string" @bind-Value="_forwarderProtocol" Label="Forwarder Protocol"
+                       Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
+                <MudSelectItem Value="@("Udp")">UDP</MudSelectItem>
+                <MudSelectItem Value="@("Tcp")">TCP</MudSelectItem>
+                <MudSelectItem Value="@("Tls")">TLS</MudSelectItem>
+                <MudSelectItem Value="@("Https")">HTTPS</MudSelectItem>
+                <MudSelectItem Value="@("Quic")">QUIC</MudSelectItem>
+            </MudSelect>
+            <MudTextField @bind-Value="_forwarder" Label="Forwarder"
+                          Variant="Variant.Outlined" Margin="Margin.Dense"
+                          HelperText="e.g. 8.8.8.8, dns.quad9.net:853" />
+        }
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="SaveAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Add Zone
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public string Node { get; set; } = "cluster";
+
+    private string  _zoneName          = string.Empty;
+    private string  _type              = "Primary";
+    private string  _primaryAddresses  = string.Empty;
+    private string  _transferProtocol  = "Tcp";
+    private string  _forwarderProtocol = "Udp";
+    private string  _forwarder         = string.Empty;
+    private string? _error;
+    private bool    _busy;
+
+    protected override void OnParametersSet()
+    {
+        if (_type == "SecondaryRoot") _zoneName = ".";
+    }
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_zoneName)) { _error = "Zone name is required."; return; }
+
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["zone"] = _zoneName.Trim(),
+            ["type"] = _type,
+            ["node"] = Node,
+        };
+
+        if (!string.IsNullOrWhiteSpace(_primaryAddresses))
+            form["primaryNameServerAddresses"] = string.Join(",",
+                _primaryAddresses.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+
+        if (_type is "Secondary" or "Stub" or "SecondaryForwarder" or "SecondaryCatalog" or "SecondaryRoot")
+            form["zoneTransferProtocol"] = _transferProtocol;
+
+        if (_type == "Forwarder")
+        {
+            form["forwarderProtocol"] = _forwarderProtocol;
+            if (!string.IsNullOrWhiteSpace(_forwarder))
+                form["forwarder"] = _forwarder;
+        }
+
+        var result = await Api.PostAsync<object>("api/zones/create", form);
+        _busy = false;
+
+        if (result.IsOk)
+            MudDialog.Close(DialogResult.Ok(true));
+        else
+            _error = result.DisplayError;
+    }
+}

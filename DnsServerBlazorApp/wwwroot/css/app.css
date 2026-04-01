@@ -1,0 +1,232 @@
+/* ============================================================
+   Technitium DNS Server — Blazor/MudBlazor application styles
+   Ported faithfully from the original main.css with MudBlazor
+   conventions layered on top.
+   ============================================================ */
+
+/* ── Root ── */
+html, body {
+    height: 100% !important;
+    scrollbar-gutter: stable;
+}
+
+body {
+    margin: 0 !important;
+    line-height: 1.42857143 !important;
+}
+
+/* ── Alert placeholder (fixed top-centre) ── */
+.dns-alert-placeholder {
+    position: fixed;
+    width: 800px;
+    max-width: 95vw;
+    margin: auto;
+    left: 0;
+    right: 0;
+    top: 56px;          /* below MudAppBar (56 px default) */
+    z-index: 1300;
+}
+
+/* ── Blazor error UI ── */
+#blazor-error-ui {
+    background: lightyellow;
+    bottom: 0; left: 0; right: 0;
+    padding: 10px 15px;
+    position: fixed;
+    display: none;
+    z-index: 9999;
+}
+
+/* ── Dashboard stats strip ── */
+.dns-stats-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    padding: 6px 0;
+    overflow-x: auto;
+}
+
+.dns-stat-card {
+    flex: 1 1 0;
+    min-width: 82px;
+    border-radius: 4px;
+    padding: 6px 8px;
+    color: #fff;
+    cursor: default;
+    user-select: none;
+}
+
+.dns-stat-card .stat-number {
+    font-size: 15px;
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+.dns-stat-card .stat-pct {
+    font-size: 10px;
+    font-weight: 700;
+}
+
+.dns-stat-card .stat-title {
+    font-size: 11px;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+/* Colour variants matching originals */
+.dns-stat--total        { background-color: rgba(102,153,255,0.85); }
+.dns-stat--noerror      { background-color: rgba(92,184,92,0.85);   }
+.dns-stat--servfail     { background-color: rgba(217,83,79,0.85);   }
+.dns-stat--nxdomain     { background-color: rgba(120,120,120,0.85); }
+.dns-stat--refused      { background-color: rgba(91,192,222,0.85);  }
+.dns-stat--auth         { background-color: rgba(150,150,0,0.85);   }
+.dns-stat--recursive    { background-color: rgba(23,162,184,0.85);  }
+.dns-stat--cached       { background-color: rgba(111,84,153,0.85);  }
+.dns-stat--blocked      { background-color: rgba(255,165,0,0.85);   }
+.dns-stat--dropped      { background-color: rgba(30,30,30,0.85);    }
+.dns-stat--clients      { background-color: rgba(51,122,183,0.85);  }
+
+/* ── Zone stats row (below dashboard charts) ── */
+.dns-zone-stats-strip {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 6px;
+    margin-bottom: 14px;
+}
+
+.dns-zone-stat-card {
+    flex: 1 1 0;
+    min-width: 90px;
+    background-color: rgba(51,122,183,0.80);
+    color: #fff;
+    border-radius: 4px;
+    padding: 8px;
+    text-align: center;
+}
+
+.dns-zone-stat-card .zone-stat-number {
+    font-size: 14px;
+    font-weight: 700;
+    padding: 4px 0;
+}
+
+.dns-zone-stat-card .zone-stat-title {
+    font-size: 11px;
+    font-weight: 700;
+}
+
+/* ── Split-pane layouts (Cache / Logs) ── */
+.dns-split-left {
+    width: 22%;
+    min-width: 180px;
+    flex-shrink: 0;
+    overflow-y: auto;
+}
+
+.dns-split-right {
+    flex: 1;
+    overflow: auto;
+}
+
+.dns-split-container {
+    display: flex;
+    gap: 12px;
+    min-height: 400px;
+}
+
+/* ── Zone tree list ── */
+.dns-zone-list {
+    font-size: 14px;
+}
+
+.dns-zone-list .zone-entry {
+    padding: 3px 4px;
+    cursor: pointer;
+    border-radius: 3px;
+}
+
+.dns-zone-list .zone-entry:hover {
+    background-color: rgba(102,153,255,0.12);
+}
+
+/* ── Log list ── */
+.dns-log-list {
+    font-size: 12px;
+}
+
+.dns-log-list .log-entry {
+    padding: 2px 4px;
+    cursor: pointer;
+    border-radius: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dns-log-list .log-entry:hover,
+.dns-log-list .log-entry.selected {
+    background-color: rgba(102,153,255,0.15);
+}
+
+/* ── Query logs table hover ── */
+.dns-query-logs-table tr:hover {
+    backdrop-filter: brightness(95%);
+}
+
+/* ── Cluster-node select ── */
+.dns-cluster-select {
+    max-width: 220px;
+}
+
+/* ── About page ── */
+.dns-about p {
+    text-align: center;
+    color: rgba(0,0,0,0.6);
+}
+
+/* ── Misc helpers ── */
+.dns-code-block {
+    font-family: monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+
+.dns-panel-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dns-form-section {
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-bottom: 16px;
+}
+
+.dns-form-section-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: rgba(0,0,0,0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+/* ── Dark-mode overrides ── */
+.dark-mode .dns-about p             { color: rgba(255,255,255,0.6); }
+.dark-mode .dns-form-section        { border-color: rgba(255,255,255,0.12); }
+.dark-mode .dns-form-section-title  { color: rgba(255,255,255,0.7); }
+.dark-mode .dns-zone-list .zone-entry:hover { background-color: rgba(102,153,255,0.2); }
+.dark-mode .dns-log-list .log-entry:hover,
+.dark-mode .dns-log-list .log-entry.selected { background-color: rgba(102,153,255,0.25); }
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+    .dns-stats-strip  { flex-wrap: wrap; }
+    .dns-stat-card    { min-width: 72px; }
+    .dns-split-container { flex-direction: column; }
+    .dns-split-left   { width: 100%; min-width: unset; }
+}

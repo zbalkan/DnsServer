@@ -1,0 +1,55 @@
+@inject ApiService Api
+@inject ISnackbar  Snackbar
+
+<MudDialog>
+    <DialogContent>
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Class="mb-3" ShowCloseIcon="true"
+                      CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+        }
+        <MudTextField @bind-Value="_name" Label="Group Name" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" Class="mb-2"
+                      OnKeyUp="@(e => { if(e.Key=="Enter") _ = SaveAsync(); })" />
+        <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined"
+                      Margin="Margin.Dense" />
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton Color="Color.Primary" Variant="Variant.Filled"
+                   Disabled="@_busy" OnClick="SaveAsync">
+            @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+            Create
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+
+    private string  _name        = string.Empty;
+    private string  _description = string.Empty;
+    private string? _error;
+    private bool    _busy;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_name)) { _error = "Group name required."; return; }
+        _busy = true;
+        var form = new Dictionary<string, string>
+        {
+            ["group"]       = _name,
+            ["description"] = _description,
+        };
+        var result = await Api.PostAsync<object>("api/user/group/create", form);
+        _busy = false;
+
+        if (result.IsOk)
+        {
+            Snackbar.Add($"Group '{_name}' created.", Severity.Success);
+            MudDialog.Close(DialogResult.Ok(true));
+        }
+        else
+            _error = result.DisplayError;
+    }
+}
