@@ -20,7 +20,7 @@
             { <MudSelectItem Value="@t">@t</MudSelectItem> }
         </MudSelect>
 
-        <ClusterNodeSelect @bind-Value="_node" ValueChanged="@((_) => _ = LoadZonesAsync())" />
+        <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
 
         <MudSpacer />
 
@@ -46,7 +46,7 @@
                 <MudTh><MudTableSortLabel SortBy="new Func<ZoneInfo,object>(z=>z.Name)">Zone</MudTableSortLabel></MudTh>
                 <MudTh>Type</MudTh>
                 <MudTh>Status</MudTh>
-                <MudTh Style="text-align:right">Records</MudTh>
+                <MudTh Style="text-align:right">DNSSEC</MudTh>
                 <MudTh></MudTh>
             </HeaderContent>
             <RowTemplate>
@@ -147,7 +147,7 @@ else
         if (result.IsOk && result.Data?.Zones is { } list)
             _zones = list;
         else if (result.IsInvalidToken)
-            await (Task)typeof(SessionService).GetMethod("ClearSessionAsync")!.Invoke(SessionService, null)!;
+            await SessionService.ClearSessionAsync();
         else
             Snackbar.Add(result.DisplayError, Severity.Error);
     }
@@ -173,9 +173,7 @@ else
             ["node"] = _node,
         };
         var url = $"api/zones/{action}";
-        var res = zone.Disabled
-            ? await Api.PostAsync<object>(url, form)
-            : await Api.PostAsync<object>(url, form);
+        var res = await Api.PostAsync<object>(url, form);
 
         if (res.IsOk)
         {

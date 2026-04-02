@@ -4,7 +4,7 @@
 
 @if (_items.Count > 1)
 {
-    <MudSelect T="string" @bind-Value="Value" ValueChanged="OnValueChanged"
+    <MudSelect T="string" Value="@Value" ValueChanged="OnValueChanged"
                Dense="true" Margin="Margin.Dense" Variant="Variant.Outlined"
                Style="max-width:220px;" Class="dns-cluster-select"
                Label="Node">

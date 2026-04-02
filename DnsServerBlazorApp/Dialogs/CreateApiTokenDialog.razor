@@ -58,7 +58,7 @@
             ["user"]      = SessionService.Username,
             ["tokenName"] = _tokenName,
         };
-        var result = await Api.PostAsync<Models.Auth.ApiTokenResponse>("api/user/session/createToken", form);
+        var result = await Api.PostAsync<Models.Auth.ApiTokenResponse>("api/user/createToken", form);
         _busy = false;
 
         if (result.IsOk)

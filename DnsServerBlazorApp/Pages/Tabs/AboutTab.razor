@@ -40,10 +40,10 @@
 </MudPaper>
 
 @code {
-    private static string FormatUptime(long? uptimestamp)
+    private static string FormatUptime(DateTime? uptimestamp)
     {
-        if (uptimestamp is null or 0) return "—";
-        var ts = TimeSpan.FromSeconds(uptimestamp.Value);
+        if (uptimestamp is null) return "—";
+        var ts = DateTime.UtcNow - uptimestamp.Value;
         if (ts.TotalDays >= 1)
             return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
         if (ts.TotalHours >= 1)

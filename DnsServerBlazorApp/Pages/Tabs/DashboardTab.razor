@@ -25,7 +25,7 @@
         </MudStack>
     }
 
-    <ClusterNodeSelect @bind-Value="_node" ValueChanged="@((_) => _ = RefreshAsync())" />
+    <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = RefreshAsync(); })" />
 </div>
 
 @* ── Loading ── *@
@@ -44,7 +44,7 @@ else if (_stats is not null)
         <StatsCard StatKey="ServerFailure" Title="Server Failure" Value="@_stats.TotalServerFailure" ShowPercent="true" Percent="@_stats.ServerFailurePct" />
         <StatsCard StatKey="NxDomain"      Title="NX Domain"      Value="@_stats.TotalNxDomain" ShowPercent="true" Percent="@_stats.NxDomainPct" />
         <StatsCard StatKey="Refused"       Title="Refused"        Value="@_stats.TotalRefused"  ShowPercent="true" Percent="@_stats.RefusedPct" />
-        <StatsCard StatKey="Auth"          Title="Authoritative"  Value="@_stats.TotalAuthHit"  ShowPercent="true" Percent="@_stats.AuthHitPct" />
+        <StatsCard StatKey="AuthHit"        Title="Authoritative"  Value="@_stats.TotalAuthHit"  ShowPercent="true" Percent="@_stats.AuthHitPct" />
         <StatsCard StatKey="Recursions"    Title="Recursive"      Value="@_stats.TotalRecursions" ShowPercent="true" Percent="@_stats.RecursionsPct" />
         <StatsCard StatKey="CacheHit"      Title="Cached"         Value="@_stats.TotalCacheHit" ShowPercent="true" Percent="@_stats.CacheHitPct" />
         <StatsCard StatKey="Blocked"       Title="Blocked"        Value="@_stats.TotalBlocked"  ShowPercent="true" Percent="@_stats.BlockedPct" />

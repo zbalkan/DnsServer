@@ -9,7 +9,7 @@
     <MudPaper Elevation="1" Style="width:320px;min-width:220px;display:flex;flex-direction:column;">
         <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
             <MudText Typo="Typo.subtitle2" Style="flex:1">Allowed Zones</MudText>
-            <ClusterNodeSelect @bind-Value="_node" ValueChanged="@((_) => _ = LoadZonesAsync())" />
+            <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
         </div>
 
         @if (SessionService.CanModify("Allowed"))

@@ -49,7 +49,7 @@
                                  Variant="Variant.Outlined">@context.Type</MudChip>
                     </MudTd>
                     <MudTd DataLabel="Expires">
-                        @context.LeaseObtained.ToLocalTime().ToString("g")
+                        @context.LeaseExpires.ToLocalTime().ToString("g")
                     </MudTd>
                     @if (SessionService.CanModify("DhcpServer"))
                     {

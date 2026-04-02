@@ -76,7 +76,7 @@
     {
         _busy = true;
         var result = await Api.GetAsync<Models.Auth.TotpSetupResponse>(
-            $"api/user/totp/setup?user={Uri.EscapeDataString(SessionService.Username)}");
+            $"api/user/2fa/init?user={Uri.EscapeDataString(SessionService.Username)}");
         _busy = false;
 
         if (result.IsOk && result.Data is not null)
@@ -97,7 +97,7 @@
             ["user"] = SessionService.Username,
             ["code"] = _totp,
         };
-        var result = await Api.PostAsync<object>("api/user/totp/enable", form);
+        var result = await Api.PostAsync<object>("api/user/2fa/enable", form);
         _busy = false;
 
         if (result.IsOk)
@@ -118,7 +118,7 @@
             ["user"] = SessionService.Username,
             ["code"] = _totp,
         };
-        var result = await Api.PostAsync<object>("api/user/totp/disable", form);
+        var result = await Api.PostAsync<object>("api/user/2fa/disable", form);
         _busy = false;
 
         if (result.IsOk)

@@ -188,7 +188,7 @@
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>@context.Name</MudTd>
-                        <MudTd>@(context.IsPrimary ? "Primary" : "Secondary")</MudTd>
+                        <MudTd>@(context.Name == _primaryNodeName ? "Primary" : "Secondary")</MudTd>
                         <MudTd>
                             <MudChip T="string" Size="Size.Small"
                                      Color="@(context.Status=="Online" ? Color.Success : Color.Error)"
@@ -216,8 +216,9 @@
     private List<GroupInfo> _groups        = [];
 
     // Cluster
-    private bool              _loadingCluster = true;
-    private List<ClusterNode> _clusterNodes   = [];
+    private bool              _loadingCluster  = true;
+    private List<ClusterNode> _clusterNodes    = [];
+    private string?           _primaryNodeName;
 
     protected override async Task OnInitializedAsync()
     {
@@ -349,11 +350,18 @@
     // ── Cluster ───────────────────────────────────────────────────────
     private async Task LoadClusterAsync()
     {
+        if (!SessionService.CanView("Administration")) { _loadingCluster = false; return; }
         _loadingCluster = true;
         var result = await Api.GetAsync<ClusterStateResponse>("api/cluster/getNodes");
         _loadingCluster = false;
 
-        if (result.IsOk && result.Data?.Nodes is { } list)
-            _clusterNodes = list;
+        if (result.IsOk && result.Data is { } data)
+        {
+            _primaryNodeName = data.PrimaryNode?.Name;
+            var nodes = new List<ClusterNode>();
+            if (data.PrimaryNode is not null) nodes.Add(data.PrimaryNode);
+            if (data.SecondaryNodes is not null) nodes.AddRange(data.SecondaryNodes);
+            _clusterNodes = nodes;
+        }
     }
 }

@@ -94,6 +94,8 @@
             form["primaryNameServerAddresses"] = string.Join(",",
                 _primaryAddresses.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
 
+        form["dnssecValidation"] = _opts.DnssecValidation.ToString().ToLower();
+
         if (_opts.ZoneTransferProtocol is not null)
             form["zoneTransferProtocol"] = _opts.ZoneTransferProtocol;
 

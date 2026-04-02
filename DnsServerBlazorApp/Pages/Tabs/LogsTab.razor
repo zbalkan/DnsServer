@@ -125,14 +125,14 @@
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Time">@context.Timestamp.ToLocalTime().ToString("HH:mm:ss")</MudTd>
-                    <MudTd DataLabel="Client">@context.RemoteEndPoint</MudTd>
+                    <MudTd DataLabel="Client">@context.ClientAddress</MudTd>
                     <MudTd DataLabel="Protocol">@context.Protocol</MudTd>
-                    <MudTd DataLabel="Domain">@context.QuestionName</MudTd>
-                    <MudTd DataLabel="Type">@context.QuestionType</MudTd>
+                    <MudTd DataLabel="Domain">@context.Question</MudTd>
+                    <MudTd DataLabel="Type">@context.QueryType</MudTd>
                     <MudTd DataLabel="Response">
                         <MudChip T="string" Size="Size.Small"
-                                 Color="@(context.Answer == "NOERROR" ? Color.Success : Color.Error)"
-                                 Variant="Variant.Filled">@context.Answer</MudChip>
+                                 Color="@(context.Rcode == "NOERROR" ? Color.Success : Color.Error)"
+                                 Variant="Variant.Filled">@context.Rcode</MudChip>
                     </MudTd>
                 </RowTemplate>
             </MudTable>
@@ -190,8 +190,8 @@
 
         if (result.IsOk && result.Data is not null)
         {
-            _logText  = result.Data.Text ?? string.Empty;
-            _logTotal = result.Data.Total;
+            _logText  = string.Join("\n", result.Data.Entries ?? []);
+            _logTotal = result.Data.Length;
             _logTo    = Math.Min(_logFrom + _logPageSize - 1, _logTotal);
         }
         else
@@ -255,7 +255,7 @@
         var result = await Api.GetAsync<QueryLogsResponse>(url);
         _qLoading = false;
 
-        if (result.IsOk && result.Data?.Log is { } list)
+        if (result.IsOk && result.Data?.Entries is { } list)
             _qLogs = list;
         else
             Snackbar.Add(result.DisplayError, Severity.Error);

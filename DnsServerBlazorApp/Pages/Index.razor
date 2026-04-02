@@ -197,8 +197,6 @@ else
         var storedToken = await SessionService.LoadStoredTokenAsync();
         if (storedToken is { Length: > 0 })
             await TryRestoreSessionAsync(storedToken);
-        else
-            await AttemptAutoLoginAsync();
     }
 
     protected override void OnAfterRender(bool firstRender)
@@ -211,9 +209,9 @@ else
     private async Task TryRestoreSessionAsync(string token)
     {
         var result = await Api.GetAsync<Models.Auth.SessionData>($"api/user/session/get?token={Uri.EscapeDataString(token)}");
-        if (result.IsOk && result.Envelope is not null)
+        if (result.IsOk && result.Envelope is { } env)
         {
-            var sd = BuildSessionData(result.Envelope);
+            var sd = BuildSessionData(env);
             await SessionService.SetSessionAsync(sd);
             UpdatePageTitle();
             StartAutoRefresh();
@@ -221,25 +219,6 @@ else
         else
         {
             await SessionService.ClearSessionAsync();
-        }
-    }
-
-    // Original behaviour: attempt admin/admin on first load with no token
-    private async Task AttemptAutoLoginAsync()
-    {
-        var form = new Dictionary<string, string>
-        {
-            ["user"]        = "admin",
-            ["pass"]        = "admin",
-            ["includeInfo"] = "true"
-        };
-        var result = await Api.PostAsync<object>("api/user/login", form);
-        if (result.IsOk && result.Envelope is not null)
-        {
-            var sd = BuildSessionData(result.Envelope);
-            await SessionService.SetSessionAsync(sd);
-            UpdatePageTitle();
-            StartAutoRefresh();
         }
     }
 
@@ -310,7 +289,7 @@ else
     }
 
     // ── Helpers ───────────────────────────────────────────────────────
-    private static Models.Auth.SessionData BuildSessionData(ApiResponse<object> env) => new()
+    private static Models.Auth.SessionData BuildSessionData<T>(ApiResponse<T> env) => new()
     {
         Token       = env.Token ?? string.Empty,
         Username    = env.Username ?? string.Empty,

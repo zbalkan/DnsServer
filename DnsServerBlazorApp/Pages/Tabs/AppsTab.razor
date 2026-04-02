@@ -5,7 +5,7 @@
 
 <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
     <MudText Typo="Typo.subtitle2" Style="flex:1">DNS Apps</MudText>
-    <ClusterNodeSelect @bind-Value="_node" ValueChanged="@((_) => _ = LoadAsync())" />
+    <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = LoadAsync(); })" />
     @if (SessionService.CanModify("Apps"))
     {
         <MudButton Variant="Variant.Outlined" Size="Size.Small"

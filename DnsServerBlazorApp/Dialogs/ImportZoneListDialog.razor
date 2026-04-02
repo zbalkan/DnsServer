@@ -35,7 +35,7 @@
     private string? _error;
     private bool    _busy;
 
-    private async void OnFileSelected(InputFileChangeEventArgs e)
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
     {
         using var reader = new System.IO.StreamReader(e.File.OpenReadStream());
         _text = await reader.ReadToEndAsync();

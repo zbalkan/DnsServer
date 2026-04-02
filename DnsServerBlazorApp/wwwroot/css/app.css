@@ -23,7 +23,7 @@ body {
     margin: auto;
     left: 0;
     right: 0;
-    top: 56px;          /* below MudAppBar (56 px default) */
+    top: 48px;          /* below MudAppBar (48 px) */
     z-index: 1300;
 }
 
