@@ -50,7 +50,7 @@
             ["displayName"] = _displayName,
             ["pass"]        = _password,
         };
-        var result = await Api.PostAsync<object>("api/user/create", form);
+        var result = await Api.PostAsync<object>("api/admin/users/create", form);
         _busy = false;
 
         if (result.IsOk)

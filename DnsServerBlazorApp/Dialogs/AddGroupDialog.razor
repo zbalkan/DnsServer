@@ -41,7 +41,7 @@
             ["group"]       = _name,
             ["description"] = _description,
         };
-        var result = await Api.PostAsync<object>("api/user/group/create", form);
+        var result = await Api.PostAsync<object>("api/admin/groups/create", form);
         _busy = false;
 
         if (result.IsOk)

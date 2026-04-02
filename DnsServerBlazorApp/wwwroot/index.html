@@ -48,6 +48,14 @@
         <a class="dismiss">🗙</a>
     </div>
 
+    <script>
+        window.dnsApp = {
+            setBodyClass: function (cls, add) {
+                if (add) document.body.classList.add(cls);
+                else document.body.classList.remove(cls);
+            }
+        };
+    </script>
     <script src="_content/MudBlazor/MudBlazor.min.js"></script>
     <script src="_content/MudBlazor.Extensions/MudBlazor.Extensions.min.js"></script>
     <script src="_framework/blazor.webassembly.js"></script>

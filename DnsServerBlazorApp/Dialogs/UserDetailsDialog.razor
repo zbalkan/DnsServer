@@ -61,7 +61,7 @@
         if (!string.IsNullOrEmpty(_newPass))
             form["newPass"] = _newPass;
 
-        var result = await Api.PostAsync<object>("api/user/update", form);
+        var result = await Api.PostAsync<object>("api/admin/users/set", form);
         _busy = false;
 
         if (result.IsOk)

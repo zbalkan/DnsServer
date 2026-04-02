@@ -27,16 +27,6 @@ body {
     z-index: 1300;
 }
 
-/* ── Blazor error UI ── */
-#blazor-error-ui {
-    background: lightyellow;
-    bottom: 0; left: 0; right: 0;
-    padding: 10px 15px;
-    position: fixed;
-    display: none;
-    z-index: 9999;
-}
-
 /* ── Dashboard stats strip ── */
 .dns-stats-strip {
     display: flex;

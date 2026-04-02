@@ -68,12 +68,7 @@ public sealed class ThemeService
     {
         try
         {
-            if (IsDarkMode)
-                await _js.InvokeVoidAsync("eval",
-                    "document.body.classList.add('dark-mode')");
-            else
-                await _js.InvokeVoidAsync("eval",
-                    "document.body.classList.remove('dark-mode')");
+            await _js.InvokeVoidAsync("dnsApp.setBodyClass", "dark-mode", IsDarkMode);
         }
         catch { /* best-effort */ }
     }

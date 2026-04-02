@@ -5,6 +5,7 @@
 @inject ISnackbar        Snackbar
 @inject IDialogService   DialogService
 @inject ThemeService     ThemeService
+@implements IDisposable
 
 <PageTitle>@_pageTitle</PageTitle>
 
@@ -192,7 +193,7 @@ else
     // ── Lifecycle ─────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync()
     {
-        SessionService.OnChange += StateHasChanged;
+        SessionService.OnChange += OnSessionChanged;
 
         var storedToken = await SessionService.LoadStoredTokenAsync();
         if (storedToken is { Length: > 0 })
@@ -316,9 +317,11 @@ else
         await DialogService.ShowAsync<Dialogs.ChangePasswordDialog>("Change Password", p);
     }
 
+    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+
     public void Dispose()
     {
-        SessionService.OnChange -= StateHasChanged;
+        SessionService.OnChange -= OnSessionChanged;
         _refreshTimer?.Dispose();
     }
 }

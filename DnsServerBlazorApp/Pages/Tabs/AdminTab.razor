@@ -229,7 +229,7 @@
     private async Task LoadSessionsAsync()
     {
         _loadingSessions = true;
-        var result = await Api.GetAsync<Models.Auth.SessionListResponse>("api/user/session/list");
+        var result = await Api.GetAsync<Models.Auth.SessionListResponse>("api/admin/sessions/list");
         _loadingSessions = false;
 
         if (result.IsOk && result.Data?.Sessions is { } list)
@@ -241,7 +241,7 @@
     private async Task RevokeSessionAsync(SessionInfo session)
     {
         var form = new Dictionary<string, string> { ["token"] = session.Token ?? "" };
-        var res = await Api.PostAsync<object>("api/user/session/delete", form);
+        var res = await Api.PostAsync<object>("api/admin/sessions/delete", form);
         if (res.IsOk)
         {
             _sessions.Remove(session);
@@ -255,7 +255,7 @@
     private async Task LoadUsersAsync()
     {
         _loadingUsers = true;
-        var result = await Api.GetAsync<Models.Auth.UserListResponse>("api/user/list");
+        var result = await Api.GetAsync<Models.Auth.UserListResponse>("api/admin/users/list");
         _loadingUsers = false;
 
         if (result.IsOk && result.Data?.Users is { } list)
@@ -289,7 +289,7 @@
         if (confirm is not true) return;
 
         var form = new Dictionary<string, string> { ["user"] = user.Username ?? "" };
-        var res = await Api.PostAsync<object>("api/user/delete", form);
+        var res = await Api.PostAsync<object>("api/admin/users/delete", form);
         if (res.IsOk)
         {
             _users.Remove(user);
@@ -303,7 +303,7 @@
     private async Task LoadGroupsAsync()
     {
         _loadingGroups = true;
-        var result = await Api.GetAsync<Models.Auth.GroupListResponse>("api/user/group/list");
+        var result = await Api.GetAsync<Models.Auth.GroupListResponse>("api/admin/groups/list");
         _loadingGroups = false;
 
         if (result.IsOk && result.Data?.Groups is { } list)
@@ -337,7 +337,7 @@
         if (confirm is not true) return;
 
         var form = new Dictionary<string, string> { ["group"] = group.Name ?? "" };
-        var res = await Api.PostAsync<object>("api/user/group/delete", form);
+        var res = await Api.PostAsync<object>("api/admin/groups/delete", form);
         if (res.IsOk)
         {
             _groups.Remove(group);
@@ -352,7 +352,7 @@
     {
         if (!SessionService.CanView("Administration")) { _loadingCluster = false; return; }
         _loadingCluster = true;
-        var result = await Api.GetAsync<ClusterStateResponse>("api/cluster/getNodes");
+        var result = await Api.GetAsync<ClusterStateResponse>("api/admin/cluster/state");
         _loadingCluster = false;
 
         if (result.IsOk && result.Data is { } data)
