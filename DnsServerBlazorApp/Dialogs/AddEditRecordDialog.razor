@@ -146,16 +146,47 @@
 
     protected override void OnParametersSet()
     {
-        if (Record is { } r)
+        if (Record is not { } r) return;
+
+        // Strip zone suffix to get relative label (avoid double-appending on save)
+        _name = r.Name == Zone ? ""
+              : r.Name.EndsWith($".{Zone}", StringComparison.OrdinalIgnoreCase)
+                  ? r.Name[..^(Zone.Length + 1)]
+                  : r.Name;
+        _type     = r.Type;
+        _ttl      = r.TtlValue;
+        _disabled = r.Disabled;
+
+        // Populate type-specific rdata fields for edit mode
+        switch (r.Type)
         {
-            _name     = r.Name == Zone ? "" : r.Name;
-            _type     = r.Type;
-            _ttl      = r.TtlValue;
-            _disabled = r.Disabled;
-            // populate rdata from record
-            _rdata = r.RData?.ToString() ?? string.Empty;
+            case "MX":
+                _rdata      = r.RData.Value ?? string.Empty;
+                _rdataExtra = r.RData.Priority?.ToString() ?? string.Empty;
+                break;
+            case "SRV":
+                _rdata       = r.RData.Value ?? string.Empty;
+                _rdataExtra  = r.RData.Priority?.ToString() ?? string.Empty;
+                _rdataExtra2 = r.RData.Weight?.ToString() ?? string.Empty;
+                _rdataExtra3 = r.RData.Port?.ToString() ?? string.Empty;
+                break;
+            case "CAA":
+                _rdata       = r.RData.Value ?? string.Empty;
+                _rdataExtra  = GetExtraField(r.RData, "flags");
+                _rdataExtra2 = GetExtraField(r.RData, "tag");
+                break;
+            case "FWD":
+                _rdata      = r.RData.Value ?? string.Empty;
+                _rdataExtra = GetExtraField(r.RData, "protocol");
+                break;
+            default:
+                _rdata = r.RData.ToString();
+                break;
         }
     }
+
+    private static string GetExtraField(ZoneRecordRData rdata, string key) =>
+        rdata.Extra?.TryGetValue(key, out var v) is true ? v.ToString() : string.Empty;
 
     private async Task SaveAsync()
     {
