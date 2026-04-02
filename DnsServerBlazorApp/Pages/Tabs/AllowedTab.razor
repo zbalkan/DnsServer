@@ -9,7 +9,7 @@
     <MudPaper Elevation="1" Style="width:320px;min-width:220px;display:flex;flex-direction:column;">
         <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
             <MudText Typo="Typo.subtitle2" Style="flex:1">Allowed Zones</MudText>
-            <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
+            <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
         </div>
 
         @if (SessionService.CanModify("Allowed"))
@@ -108,12 +108,12 @@
     private async Task LoadZonesAsync()
     {
         _loading = true;
-        var result = await Api.GetAsync<ZoneListResponse>(
-            $"api/zones/allowed/list?node={Uri.EscapeDataString(_node)}");
+        var result = await Api.GetAsync<SimpleZoneListResponse>(
+            $"api/allowed/list?node={Uri.EscapeDataString(_node)}");
         _loading = false;
 
         if (result.IsOk && result.Data?.Zones is { } list)
-            _zones = list.Select(z => z.Name).ToList();
+            _zones = list;
         else
             Snackbar.Add(result.DisplayError, Severity.Error);
     }
@@ -137,7 +137,7 @@
             ["domain"] = _newZone.Trim(),
             ["node"]   = _node,
         };
-        var res = await Api.PostAsync<object>("api/zones/allowed/add", form);
+        var res = await Api.PostAsync<object>("api/allowed/add", form);
         if (res.IsOk)
         {
             _newZone = string.Empty;
@@ -150,7 +150,7 @@
     private async Task DeleteZoneAsync(string zone)
     {
         var form = new Dictionary<string, string> { ["domain"] = zone, ["node"] = _node };
-        var res = await Api.PostAsync<object>("api/zones/allowed/delete", form);
+        var res = await Api.PostAsync<object>("api/allowed/delete", form);
         if (res.IsOk)
         {
             if (_selected == zone) { _selected = null; _records.Clear(); }
@@ -172,7 +172,7 @@
     private void ExportAsync()
     {
         var url = Api.BuildDownloadUrl(
-            $"api/zones/allowed/export?node={Uri.EscapeDataString(_node)}");
+            $"api/allowed/export?node={Uri.EscapeDataString(_node)}");
         // trigger browser download via JS would go here; snackbar for now
         Snackbar.Add("Export URL: " + url, Severity.Info);
     }

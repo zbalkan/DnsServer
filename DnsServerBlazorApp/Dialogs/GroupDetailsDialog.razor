@@ -54,15 +54,20 @@
             ["description"] = _description,
             ["members"]     = string.Join(",", memberList),
         };
-        var result = await Api.PostAsync<object>("api/admin/groups/set", form);
-        _busy = false;
-
-        if (result.IsOk)
+        try
         {
-            Snackbar.Add("Group updated.", Severity.Success);
-            MudDialog.Close(DialogResult.Ok(true));
+            var result = await Api.PostAsync<object>("api/admin/groups/set", form);
+            if (result.IsOk)
+            {
+                Snackbar.Add("Group updated.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+                _error = result.DisplayError;
         }
-        else
-            _error = result.DisplayError;
+        finally
+        {
+            _busy = false;
+        }
     }
 }

@@ -46,22 +46,28 @@
     {
         if (string.IsNullOrWhiteSpace(_text)) { _error = "Nothing to import."; return; }
         _busy = true;
-
-        var url  = $"api/zones/{ZoneType}/import";
-        var form = new Dictionary<string, string>
+        try
         {
-            ["domains"] = _text,
-            ["node"]    = Node,
-        };
-        var result = await Api.PostAsync<object>(url, form);
-        _busy = false;
+            var url       = $"api/{ZoneType}/import";
+            var paramName = ZoneType == "allowed" ? "allowedZones" : "blockedZones";
+            var form = new Dictionary<string, string>
+            {
+                [paramName] = _text,
+                ["node"]    = Node,
+            };
+            var result = await Api.PostAsync<object>(url, form);
 
-        if (result.IsOk)
-        {
-            Snackbar.Add("Zones imported.", Severity.Success);
-            MudDialog.Close(DialogResult.Ok(true));
+            if (result.IsOk)
+            {
+                Snackbar.Add("Zones imported.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+                _error = result.DisplayError;
         }
-        else
-            _error = result.DisplayError;
+        finally
+        {
+            _busy = false;
+        }
     }
 }

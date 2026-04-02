@@ -51,20 +51,26 @@
 
     private async Task CreateAsync()
     {
+        if (_busy) return;
         if (string.IsNullOrWhiteSpace(_tokenName)) { _error = "Token name required."; return; }
         _busy = true;
-        var form = new Dictionary<string, string>
+        try
         {
-            ["user"]      = SessionService.Username,
-            ["tokenName"] = _tokenName,
-        };
-        var result = await Api.PostAsync<Models.Auth.ApiTokenResponse>("api/user/createToken", form);
-        _busy = false;
-
-        if (result.IsOk)
-            _token = result.Data?.Token;
-        else
-            _error = result.DisplayError;
+            var form = new Dictionary<string, string>
+            {
+                ["user"]      = SessionService.Username,
+                ["tokenName"] = _tokenName,
+            };
+            var result = await Api.PostAsync<Models.Auth.ApiTokenResponse>("api/user/createToken", form);
+            if (result.IsOk)
+                _token = result.Data?.Token;
+            else
+                _error = result.DisplayError;
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 
     private async Task CopyToken()

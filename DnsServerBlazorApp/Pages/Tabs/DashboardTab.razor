@@ -25,7 +25,7 @@
         </MudStack>
     }
 
-    <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = RefreshAsync(); })" />
+    <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = RefreshAsync(); })" />
 </div>
 
 @* ── Loading ── *@

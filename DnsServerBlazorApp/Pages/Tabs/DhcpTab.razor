@@ -168,7 +168,7 @@
     private async Task LoadScopesAsync()
     {
         _loadingScopes = true;
-        var result = await Api.GetAsync<DhcpScopesResponse>("api/dhcp/scope/list");
+        var result = await Api.GetAsync<DhcpScopesResponse>("api/dhcp/scopes/list");
         _loadingScopes = false;
 
         if (result.IsOk && result.Data?.Scopes is { } list)
@@ -184,7 +184,7 @@
             ["clientIpAddress"] = lease.Address ?? "",
             ["hostName"]        = lease.HostName ?? "",
         };
-        var res = await Api.PostAsync<object>("api/dhcp/leases/convertToReservation", form);
+        var res = await Api.PostAsync<object>("api/dhcp/leases/convertToReserved", form);
         if (res.IsOk)
         {
             Snackbar.Add("Lease converted to reservation.", Severity.Success);
@@ -228,7 +228,7 @@
     {
         var action = scope.Enabled ? "disable" : "enable";
         var form = new Dictionary<string, string> { ["name"] = scope.Name ?? "" };
-        var res = await Api.PostAsync<object>($"api/dhcp/scope/{action}", form);
+        var res = await Api.PostAsync<object>($"api/dhcp/scopes/{action}", form);
         if (res.IsOk)
         {
             scope.Enabled = !scope.Enabled;
@@ -247,7 +247,7 @@
         if (confirm is not true) return;
 
         var form = new Dictionary<string, string> { ["name"] = scope.Name ?? "" };
-        var res = await Api.PostAsync<object>("api/dhcp/scope/delete", form);
+        var res = await Api.PostAsync<object>("api/dhcp/scopes/delete", form);
         if (res.IsOk)
         {
             _scopes.Remove(scope);

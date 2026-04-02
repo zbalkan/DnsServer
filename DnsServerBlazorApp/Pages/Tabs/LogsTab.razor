@@ -1,6 +1,7 @@
 @inject ApiService     Api
 @inject SessionService SessionService
 @inject ISnackbar      Snackbar
+@inject IJSRuntime     JS
 
 <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
          PanelClass="pt-2" SliderColor="Color.Primary">
@@ -35,8 +36,12 @@
                         {
                             <div style="display:flex;align-items:center;padding:3px 8px;cursor:pointer;
                                         background:@(_selectedFile == f.FileName ? "rgba(102,153,255,.15)" : "transparent");"
-                                 @onclick="@(() => SelectFileAsync(f.FileName))">
-                                <MudText Typo="Typo.body2" Style="flex:1;word-break:break-all;">@f.FileName</MudText>
+                                 @onclick="@(() => _selectedFile = f.FileName)">
+                                <MudText Typo="Typo.body2" Style="flex:1;word-break:break-all;">
+                                    @f.FileName
+                                    @if (!string.IsNullOrEmpty(f.Size))
+                                    { <MudText Typo="Typo.caption" Style="margin-left:4px;opacity:.6;">(@f.Size)</MudText> }
+                                </MudText>
                                 @if (SessionService.CanModify("Logs"))
                                 {
                                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
@@ -49,38 +54,33 @@
                 </div>
             </MudPaper>
 
-            @* Right: log viewer *@
+            @* Right: download panel *@
             <MudPaper Elevation="1" Style="flex:1;display:flex;flex-direction:column;min-width:0;">
                 <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
                     <MudText Typo="Typo.subtitle2" Style="flex:1">@(_selectedFile ?? "Select a log file")</MudText>
                     @if (_selectedFile is not null)
                     {
-                        <MudIconButton Icon="@Icons.Material.Filled.Download" Size="Size.Small"
-                                       Title="Download" OnClick="DownloadLog" />
-                        <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                                       Title="Reload" OnClick="@(() => SelectFileAsync(_selectedFile!))" />
+                        <MudButton Variant="Variant.Outlined" Size="Size.Small"
+                                   StartIcon="@Icons.Material.Filled.Download"
+                                   OnClick="DownloadLogAsync">Download / View</MudButton>
                     }
                 </div>
-                <div style="flex:1;overflow:auto;padding:8px;">
-                    @if (_loadingView)
+                <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;">
+                    @if (_selectedFile is null)
                     {
-                        <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                        <MudText Typo="Typo.body2" Style="opacity:.5;">Select a file from the list to download it.</MudText>
                     }
-                    else if (!string.IsNullOrEmpty(_logText))
+                    else
                     {
-                        <pre style="font-family:monospace;font-size:11px;white-space:pre;margin:0;">@_logText</pre>
+                        <div>
+                            <MudIcon Icon="@Icons.Material.Filled.Description" Style="font-size:48px;opacity:.3;" />
+                            <MudText Typo="Typo.body1" Class="mt-2">@_selectedFile</MudText>
+                            <MudText Typo="Typo.body2" Style="opacity:.6;" Class="mt-1">
+                                Click <strong>Download / View</strong> to open this log file.
+                            </MudText>
+                        </div>
                     }
                 </div>
-                @if (_logTotal > 0)
-                {
-                    <div style="border-top:1px solid rgba(0,0,0,.12);padding:4px 8px;display:flex;align-items:center;gap:8px;">
-                        <MudText Typo="Typo.caption">Lines @_logFrom–@_logTo of @_logTotal</MudText>
-                        <MudIconButton Icon="@Icons.Material.Filled.NavigateBefore" Size="Size.Small"
-                                       Disabled="@(_logFrom <= 1)" OnClick="LogPagePrevAsync" />
-                        <MudIconButton Icon="@Icons.Material.Filled.NavigateNext" Size="Size.Small"
-                                       Disabled="@(_logTo >= _logTotal)" OnClick="LogPageNextAsync" />
-                    </div>
-                }
             </MudPaper>
         </div>
     </MudTabPanel>
@@ -125,10 +125,10 @@
                 </HeaderContent>
                 <RowTemplate>
                     <MudTd DataLabel="Time">@context.Timestamp.ToLocalTime().ToString("HH:mm:ss")</MudTd>
-                    <MudTd DataLabel="Client">@context.ClientAddress</MudTd>
+                    <MudTd DataLabel="Client">@context.ClientIpAddress</MudTd>
                     <MudTd DataLabel="Protocol">@context.Protocol</MudTd>
-                    <MudTd DataLabel="Domain">@context.Question</MudTd>
-                    <MudTd DataLabel="Type">@context.QueryType</MudTd>
+                    <MudTd DataLabel="Domain">@context.Qname</MudTd>
+                    <MudTd DataLabel="Type">@context.Qtype</MudTd>
                     <MudTd DataLabel="Response">
                         <MudChip T="string" Size="Size.Small"
                                  Color="@(context.Rcode == "NOERROR" ? Color.Success : Color.Error)"
@@ -143,12 +143,8 @@
 @code {
     // ── Log files ──────────────────────────────────────────────────────
     private bool          _loadingFiles = true;
-    private bool          _loadingView;
     private string?       _selectedFile;
     private List<LogFile> _logFiles     = [];
-    private string        _logText      = string.Empty;
-    private long          _logFrom, _logTo, _logTotal;
-    private const int     _logPageSize  = 500;
 
     // ── Query logs ─────────────────────────────────────────────────────
     private MudTabPanel? _queryLogsPanel;
@@ -163,7 +159,7 @@
     private async Task LoadFileListAsync()
     {
         _loadingFiles = true;
-        var result = await Api.GetAsync<LogFilesResponse>("api/log/list");
+        var result = await Api.GetAsync<LogFilesResponse>("api/logs/list");
         _loadingFiles = false;
 
         if (result.IsOk && result.Data?.LogFiles is { } list)
@@ -172,51 +168,20 @@
             Snackbar.Add(result.DisplayError, Severity.Error);
     }
 
-    private async Task SelectFileAsync(string fileName)
-    {
-        _selectedFile = fileName;
-        _logFrom = 1;
-        await LoadLogViewAsync();
-    }
-
-    private async Task LoadLogViewAsync()
+    private async Task DownloadLogAsync()
     {
         if (_selectedFile is null) return;
-        _loadingView = true;
-        var url = $"api/log/view?fileName={Uri.EscapeDataString(_selectedFile)}" +
-                  $"&offset={_logFrom - 1}&limit={_logPageSize}";
-        var result = await Api.GetAsync<LogViewResponse>(url);
-        _loadingView = false;
-
-        if (result.IsOk && result.Data is not null)
-        {
-            _logText  = string.Join("\n", result.Data.Entries ?? []);
-            _logTotal = result.Data.Length;
-            _logTo    = Math.Min(_logFrom + _logPageSize - 1, _logTotal);
-        }
-        else
-            Snackbar.Add(result.DisplayError, Severity.Error);
-    }
-
-    private async Task LogPagePrevAsync()
-    {
-        _logFrom = Math.Max(1, _logFrom - _logPageSize);
-        await LoadLogViewAsync();
-    }
-
-    private async Task LogPageNextAsync()
-    {
-        _logFrom = _logTo + 1;
-        await LoadLogViewAsync();
+        var url = Api.BuildDownloadUrl($"api/logs/download?fileName={Uri.EscapeDataString(_selectedFile)}");
+        await JS.InvokeVoidAsync("open", url, "_blank");
     }
 
     private async Task DeleteLogAsync(string fileName)
     {
         var form = new Dictionary<string, string> { ["fileName"] = fileName };
-        var res = await Api.PostAsync<object>("api/log/delete", form);
+        var res = await Api.PostAsync<object>("api/logs/delete", form);
         if (res.IsOk)
         {
-            if (_selectedFile == fileName) { _selectedFile = null; _logText = string.Empty; }
+            if (_selectedFile == fileName) _selectedFile = null;
             await LoadFileListAsync();
         }
         else
@@ -225,32 +190,26 @@
 
     private async Task DeleteAllLogsAsync()
     {
-        var res = await Api.PostAsync<object>("api/log/deleteAll", new Dictionary<string, string>());
+        var res = await Api.PostAsync<object>("api/logs/deleteAll", new Dictionary<string, string>());
         if (res.IsOk)
         {
-            _selectedFile = null; _logText = string.Empty; _logFiles.Clear();
+            _selectedFile = null;
+            _logFiles.Clear();
             Snackbar.Add("All logs deleted.", Severity.Success);
         }
         else
             Snackbar.Add(res.DisplayError, Severity.Error);
     }
 
-    private void DownloadLog()
-    {
-        if (_selectedFile is null) return;
-        var url = Api.BuildDownloadUrl($"api/log/download?fileName={Uri.EscapeDataString(_selectedFile)}");
-        Snackbar.Add("Download URL: " + url, Severity.Info);
-    }
-
     // ── Query Logs ─────────────────────────────────────────────────────
     private async Task QueryLogsAsync()
     {
         _qLoading = true;
-        var url = "api/log/query?" +
-            (string.IsNullOrEmpty(_qSearch)   ? "" : $"domain={Uri.EscapeDataString(_qSearch)}&") +
+        var url = "api/logs/query?" +
+            (string.IsNullOrEmpty(_qSearch)   ? "" : $"qname={Uri.EscapeDataString(_qSearch)}&") +
             (string.IsNullOrEmpty(_qClient)   ? "" : $"clientIpAddress={Uri.EscapeDataString(_qClient)}&") +
             (string.IsNullOrEmpty(_qProtocol) ? "" : $"protocol={_qProtocol}&") +
-            "limit=200";
+            "entriesPerPage=200";
 
         var result = await Api.GetAsync<QueryLogsResponse>(url);
         _qLoading = false;

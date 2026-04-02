@@ -9,8 +9,3 @@ public sealed class CacheListResponse
     public List<string>? Zones { get; init; }
 }
 
-public sealed class CacheViewResponse
-{
-    [JsonPropertyName("text")]
-    public string? Text { get; init; }
-}

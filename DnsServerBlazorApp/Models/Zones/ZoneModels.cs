@@ -4,6 +4,13 @@ namespace DnsServerBlazorApp.Models.Zones;
 
 // ── Zone list ──────────────────────────────────────────────────────────────
 
+/// <summary>Response from /api/allowed/list and /api/blocked/list (returns string array).</summary>
+public sealed class SimpleZoneListResponse
+{
+    [JsonPropertyName("zones")]
+    public List<string> Zones { get; set; } = [];
+}
+
 public sealed class ZoneListResponse
 {
     [JsonPropertyName("pageNumber")]

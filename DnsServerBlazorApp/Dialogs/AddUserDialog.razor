@@ -40,25 +40,31 @@
 
     private async Task SaveAsync()
     {
+        if (_busy) return;
         if (string.IsNullOrWhiteSpace(_username)) { _error = "Username required."; return; }
         if (_password != _confirm) { _error = "Passwords do not match."; return; }
 
         _busy = true;
-        var form = new Dictionary<string, string>
+        try
         {
-            ["user"]        = _username,
-            ["displayName"] = _displayName,
-            ["pass"]        = _password,
-        };
-        var result = await Api.PostAsync<object>("api/admin/users/create", form);
-        _busy = false;
-
-        if (result.IsOk)
-        {
-            Snackbar.Add($"User '{_username}' created.", Severity.Success);
-            MudDialog.Close(DialogResult.Ok(true));
+            var form = new Dictionary<string, string>
+            {
+                ["user"]        = _username,
+                ["displayName"] = _displayName,
+                ["pass"]        = _password,
+            };
+            var result = await Api.PostAsync<object>("api/admin/users/create", form);
+            if (result.IsOk)
+            {
+                Snackbar.Add($"User '{_username}' created.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+                _error = result.DisplayError;
         }
-        else
-            _error = result.DisplayError;
+        finally
+        {
+            _busy = false;
+        }
     }
 }

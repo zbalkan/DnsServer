@@ -2,95 +2,71 @@
 @inject SessionService SessionService
 @inject ISnackbar      Snackbar
 
-<div style="display:flex;gap:12px;height:calc(100vh - 200px);">
+<MudPaper Elevation="1" Style="display:flex;flex-direction:column;height:calc(100vh - 200px);">
+    <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
+        <MudText Typo="Typo.subtitle2" Style="flex:1">Cached Zones</MudText>
+        <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = RefreshListAsync(); })" />
+        <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
+                       Title="Refresh" OnClick="RefreshListAsync" />
+        @if (SessionService.CanModify("Cache"))
+        {
+            <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small"
+                           Color="Color.Error" Title="Flush all cache"
+                           OnClick="FlushAllAsync" />
+        }
+    </div>
 
-    @* ── Left panel: zone tree ── *@
-    <MudPaper Elevation="1" Style="width:280px;min-width:200px;display:flex;flex-direction:column;">
-        <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
-            <MudText Typo="Typo.subtitle2" Style="flex:1">Cached Zones</MudText>
-            <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = RefreshListAsync(); })" />
-            @if (SessionService.CanModify("Cache"))
+    <div style="overflow-y:auto;flex:1;padding:4px;">
+        @if (_loadingList)
+        {
+            <div style="display:flex;justify-content:center;padding:20px;">
+                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+            </div>
+        }
+        else
+        {
+            @if (!string.IsNullOrEmpty(_domain))
             {
-                <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small"
-                               Color="Color.Error" Title="Flush all cache"
-                               OnClick="FlushAllAsync" />
-            }
-        </div>
-
-        <div style="overflow-y:auto;flex:1;padding:4px;">
-            @if (_loadingList)
-            {
-                <div style="display:flex;justify-content:center;padding:20px;">
-                    <MudProgressCircular Indeterminate="true" Size="Size.Small" />
+                <div class="dns-zone-item" @onclick="NavigateUpAsync"
+                     style="cursor:pointer;padding:4px 8px;">
+                    <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" />
+                    <MudText Typo="Typo.body2" Style="display:inline;margin-left:4px;">..</MudText>
                 </div>
             }
-            else
+            @foreach (var z in _subZones)
             {
-                @if (!string.IsNullOrEmpty(_domain) && _domain != "<ROOT>")
-                {
-                    <div class="dns-zone-item" @onclick="NavigateUpAsync"
-                         style="cursor:pointer;padding:4px 8px;">
-                        <MudIcon Icon="@Icons.Material.Filled.ArrowUpward" Size="Size.Small" />
-                        <MudText Typo="Typo.body2" Style="display:inline;margin-left:4px;">..</MudText>
-                    </div>
-                }
-                @foreach (var z in _subZones)
-                {
-                    <div class="dns-zone-item" @onclick="@(() => DrillDownAsync(z))"
-                         style="cursor:pointer;padding:4px 8px;border-radius:4px;"
-                         title="@z">
-                        <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" />
-                        <MudText Typo="Typo.body2" Style="display:inline;margin-left:4px;">@z</MudText>
-                    </div>
-                }
+                <div class="dns-zone-item" @onclick="@(() => DrillDownAsync(z))"
+                     style="cursor:pointer;padding:4px 8px;border-radius:4px;" title="@z">
+                    <MudIcon Icon="@Icons.Material.Filled.Folder" Size="Size.Small" />
+                    <MudText Typo="Typo.body2" Style="display:inline;margin-left:4px;">@z</MudText>
+                </div>
             }
-        </div>
-    </MudPaper>
+            @if (!_loadingList && _subZones.Count == 0)
+            {
+                <MudText Typo="Typo.caption" Color="Color.Default" Class="pa-4">No cached zones.</MudText>
+            }
+        }
+    </div>
 
-    @* ── Right panel: viewer ── *@
-    <MudPaper Elevation="1" Style="flex:1;display:flex;flex-direction:column;min-width:0;">
-        <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
-            <MudText Typo="Typo.subtitle2" Style="flex:1">
-                @(_domain is null or "" ? "<ROOT>" : _domain)
-            </MudText>
-            @if (!string.IsNullOrEmpty(_domain) && _domain != "<ROOT>" && SessionService.CanModify("Cache"))
-            {
-                <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
-                           StartIcon="@Icons.Material.Filled.Delete"
-                           OnClick="DeleteZoneAsync">Delete Zone</MudButton>
-            }
-            <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                           Title="Refresh" OnClick="@(() => LoadViewerAsync(_domain ?? ""))" />
+    @if (!string.IsNullOrEmpty(_domain) && SessionService.CanModify("Cache"))
+    {
+        <div class="pa-2" style="border-top:1px solid rgba(0,0,0,.12);display:flex;justify-content:flex-end;">
+            <MudButton Size="Size.Small" Variant="Variant.Outlined" Color="Color.Error"
+                       StartIcon="@Icons.Material.Filled.Delete"
+                       OnClick="DeleteZoneAsync">Delete Zone "@_domain"</MudButton>
         </div>
-
-        <div style="flex:1;overflow:auto;padding:8px;">
-            @if (_loadingViewer)
-            {
-                <MudProgressCircular Indeterminate="true" Size="Size.Small" />
-            }
-            else if (!string.IsNullOrEmpty(_viewerText))
-            {
-                <pre style="font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;margin:0;">@_viewerText</pre>
-            }
-            else
-            {
-                <MudText Typo="Typo.caption" Color="Color.Default">Select a zone to view cached records.</MudText>
-            }
-        </div>
-    </MudPaper>
-</div>
+    }
+</MudPaper>
 
 @code {
     private string  _node         = "cluster";
-    private string? _domain;
+    private string  _domain       = string.Empty;
     private bool    _loadingList;
-    private bool    _loadingViewer;
-    private List<string> _subZones   = [];
-    private string  _viewerText   = string.Empty;
+    private List<string> _subZones = [];
 
     protected override async Task OnInitializedAsync() => await RefreshListAsync();
 
-    private async Task RefreshListAsync() => await LoadListAsync(_domain ?? "");
+    private async Task RefreshListAsync() => await LoadListAsync(_domain);
 
     private async Task LoadListAsync(string domain)
     {
@@ -101,23 +77,9 @@
 
         if (result.IsOk && result.Data is not null)
         {
-            _domain    = domain;
-            _subZones  = result.Data.Zones ?? [];
+            _domain   = domain;
+            _subZones = result.Data.Zones ?? [];
         }
-        else
-            Snackbar.Add(result.DisplayError, Severity.Error);
-    }
-
-    private async Task LoadViewerAsync(string domain)
-    {
-        if (string.IsNullOrEmpty(domain)) return;
-        _loadingViewer = true;
-        var url = $"api/cache/view?domain={Uri.EscapeDataString(domain)}&node={Uri.EscapeDataString(_node)}";
-        var result = await Api.GetAsync<Models.Cache.CacheViewResponse>(url);
-        _loadingViewer = false;
-
-        if (result.IsOk)
-            _viewerText = result.Data?.Text ?? string.Empty;
         else
             Snackbar.Add(result.DisplayError, Severity.Error);
     }
@@ -126,14 +88,12 @@
     {
         var full = string.IsNullOrEmpty(_domain) ? sub : $"{sub}.{_domain}";
         await LoadListAsync(full);
-        await LoadViewerAsync(full);
     }
 
     private async Task NavigateUpAsync()
     {
-        var parent = GetParentDomain(_domain ?? "");
+        var parent = GetParentDomain(_domain);
         await LoadListAsync(parent);
-        _viewerText = string.Empty;
     }
 
     private async Task DeleteZoneAsync()
@@ -148,9 +108,7 @@
         if (res.IsOk)
         {
             Snackbar.Add($"Cached zone '{_domain}' deleted.", Severity.Success);
-            var parent = GetParentDomain(_domain);
-            _viewerText = string.Empty;
-            await LoadListAsync(parent);
+            await LoadListAsync(GetParentDomain(_domain));
         }
         else
             Snackbar.Add(res.DisplayError, Severity.Error);
@@ -163,9 +121,8 @@
         if (res.IsOk)
         {
             Snackbar.Add("Cache flushed.", Severity.Success);
-            _domain = "";
-            _viewerText = string.Empty;
-            await LoadListAsync("");
+            _domain = string.Empty;
+            await LoadListAsync(string.Empty);
         }
         else
             Snackbar.Add(res.DisplayError, Severity.Error);

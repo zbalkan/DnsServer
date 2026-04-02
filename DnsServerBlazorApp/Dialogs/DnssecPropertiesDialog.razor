@@ -39,8 +39,6 @@
 
                 <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;">
                     <MudButton Variant="Variant.Outlined" Size="Size.Small"
-                               OnClick="RefreshRrsigAsync">Refresh RRSIG</MudButton>
-                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
                                Color="Color.Warning" OnClick="RolloverKskAsync">Rollover KSK</MudButton>
                     <MudButton Variant="Variant.Outlined" Size="Size.Small"
                                Color="Color.Error" OnClick="UnsignAsync">Unsign Zone</MudButton>
@@ -90,12 +88,13 @@
     private async Task LoadAsync()
     {
         _loading = true;
-        var url = $"api/zones/dnssec/getProperties?zone={Uri.EscapeDataString(Zone)}&node={Uri.EscapeDataString(Node)}";
+        var url = $"api/zones/dnssec/properties/get?zone={Uri.EscapeDataString(Zone)}&node={Uri.EscapeDataString(Node)}";
         var result = await Api.GetAsync<DnssecPropertiesResponse>(url);
         _loading = false;
 
         if (result.IsOk && result.Data is not null)
         {
+            _error    = null;
             _isSigned = result.Data.IsSigned;
             _keys     = result.Data.Keys ?? [];
         }
@@ -137,18 +136,10 @@
             _error = res.DisplayError;
     }
 
-    private async Task RefreshRrsigAsync()
-    {
-        var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
-        var res = await Api.PostAsync<object>("api/zones/dnssec/refreshRrSig", form);
-        if (res.IsOk) Snackbar.Add("RRSIG refreshed.", Severity.Success);
-        else          _error = res.DisplayError;
-    }
-
     private async Task RolloverKskAsync()
     {
         var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
-        var res = await Api.PostAsync<object>("api/zones/dnssec/rolloverKsk", form);
+        var res = await Api.PostAsync<object>("api/zones/dnssec/properties/rolloverDnsKey", form);
         if (res.IsOk)
         {
             Snackbar.Add("KSK rollover initiated.", Severity.Success);

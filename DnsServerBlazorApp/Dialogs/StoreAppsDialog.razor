@@ -79,7 +79,7 @@
     protected override async Task OnInitializedAsync()
     {
         var result = await Api.GetAsync<StoreAppsListResponse>(
-            $"api/apps/store/list?node={Uri.EscapeDataString(Node)}");
+            $"api/apps/listStoreApps?node={Uri.EscapeDataString(Node)}");
         _loading = false;
 
         if (result.IsOk && result.Data?.StoreApps is { } list)

@@ -47,15 +47,20 @@
         var stream = _file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
         mp.Add(new StreamContent(stream), "backup", _file.Name);
 
-        var result = await Api.PostMultipartAsync<object>("api/settings/restore", mp);
-        _busy = false;
-
-        if (result.IsOk)
+        try
         {
-            Snackbar.Add("Settings restored. Server may restart.", Severity.Success);
-            MudDialog.Close(DialogResult.Ok(true));
+            var result = await Api.PostMultipartAsync<object>("api/settings/restore", mp);
+            if (result.IsOk)
+            {
+                Snackbar.Add("Settings restored. Server may restart.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+                _error = result.DisplayError;
         }
-        else
-            _error = result.DisplayError;
+        finally
+        {
+            _busy = false;
+        }
     }
 }

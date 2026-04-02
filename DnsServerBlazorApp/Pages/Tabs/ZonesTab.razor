@@ -20,7 +20,7 @@
             { <MudSelectItem Value="@t">@t</MudSelectItem> }
         </MudSelect>
 
-        <ClusterNodeSelect Value="_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
+        <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
 
         <MudSpacer />
 

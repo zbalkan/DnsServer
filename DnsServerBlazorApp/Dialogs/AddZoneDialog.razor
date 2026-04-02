@@ -14,8 +14,8 @@
                       Disabled="@(_type == "SecondaryRoot")"
                       HelperText="e.g. example.com" />
 
-        <MudSelect T="string" @bind-Value="_type" Label="Zone Type" Variant="Variant.Outlined"
-                   Margin="Margin.Dense" Class="mb-3">
+        <MudSelect T="string" Value="@_type" ValueChanged="@OnTypeChanged" Label="Zone Type"
+                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3">
             <MudSelectItem Value="@("Primary")">Primary</MudSelectItem>
             <MudSelectItem Value="@("Secondary")">Secondary</MudSelectItem>
             <MudSelectItem Value="@("Stub")">Stub</MudSelectItem>
@@ -77,9 +77,13 @@
     private string? _error;
     private bool    _busy;
 
-    protected override void OnParametersSet()
+    private void OnTypeChanged(string type)
     {
-        if (_type == "SecondaryRoot") _zoneName = ".";
+        _type = type;
+        if (_type == "SecondaryRoot")
+            _zoneName = ".";
+        else if (_zoneName == ".")
+            _zoneName = string.Empty;
     }
 
     private async Task SaveAsync()

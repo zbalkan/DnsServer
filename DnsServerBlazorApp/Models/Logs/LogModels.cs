@@ -14,22 +14,7 @@ public sealed class LogFile
     public string FileName { get; set; } = string.Empty;
 
     [JsonPropertyName("size")]
-    public long Size { get; set; }
-}
-
-public sealed class LogViewResponse
-{
-    [JsonPropertyName("fileName")]
-    public string FileName { get; set; } = string.Empty;
-
-    [JsonPropertyName("offset")]
-    public long Offset { get; set; }
-
-    [JsonPropertyName("length")]
-    public long Length { get; set; }
-
-    [JsonPropertyName("entries")]
-    public List<string> Entries { get; set; } = [];
+    public string Size { get; set; } = string.Empty;
 }
 
 public sealed class QueryLogsResponse
@@ -52,17 +37,17 @@ public sealed class QueryLogEntry
     [JsonPropertyName("timestamp")]
     public DateTime Timestamp { get; set; }
 
-    [JsonPropertyName("clientAddress")]
-    public string ClientAddress { get; set; } = string.Empty;
+    [JsonPropertyName("clientIpAddress")]
+    public string ClientIpAddress { get; set; } = string.Empty;
 
     [JsonPropertyName("protocol")]
     public string Protocol { get; set; } = string.Empty;
 
-    [JsonPropertyName("question")]
-    public string Question { get; set; } = string.Empty;
+    [JsonPropertyName("qname")]
+    public string Qname { get; set; } = string.Empty;
 
-    [JsonPropertyName("queryType")]
-    public string QueryType { get; set; } = string.Empty;
+    [JsonPropertyName("qtype")]
+    public string Qtype { get; set; } = string.Empty;
 
     [JsonPropertyName("responseType")]
     public string ResponseType { get; set; } = string.Empty;

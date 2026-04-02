@@ -17,7 +17,7 @@
             </MudAlert>
             <MudTextField @bind-Value="_totp" Label="Enter TOTP code to disable 2FA"
                           Variant="Variant.Outlined" Margin="Margin.Dense"
-                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = DisableAsync(); })" />
+                          OnKeyUp="@(async e => { if(e.Key=="Enter") await DisableAsync(); })" />
         }
         else if (_qrCodeUrl is null)
         {
@@ -42,7 +42,7 @@
                           Margin="Margin.Dense" ReadOnly="true" Class="mb-2" />
             <MudTextField @bind-Value="_totp" Label="TOTP Code" Variant="Variant.Outlined"
                           Margin="Margin.Dense"
-                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = EnableAsync(); })" />
+                          OnKeyUp="@(async e => { if(e.Key=="Enter") await EnableAsync(); })" />
         }
     </DialogContent>
     <DialogActions>

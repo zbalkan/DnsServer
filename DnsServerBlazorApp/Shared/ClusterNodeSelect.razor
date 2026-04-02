@@ -39,7 +39,10 @@
 
         // Default to first item if current value is not in list
         if (_items.Count > 0 && !_items.Any(i => i.Value == Value))
+        {
             Value = _items[0].Value;
+            _ = ValueChanged.InvokeAsync(Value);
+        }
     }
 
     private Task OnValueChanged(string v)
