@@ -31,7 +31,7 @@ public sealed class ApiService
 
     // ── Public API ────────────────────────────────────────────────────
 
-    /// <summary>GET request. Returns null on network error (caller shows its own alert).</summary>
+    /// <summary>GET request. Returns an <see cref="ApiResult{T}"/> with <c>IsNetworkError</c> set on failure.</summary>
     public Task<ApiResult<T>> GetAsync<T>(string path, CancellationToken ct = default)
         => SendAsync<T>(HttpMethod.Get, BuildUrl(path), null, ct);
 

@@ -204,7 +204,10 @@
 
     private Dictionary<string, string> BuildForm()
     {
-        var name = string.IsNullOrWhiteSpace(_name) ? Zone : $"{_name}.{Zone}";
+        var label = _name?.Trim() ?? string.Empty;
+        var name  = string.IsNullOrWhiteSpace(label) ? Zone
+                  : Zone == "."                      ? $"{label}."
+                  :                                    $"{label}.{Zone}";
         var f = new Dictionary<string, string>
         {
             ["zone"]     = Zone,
@@ -219,8 +222,14 @@
         {
             case "A": case "AAAA":
                 f["ipAddress"] = _rdata; break;
-            case "NS": case "CNAME": case "ANAME": case "PTR":
+            case "NS":
                 f["nameServer"] = _rdata; break;
+            case "CNAME":
+                f["cname"] = _rdata; break;
+            case "ANAME":
+                f["aname"] = _rdata; break;
+            case "PTR":
+                f["ptrName"] = _rdata; break;
             case "MX":
                 f["preference"] = _rdataExtra;
                 f["exchange"]   = _rdata; break;

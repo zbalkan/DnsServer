@@ -138,7 +138,15 @@
 
     private async Task RolloverKskAsync()
     {
-        var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
+        var ksk = _keys.FirstOrDefault(k => k.IsKsk);
+        if (ksk is null) { _error = "No KSK key found."; return; }
+
+        var form = new Dictionary<string, string>
+        {
+            ["zone"]   = Zone,
+            ["node"]   = Node,
+            ["keyTag"] = ksk.KeyTag.ToString(),
+        };
         var res = await Api.PostAsync<object>("api/zones/dnssec/properties/rolloverDnsKey", form);
         if (res.IsOk)
         {
