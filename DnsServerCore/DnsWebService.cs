@@ -1530,7 +1530,7 @@ namespace DnsServerCore
                 UsePollingFileWatcher = true
             };
 
-            builder.Environment.WebRootFileProvider = new PhysicalFileProvider(Path.Combine(_appFolder, "www"))
+            builder.Environment.WebRootFileProvider = new PhysicalFileProvider(Path.Combine(_appFolder, "wwwroot"))
             {
                 UseActivePolling = true,
                 UsePollingFileWatcher = true
@@ -2435,7 +2435,7 @@ namespace DnsServerCore
             try
             {
                 //init dns server
-                _dnsServer = new DnsServer(_configFolder, Path.Combine(_appFolder, "dohwww"), _log);
+                _dnsServer = new DnsServer(_configFolder, Path.Combine(_appFolder, "wwwroot"), _log);
 
                 //init dhcp server
                 _dhcpServer = new DhcpServer(Path.Combine(_configFolder, "scopes"), _log);

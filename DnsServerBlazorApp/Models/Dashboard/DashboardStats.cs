@@ -158,9 +158,12 @@ public sealed class TopStatsEntry
 
 public sealed class TopStatsResponse
 {
-    [JsonPropertyName("type")]
-    public string Type { get; set; } = string.Empty;
+    [JsonPropertyName("topClients")]
+    public List<TopStatsEntry>? TopClients { get; set; }
 
-    [JsonPropertyName("stats")]
-    public List<TopStatsEntry> Stats { get; set; } = [];
+    [JsonPropertyName("topDomains")]
+    public List<TopStatsEntry>? TopDomains { get; set; }
+
+    [JsonPropertyName("topBlockedDomains")]
+    public List<TopStatsEntry>? TopBlockedDomains { get; set; }
 }
