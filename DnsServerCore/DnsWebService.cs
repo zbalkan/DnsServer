@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 */
 
+using DnsServerBlazorApp;
 using DnsServerCore.Auth;
 using DnsServerCore.Cluster;
 using DnsServerCore.Dhcp;
@@ -1580,6 +1581,8 @@ namespace DnsServerCore
 
             builder.Logging.ClearProviders();
 
+            builder.Services.AddDnsBlazorServices();
+
             _webService = builder.Build();
 
             _webService.UseResponseCompression();
@@ -1587,7 +1590,6 @@ namespace DnsServerCore
             if (_webServiceHttpToTlsRedirect && !httpOnlyMode && _webServiceEnableTls && (_webServiceSslServerAuthenticationOptions is not null))
                 _webService.Use(WebServiceHttpsRedirectionMiddleware);
 
-            _webService.UseDefaultFiles();
             _webService.UseStaticFiles(new StaticFileOptions()
             {
                 OnPrepareResponse = delegate (StaticFileResponseContext ctx)
@@ -1598,7 +1600,11 @@ namespace DnsServerCore
                 ServeUnknownFileTypes = true
             });
 
+            _webService.UseAntiforgery();
+
             ConfigureWebServiceRoutes();
+
+            _webService.MapDnsBlazorApp();
 
             try
             {

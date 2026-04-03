@@ -1,12 +1,22 @@
-<Router AppAssembly="@typeof(App).Assembly">
-    <Found Context="routeData">
-        <RouteView RouteData="@routeData" DefaultLayout="@typeof(DnsServerBlazorApp.Layout.MainLayout)" />
-        <FocusOnNavigate RouteData="@routeData" Selector="h1" />
-    </Found>
-    <NotFound>
-        <PageTitle>Not found</PageTitle>
-        <LayoutView Layout="@typeof(DnsServerBlazorApp.Layout.MainLayout)">
-            <MudText Typo="Typo.h6">Page not found.</MudText>
-        </LayoutView>
-    </NotFound>
-</Router>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <base href="/" />
+    <HeadOutlet @rendermode="@InteractiveServer" />
+    <link href="_content/MudBlazor/MudBlazor.min.css" rel="stylesheet" />
+    <link href="_content/MudBlazor.Extensions/MudBlazor.Extensions.min.css" rel="stylesheet" />
+    <link href="css/app.css" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="img/logo25x25.png" />
+</head>
+<body>
+    <Routes @rendermode="@InteractiveServer" />
+    <script src="js/app.js"></script>
+    <script src="_content/MudBlazor/MudBlazor.min.js"></script>
+    <script src="_content/MudBlazor.Extensions/MudBlazor.Extensions.min.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+</body>
+</html>
