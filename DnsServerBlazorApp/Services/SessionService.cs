@@ -56,6 +56,22 @@ public sealed class SessionService
         Notify();
     }
 
+    /// <summary>Update display name in the current session (called after profile save).</summary>
+    public void UpdateDisplayName(string name)
+    {
+        if (Session is null) return;
+        Session.DisplayName = name;
+        Notify();
+    }
+
+    /// <summary>Update TOTP-enabled flag (called after 2FA enable/disable).</summary>
+    public void UpdateTotpEnabled(bool enabled)
+    {
+        if (Session is null) return;
+        Session.TotpEnabled = enabled;
+        Notify();
+    }
+
     /// <summary>Update cluster node list (called after refreshing settings).</summary>
     public void UpdateClusterNodes(List<ClusterNodeRef> nodes)
     {

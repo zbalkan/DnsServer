@@ -15,12 +15,14 @@
         }
         else
         {
-            <MudTextField @bind-Value="_search" Label="Search" Variant="Variant.Outlined"
+            <MudTextField Value="@_search"
+                          ValueChanged="@((string v) => { _search = v; UpdateFilteredApps(); })"
+                          Label="Search" Variant="Variant.Outlined"
                           Margin="Margin.Dense" Class="mb-3"
                           Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
                           Immediate="true" />
 
-            <MudTable Items="@FilteredApps" Dense="true" Hover="true" Elevation="0"
+            <MudTable Items="@_filteredApps" Dense="true" Hover="true" Elevation="0"
                       FixedHeader="true" Height="480px">
                 <HeaderContent>
                     <MudTh>App</MudTh>
@@ -64,17 +66,22 @@
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
     [Parameter] public string Node { get; set; } = "cluster";
 
-    private bool              _loading    = true;
+    private bool              _loading      = true;
     private string?           _error;
-    private string            _search     = string.Empty;
+    private string            _search       = string.Empty;
     private bool              _installed;
-    private List<StoreApp>    _apps       = [];
-    private HashSet<string>   _installing = [];
+    private List<StoreApp>    _apps         = [];
+    private List<StoreApp>    _filteredApps = [];
+    private HashSet<string>   _installing   = [];
 
-    private IEnumerable<StoreApp> FilteredApps => string.IsNullOrEmpty(_search)
-        ? _apps
-        : _apps.Where(a => a.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
-                           (a.Description?.Contains(_search, StringComparison.OrdinalIgnoreCase) == true));
+    private void UpdateFilteredApps()
+    {
+        _filteredApps = string.IsNullOrEmpty(_search)
+            ? _apps
+            : _apps.Where(a => a.Name.Contains(_search, StringComparison.OrdinalIgnoreCase) ||
+                               (a.Description?.Contains(_search, StringComparison.OrdinalIgnoreCase) == true))
+                   .ToList();
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -86,6 +93,8 @@
             _apps = list;
         else
             _error = result.DisplayError;
+
+        UpdateFilteredApps();
     }
 
     private async Task InstallAsync(StoreApp app)

@@ -98,6 +98,7 @@
 
         if (result.IsOk)
         {
+            SessionService.UpdateTotpEnabled(true);
             Snackbar.Add("2FA enabled.", Severity.Success);
             MudDialog.Close();
         }
@@ -113,6 +114,7 @@
 
         if (result.IsOk)
         {
+            SessionService.UpdateTotpEnabled(false);
             Snackbar.Add("2FA disabled.", Severity.Success);
             MudDialog.Close();
         }

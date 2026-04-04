@@ -107,7 +107,7 @@
         if (!string.IsNullOrWhiteSpace(_dnsServers))
             form["dnsServers"] = _dnsServers;
 
-        var url = IsEdit ? "api/dhcp/scopes/set" : "api/dhcp/scopes/set";
+        var url = "api/dhcp/scopes/set";
         var result = await Api.PostAsync<object>(url, form);
         _busy = false;
 

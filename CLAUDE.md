@@ -2,7 +2,7 @@
 
 ## Overview
 
-Technitium DNS Server is a cross-platform, full-featured DNS server with an integrated web administration console. The solution is written in C# targeting .NET 9 and uses Blazor Web App (Interactive Server rendering) for the UI.
+Technitium DNS Server is a cross-platform, full-featured DNS server with an integrated web administration console. The solution is written in C# targeting .NET 10 and uses Blazor Web App (Interactive Server rendering) for the UI.
 
 - **License**: GPL v3
 - **Target framework**: `net10.0` throughout

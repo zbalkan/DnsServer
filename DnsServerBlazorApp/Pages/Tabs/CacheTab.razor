@@ -62,6 +62,7 @@
     private string  _node         = "cluster";
     private string  _domain       = string.Empty;
     private bool    _loadingList;
+    private int     _loadVersion;
     private List<string> _subZones = [];
 
     protected override async Task OnInitializedAsync() => await RefreshListAsync();
@@ -72,9 +73,12 @@
 
     private async Task LoadListAsync(string domain)
     {
+        var version = ++_loadVersion;
         _loadingList = true;
         var url = $"api/cache/list?domain={Uri.EscapeDataString(domain)}&node={Uri.EscapeDataString(_node)}";
         var result = await Api.GetAsync<Models.Cache.CacheListResponse>(url);
+
+        if (_loadVersion != version) return; // discard stale response from concurrent navigation
         _loadingList = false;
 
         if (result.IsOk && result.Data is not null)

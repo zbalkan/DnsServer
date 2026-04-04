@@ -29,16 +29,6 @@
 
     <MudSpacer />
 
-    @* Update badge *@
-    @if (_updateAvailable)
-    {
-        <MudLink Href="#" Color="Color.Error" Typo="Typo.body2"
-                 Style="margin-right:12px;color:#ff6b6b!important;font-weight:600;"
-                 @onclick="ShowUpdateModal" @onclick:preventDefault>
-            New Update Available!
-        </MudLink>
-    }
-
     @* User menu — only when logged in *@
     @if (SessionService.IsAuthenticated)
     {
@@ -115,7 +105,6 @@
     private string?                  _alertMessage;
     private string?                  _alertTitle;
     private Severity                 _alertSeverity = Severity.Error;
-    private bool                     _updateAvailable;
     private CancellationTokenSource? _alertCts;
 
     // ── Init ──────────────────────────────────────────────────────────
@@ -169,11 +158,6 @@
     {
         Nav.NavigateTo("/", forceLoad: false);
         await SessionService.ClearSessionAsync();
-    }
-
-    private void ShowUpdateModal()
-    {
-        Snackbar.Add("A new version of Technitium DNS Server is available.", Severity.Info);
     }
 
     private Task ShowDialog<TDialog>() where TDialog : ComponentBase

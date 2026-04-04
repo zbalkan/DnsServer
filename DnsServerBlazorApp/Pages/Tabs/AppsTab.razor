@@ -101,9 +101,12 @@ else
 
     private async Task LoadAsync()
     {
+        var node = _node;
         _loading = true;
         var result = await Api.GetAsync<AppsListResponse>(
-            $"api/apps/list?node={Uri.EscapeDataString(_node)}");
+            $"api/apps/list?node={Uri.EscapeDataString(node)}");
+
+        if (_node != node) return; // discard stale response from a previous node
         _loading = false;
 
         if (result.IsOk && result.Data?.Apps is { } list)

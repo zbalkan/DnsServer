@@ -56,6 +56,7 @@
 
         if (result.IsOk)
         {
+            SessionService.UpdateDisplayName(_displayName);
             Snackbar.Add("Display name updated.", Severity.Success);
             MudDialog.Close();
         }

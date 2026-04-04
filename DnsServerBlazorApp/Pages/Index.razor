@@ -238,7 +238,7 @@ else
         _loginBusy = true;
         var form = new Dictionary<string, string>
         {
-            ["user"]        = _loginUser.ToLower(),
+            ["user"]        = _loginUser.ToLowerInvariant(),
             ["pass"]        = _loginPass,
             ["totp"]        = _loginTotp,
             ["includeInfo"] = "true"
@@ -250,6 +250,8 @@ else
         if (result.IsOk && result.Envelope is not null)
         {
             _totp2FAVisible = false;
+            _loginPass      = string.Empty;
+            _loginTotp      = string.Empty;
             var sd = BuildSessionData(result.Envelope);
             await SessionService.SetSessionAsync(sd);
             UpdatePageTitle();
