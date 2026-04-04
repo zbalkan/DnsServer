@@ -25,18 +25,25 @@
             <MudTable Items="@_sessions" Dense="true" Hover="true" Elevation="1">
                 <HeaderContent>
                     <MudTh>Username</MudTh>
-                    <MudTh>Display Name</MudTh>
-                    <MudTh>Created</MudTh>
+                    <MudTh>Type</MudTh>
+                    <MudTh>Token Name</MudTh>
                     <MudTh>Last Used</MudTh>
                     <MudTh></MudTh>
                 </HeaderContent>
                 <RowTemplate>
-                    <MudTd>@context.Username</MudTd>
-                    <MudTd>@context.DisplayName</MudTd>
-                    <MudTd>@context.CreatedOn?.ToLocalTime().ToString("g")</MudTd>
+                    <MudTd>
+                        @context.Username
+                        @if (context.IsCurrentSession)
+                        {
+                            <MudChip T="string" Size="Size.Small" Color="Color.Primary"
+                                     Variant="Variant.Outlined" Class="ml-1">current</MudChip>
+                        }
+                    </MudTd>
+                    <MudTd>@context.Type</MudTd>
+                    <MudTd>@(context.TokenName ?? "—")</MudTd>
                     <MudTd>@context.LastSeen?.ToLocalTime().ToString("g")</MudTd>
                     <MudTd>
-                        @if (context.Token != SessionService.Token)
+                        @if (!context.IsCurrentSession)
                         {
                             <MudIconButton Icon="@Icons.Material.Filled.Logout" Size="Size.Small"
                                            Color="Color.Error" Title="Revoke session"
@@ -240,7 +247,7 @@
 
     private async Task RevokeSessionAsync(SessionInfo session)
     {
-        var form = new Dictionary<string, string> { ["token"] = session.Token ?? "" };
+        var form = new Dictionary<string, string> { ["partialToken"] = session.PartialToken ?? "" };
         var res = await Api.PostAsync<object>("api/admin/sessions/delete", form);
         if (res.IsOk)
         {

@@ -31,35 +31,26 @@ public sealed class UserListResponse
 
 public sealed class SessionInfo
 {
-    [JsonPropertyName("token")]
-    public string? Token { get; init; }
-
     [JsonPropertyName("partialToken")]
     public string? PartialToken { get; init; }
 
-    [JsonPropertyName("tokenName")]
-    public string? TokenName { get; init; }
+    [JsonPropertyName("isCurrentSession")]
+    public bool IsCurrentSession { get; init; }
 
     [JsonPropertyName("username")]
     public string? Username { get; init; }
 
-    [JsonPropertyName("displayName")]
-    public string? DisplayName { get; init; }
+    [JsonPropertyName("type")]
+    public string? Type { get; init; }
 
-    [JsonPropertyName("isApiToken")]
-    public bool IsApiToken { get; init; }
-
-    [JsonPropertyName("createdOn")]
-    public DateTime? CreatedOn { get; init; }
+    [JsonPropertyName("tokenName")]
+    public string? TokenName { get; init; }
 
     [JsonPropertyName("lastSeen")]
     public DateTime? LastSeen { get; init; }
 
     [JsonPropertyName("lastSeenRemoteAddress")]
     public string? LastSeenRemoteAddress { get; init; }
-
-    [JsonPropertyName("lastSeenUserAgent")]
-    public string? LastSeenUserAgent { get; init; }
 }
 
 public sealed class SessionListResponse
@@ -97,6 +88,6 @@ public sealed class TotpSetupResponse
     [JsonPropertyName("secret")]
     public string? Secret { get; init; }
 
-    [JsonPropertyName("qrCodeUrl")]
-    public string? QrCodeUrl { get; init; }
+    [JsonPropertyName("qrCodePngImage")]
+    public string? QrCodePngImage { get; init; }
 }

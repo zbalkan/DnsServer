@@ -24,7 +24,7 @@
             <MudTextField @bind-Value="_tokenName" Label="Token Name"
                           Variant="Variant.Outlined" Margin="Margin.Dense"
                           HelperText="A memorable name for this token"
-                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = CreateAsync(); })" />
+                          OnKeyUp="@(async e => { if(e.Key=="Enter") await CreateAsync(); })" />
         }
     </DialogContent>
     <DialogActions>
@@ -61,7 +61,7 @@
                 ["user"]      = SessionService.Username,
                 ["tokenName"] = _tokenName,
             };
-            var result = await Api.PostAsync<Models.Auth.ApiTokenResponse>("api/user/createToken", form);
+            var result = await Api.PostAsync<Models.Auth.ApiTokenResponse>("api/admin/sessions/createToken", form);
             if (result.IsOk)
                 _token = result.Data?.Token;
             else

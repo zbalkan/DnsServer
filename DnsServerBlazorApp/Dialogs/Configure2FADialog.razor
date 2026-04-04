@@ -14,12 +14,10 @@
         {
             <MudAlert Severity="Severity.Info" Class="mb-3">
                 Two-factor authentication is currently <strong>enabled</strong>.
+                Disabling it will allow login without a TOTP code.
             </MudAlert>
-            <MudTextField @bind-Value="_totp" Label="Enter TOTP code to disable 2FA"
-                          Variant="Variant.Outlined" Margin="Margin.Dense"
-                          OnKeyUp="@(async e => { if(e.Key=="Enter") await DisableAsync(); })" />
         }
-        else if (_qrCodeUrl is null)
+        else if (_qrCodeImage is null)
         {
             <MudText Typo="Typo.body2" Class="mb-2">
                 Enable two-factor authentication using an authenticator app.
@@ -36,7 +34,7 @@
                 Scan this QR code with your authenticator app, then enter the code below to confirm.
             </MudText>
             <div style="text-align:center;margin:12px 0;">
-                <img src="@_qrCodeUrl" alt="QR Code" style="max-width:200px;" />
+                <img src="@($"data:image/png;base64,{_qrCodeImage}")" alt="QR Code" style="max-width:200px;" />
             </div>
             <MudTextField @bind-Value="_secret" Label="Secret Key" Variant="Variant.Outlined"
                           Margin="Margin.Dense" ReadOnly="true" Class="mb-2" />
@@ -50,9 +48,12 @@
         @if (SessionService.TotpEnabled)
         {
             <MudButton Color="Color.Error" Variant="Variant.Filled"
-                       Disabled="@_busy" OnClick="DisableAsync">Disable 2FA</MudButton>
+                       Disabled="@_busy" OnClick="DisableAsync">
+                @if (_busy) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+                Disable 2FA
+            </MudButton>
         }
-        else if (_qrCodeUrl is not null)
+        else if (_qrCodeImage is not null)
         {
             <MudButton Color="Color.Primary" Variant="Variant.Filled"
                        Disabled="@_busy" OnClick="EnableAsync">
@@ -66,7 +67,7 @@
 @code {
     [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
 
-    private string? _qrCodeUrl;
+    private string? _qrCodeImage; // base64 PNG returned by api/user/2fa/init
     private string? _secret;
     private string  _totp  = string.Empty;
     private string? _error;
@@ -75,14 +76,13 @@
     private async Task SetupAsync()
     {
         _busy = true;
-        var result = await Api.GetAsync<Models.Auth.TotpSetupResponse>(
-            $"api/user/2fa/init?user={Uri.EscapeDataString(SessionService.Username)}");
+        var result = await Api.GetAsync<Models.Auth.TotpSetupResponse>("api/user/2fa/init");
         _busy = false;
 
         if (result.IsOk && result.Data is not null)
         {
-            _secret    = result.Data.Secret;
-            _qrCodeUrl = result.Data.QrCodeUrl;
+            _secret      = result.Data.Secret;
+            _qrCodeImage = result.Data.QrCodePngImage;
         }
         else
             _error = result.DisplayError;
@@ -92,11 +92,7 @@
     {
         if (string.IsNullOrWhiteSpace(_totp)) { _error = "Enter the TOTP code."; return; }
         _busy = true;
-        var form = new Dictionary<string, string>
-        {
-            ["user"] = SessionService.Username,
-            ["code"] = _totp,
-        };
+        var form = new Dictionary<string, string> { ["totp"] = _totp };
         var result = await Api.PostAsync<object>("api/user/2fa/enable", form);
         _busy = false;
 
@@ -111,14 +107,8 @@
 
     private async Task DisableAsync()
     {
-        if (string.IsNullOrWhiteSpace(_totp)) { _error = "Enter the TOTP code."; return; }
         _busy = true;
-        var form = new Dictionary<string, string>
-        {
-            ["user"] = SessionService.Username,
-            ["code"] = _totp,
-        };
-        var result = await Api.PostAsync<object>("api/user/2fa/disable", form);
+        var result = await Api.GetAsync<object>("api/user/2fa/disable");
         _busy = false;
 
         if (result.IsOk)
