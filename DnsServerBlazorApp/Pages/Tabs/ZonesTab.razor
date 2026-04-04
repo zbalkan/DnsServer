@@ -6,21 +6,22 @@
 @if (_editingZone is null)
 {
     @* ── Zone list view ── *@
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+    <div class="dns-toolbar">
         <MudTextField @bind-Value="_search" Label="Search zones" Variant="Variant.Outlined"
                       Margin="Margin.Dense" Style="max-width:300px;"
                       Adornment="Adornment.End" AdornmentIcon="@Icons.Material.Filled.Search"
                       Immediate="true" DebounceInterval="300"
-                      OnDebounceIntervalElapsed="@(() => _page = 1)" />
+                      OnDebounceIntervalElapsed="@(() => { _page = 1; UpdateFiltered(); })" />
 
-        <MudSelect T="string" @bind-Value="_typeFilter" Label="Type" Variant="Variant.Outlined"
+        <MudSelect T="string" Value="@_typeFilter" ValueChanged="OnTypeFilterChanged"
+                   Label="Type" Variant="Variant.Outlined"
                    Margin="Margin.Dense" Style="max-width:180px;">
             <MudSelectItem Value="@("")">All Types</MudSelectItem>
             @foreach (var t in _zoneTypes)
             { <MudSelectItem Value="@t">@t</MudSelectItem> }
         </MudSelect>
 
-        <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
+        <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
 
         <MudSpacer />
 
@@ -122,20 +123,28 @@ else
     private const int    _pageSize   = 25;
 
     private List<ZoneInfo> _zones    = [];
+    private List<ZoneInfo> _filtered = [];
     private ZoneInfo?      _editingZone;
-
-    private List<ZoneInfo> _filtered => _zones
-        .Where(z => (string.IsNullOrEmpty(_search) ||
-                     z.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)) &&
-                    (string.IsNullOrEmpty(_typeFilter) || z.Type == _typeFilter))
-        .ToList();
 
     private IEnumerable<ZoneInfo> PagedZones =>
         _filtered.Skip((_page - 1) * _pageSize).Take(_pageSize);
 
     private int PageCount => Math.Max(1, (int)Math.Ceiling(_filtered.Count / (double)_pageSize));
 
+    private void UpdateFiltered()
+    {
+        _filtered = _zones
+            .Where(z => (string.IsNullOrEmpty(_search) ||
+                         z.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)) &&
+                        (string.IsNullOrEmpty(_typeFilter) || z.Type == _typeFilter))
+            .ToList();
+    }
+
+    private void OnTypeFilterChanged(string value) { _typeFilter = value; UpdateFiltered(); }
+
     protected override async Task OnInitializedAsync() => await LoadZonesAsync();
+
+    private async Task OnNodeChangedAsync(string v) { _node = v; await LoadZonesAsync(); }
 
     private async Task LoadZonesAsync()
     {
@@ -145,7 +154,10 @@ else
         _loading = false;
 
         if (result.IsOk && result.Data?.Zones is { } list)
+        {
             _zones = list;
+            UpdateFiltered();
+        }
         else if (result.IsInvalidToken)
             await SessionService.ClearSessionAsync();
         else

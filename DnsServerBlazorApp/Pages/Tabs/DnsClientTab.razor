@@ -10,7 +10,7 @@
                           HelperText="e.g. 8.8.8.8, dns.quad9.net:853, https://cloudflare-dns.com/dns-query" />
             <MudTextField @bind-Value="_domain" Label="Domain" Variant="Variant.Outlined"
                           Margin="Margin.Dense" Style="flex:2;min-width:180px;"
-                          OnKeyUp="@(e => { if(e.Key=="Enter") _ = QueryAsync(); })" />
+                          OnKeyUp="@(async e => { if(e.Key=="Enter") await QueryAsync(); })" />
             <MudSelect T="string" @bind-Value="_type" Label="Type" Variant="Variant.Outlined"
                        Margin="Margin.Dense" Style="min-width:100px;">
                 @foreach (var t in _recordTypes)

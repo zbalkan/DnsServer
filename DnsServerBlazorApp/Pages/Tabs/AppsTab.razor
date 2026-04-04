@@ -3,9 +3,9 @@
 @inject IDialogService DialogService
 @inject ISnackbar      Snackbar
 
-<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap;">
+<div class="dns-toolbar">
     <MudText Typo="Typo.subtitle2" Style="flex:1">DNS Apps</MudText>
-    <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = LoadAsync(); })" />
+    <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
     @if (SessionService.CanModify("Apps"))
     {
         <MudButton Variant="Variant.Outlined" Size="Size.Small"
@@ -96,6 +96,8 @@ else
     private List<DnsApp> _apps    = [];
 
     protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task OnNodeChangedAsync(string v) { _node = v; await LoadAsync(); }
 
     private async Task LoadAsync()
     {

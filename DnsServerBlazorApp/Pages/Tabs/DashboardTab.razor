@@ -25,7 +25,7 @@
         </MudStack>
     }
 
-    <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = RefreshAsync(); })" />
+    <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
 </div>
 
 @* ── Loading ── *@
@@ -220,6 +220,8 @@ else if (_stats is not null)
 
     // ── Lifecycle ─────────────────────────────────────────────────────
     protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task OnNodeChangedAsync(string v) { _node = v; await RefreshAsync(); }
 
     /// <summary>Called by the parent auto-refresh timer without showing spinner.</summary>
     public async Task SilentRefreshAsync()

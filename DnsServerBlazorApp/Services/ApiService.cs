@@ -6,11 +6,10 @@ using System.Text.Json;
 namespace DnsServerBlazorApp.Services;
 
 /// <summary>
-/// Wraps all HTTP calls to the Technitium REST API.
-/// Mirrors the HTTPRequest() helper from the original common.js:
+/// Wraps all HTTP calls to the Technitium REST API:
 ///   – attaches the session token to every request
 ///   – normalises the envelope status ("ok", "error", "invalid-token", "2fa-required")
-///   – exposes callbacks via ApiResult&lt;T&gt; so callers react to each status
+///   – exposes results via <see cref="ApiResult{T}"/> so callers react to each status
 /// </summary>
 public sealed class ApiService
 {
@@ -90,9 +89,7 @@ public sealed class ApiService
 
 // ── Result wrapper ─────────────────────────────────────────────────────────
 
-/// <summary>
-/// Outcome of an API call. Exactly mirrors the JS switch on response.status.
-/// </summary>
+/// <summary>Outcome of an API call.</summary>
 public sealed class ApiResult<T>
 {
     public bool   IsOk           { get; }

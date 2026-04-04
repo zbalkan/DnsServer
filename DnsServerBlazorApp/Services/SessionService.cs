@@ -4,8 +4,7 @@ using Microsoft.JSInterop;
 namespace DnsServerBlazorApp.Services;
 
 /// <summary>
-/// Holds the authenticated session (mirrors the JS <c>sessionData</c> global).
-/// Uses localStorage for token persistence across page refreshes.
+/// Holds the authenticated session and persists the token in localStorage.
 /// Raises <see cref="OnChange"/> whenever auth state changes so components
 /// can call <c>StateHasChanged()</c>.
 /// </summary>

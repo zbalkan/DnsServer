@@ -5,7 +5,7 @@
 <MudPaper Elevation="1" Style="display:flex;flex-direction:column;height:calc(100vh - 200px);">
     <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
         <MudText Typo="Typo.subtitle2" Style="flex:1">Cached Zones</MudText>
-        <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = RefreshListAsync(); })" />
+        <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
         <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
                        Title="Refresh" OnClick="RefreshListAsync" />
         @if (SessionService.CanModify("Cache"))
@@ -65,6 +65,8 @@
     private List<string> _subZones = [];
 
     protected override async Task OnInitializedAsync() => await RefreshListAsync();
+
+    private async Task OnNodeChangedAsync(string v) { _node = v; await RefreshListAsync(); }
 
     private async Task RefreshListAsync() => await LoadListAsync(_domain);
 

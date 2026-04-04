@@ -168,8 +168,7 @@ else if (_s is not null)
             @* Proxy *@
             <MudPaper Elevation="1" Class="pa-3 mb-3">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Proxy</MudText>
-                @{ var proxyType = _s.Proxy?.Type ?? "None"; }
-                <MudSelect T="string" Value="@proxyType"
+                <MudSelect T="string" Value="@(_s.Proxy?.Type ?? "None")"
                            ValueChanged="@((string v) => SetProxyType(v))"
                            Label="Proxy Type" Variant="Variant.Outlined"
                            Margin="Margin.Dense" Class="mb-2">

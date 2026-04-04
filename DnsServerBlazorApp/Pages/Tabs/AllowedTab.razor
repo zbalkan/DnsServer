@@ -1,7 +1,8 @@
-@inject ApiService     Api
-@inject SessionService SessionService
-@inject IDialogService DialogService
-@inject ISnackbar      Snackbar
+@inject ApiService       Api
+@inject SessionService   SessionService
+@inject IDialogService   DialogService
+@inject ISnackbar        Snackbar
+@inject NavigationManager Nav
 
 <div style="display:flex;gap:12px;height:calc(100vh - 200px);">
 
@@ -9,7 +10,7 @@
     <MudPaper Elevation="1" Style="width:320px;min-width:220px;display:flex;flex-direction:column;">
         <div class="pa-2" style="display:flex;align-items:center;gap:6px;border-bottom:1px solid rgba(0,0,0,.12);">
             <MudText Typo="Typo.subtitle2" Style="flex:1">Allowed Zones</MudText>
-            <ClusterNodeSelect Value="@_node" ValueChanged="@((v) => { _node = v; _ = LoadZonesAsync(); })" />
+            <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
         </div>
 
         @if (SessionService.CanModify("Allowed"))
@@ -17,7 +18,7 @@
             <div class="pa-2" style="border-bottom:1px solid rgba(0,0,0,.12);">
                 <MudTextField @bind-Value="_newZone" Label="Add domain" Variant="Variant.Outlined"
                               Margin="Margin.Dense" Class="mb-1"
-                              OnKeyUp="@(e => { if(e.Key=="Enter") _ = AddZoneAsync(); })" />
+                              OnKeyUp="@(async e => { if(e.Key=="Enter") await AddZoneAsync(); })" />
                 <div style="display:flex;gap:6px;">
                     <MudButton Variant="Variant.Filled" Color="Color.Primary" Size="Size.Small"
                                FullWidth="true" OnClick="AddZoneAsync">Allow</MudButton>
@@ -105,6 +106,8 @@
 
     protected override async Task OnInitializedAsync() => await LoadZonesAsync();
 
+    private async Task OnNodeChangedAsync(string v) { _node = v; await LoadZonesAsync(); }
+
     private async Task LoadZonesAsync()
     {
         _loading = true;
@@ -124,8 +127,9 @@
         _loadingRecords = true;
         var url = $"api/zones/records/get?zone={Uri.EscapeDataString(zone)}&node={Uri.EscapeDataString(_node)}";
         var result = await Api.GetAsync<ZoneRecordListResponse>(url);
-        _loadingRecords = false;
 
+        if (_selected != zone) return; // discard stale response
+        _loadingRecords = false;
         _records = result.IsOk ? result.Data?.Records ?? [] : [];
     }
 
@@ -173,7 +177,6 @@
     {
         var url = Api.BuildDownloadUrl(
             $"api/allowed/export?node={Uri.EscapeDataString(_node)}");
-        // trigger browser download via JS would go here; snackbar for now
-        Snackbar.Add("Export URL: " + url, Severity.Info);
+        Nav.NavigateTo(url, forceLoad: true);
     }
 }

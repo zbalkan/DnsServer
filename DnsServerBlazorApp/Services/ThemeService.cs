@@ -5,8 +5,7 @@ using MudBlazor;
 namespace DnsServerBlazorApp.Services;
 
 /// <summary>
-/// Manages dark/light theme toggling, mirroring the original
-/// <c>toggleTheme()</c> / <c>applyTheme()</c> functions from main.js.
+/// Manages dark/light theme toggling.
 /// Theme preference is stored in localStorage under the key "theme".
 /// </summary>
 public sealed class ThemeService
@@ -60,10 +59,6 @@ public sealed class ThemeService
         catch { /* best-effort */ }
     }
 
-    /// <summary>
-    /// The original CSS uses body.dark-mode class for overrides.
-    /// We keep that so any remaining CSS rules continue to apply.
-    /// </summary>
     private async Task ApplyBodyClassAsync()
     {
         try

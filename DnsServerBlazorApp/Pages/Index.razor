@@ -31,7 +31,7 @@
                 <MudTextField @bind-Value="_loginUser" Label="Username"
                               Variant="Variant.Outlined" Margin="Margin.Dense"
                               Class="mb-2" Disabled="@_loginBusy"
-                              OnKeyUp="@(e => { if(e.Key=="Enter") _ = DoLoginAsync(); })" />
+                              OnKeyUp="@(async e => { if(e.Key=="Enter") await DoLoginAsync(); })" />
                 <MudTextField @bind-Value="_loginPass" Label="Password"
                               InputType="@(_showPass ? InputType.Text : InputType.Password)"
                               Variant="Variant.Outlined" Margin="Margin.Dense"
@@ -39,7 +39,7 @@
                               Adornment="Adornment.End"
                               AdornmentIcon="@(_showPass ? Icons.Material.Filled.VisibilityOff : Icons.Material.Filled.Visibility)"
                               OnAdornmentClick="@(() => _showPass = !_showPass)"
-                              OnKeyUp="@(e => { if(e.Key=="Enter") _ = DoLoginAsync(); })" />
+                              OnKeyUp="@(async e => { if(e.Key=="Enter") await DoLoginAsync(); })" />
                 @if (_totp2FAVisible)
                 {
                     <MudTextField @bind-Value="_loginTotp" Label="Enter OTP (6-digit code)"
@@ -47,7 +47,7 @@
                                   Class="mb-2" Disabled="@_loginBusy"
                                   MaxLength="6" InputType="InputType.Number"
                                   HelperText="Enter the 6-digit code from your authenticator app."
-                                  OnKeyUp="@(e => { if(e.Key=="Enter") _ = DoLoginAsync(); })" />
+                                  OnKeyUp="@(async e => { if(e.Key=="Enter") await DoLoginAsync(); })" />
                 }
             </MudCardContent>
             <MudCardActions Style="justify-content:space-between;padding:8px 16px 16px;">

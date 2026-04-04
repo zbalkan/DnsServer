@@ -8,7 +8,7 @@
 
     @* ── Sessions ── *@
     <MudTabPanel Text="Sessions">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="dns-toolbar">
             <MudSpacer />
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
                            OnClick="LoadSessionsAsync" Title="Refresh" />
@@ -50,7 +50,7 @@
 
     @* ── Users ── *@
     <MudTabPanel Text="Users">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="dns-toolbar">
             <MudSpacer />
             @if (SessionService.CanModify("Administration"))
             {
@@ -112,7 +112,7 @@
 
     @* ── Groups ── *@
     <MudTabPanel Text="Groups">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="dns-toolbar">
             <MudSpacer />
             @if (SessionService.CanModify("Administration"))
             {
@@ -161,7 +161,7 @@
     @if (SessionService.CanView("Administration"))
     {
         <MudTabPanel Text="Cluster">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <div class="dns-toolbar">
                 <MudSpacer />
                 <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
                                OnClick="LoadClusterAsync" Title="Refresh" />
