@@ -250,8 +250,6 @@ else
         if (result.IsOk && result.Envelope is not null)
         {
             _totp2FAVisible = false;
-            _loginPass      = string.Empty;
-            _loginTotp      = string.Empty;
             var sd = BuildSessionData(result.Envelope);
             await SessionService.SetSessionAsync(sd);
             UpdatePageTitle();
@@ -260,6 +258,9 @@ else
             // Prompt default password change (mirrors original JS)
             if (!sd.TotpEnabled && _loginUser == "admin" && _loginPass == "admin")
                 await ShowChangePasswordAsync();
+
+            _loginPass = string.Empty;
+            _loginTotp = string.Empty;
         }
         else if (result.Is2FARequired)
         {
