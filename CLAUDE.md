@@ -5,8 +5,8 @@
 Technitium DNS Server is a cross-platform, full-featured DNS server with an integrated web administration console. The solution is written in C# targeting .NET 9 and uses Blazor Web App (Interactive Server rendering) for the UI.
 
 - **License**: GPL v3
-- **Target framework**: `net9.0` throughout
-- **UI framework**: Blazor Web App (`Microsoft.NET.Sdk.Web`) with MudBlazor 7.x
+- **Target framework**: `net10.0` throughout
+- **UI framework**: Blazor Web App (`Microsoft.NET.Sdk.Web`) with MudBlazor 9.x
 - **Active dev branch**: `claude/document-dns-architecture-CqgL8` (PR #14)
 - **Solution file**: `DnsServer.sln` (35 projects)
 
@@ -58,7 +58,7 @@ DnsServer/
 - SDK: **`Microsoft.NET.Sdk.Web`** (Blazor Web App, not WASM).
 - Render mode: **`@rendermode InteractiveServer`** — all components run server-side via SignalR; no WASM download.
 - HTML root: `App.razor` (replaces `index.html`). There is no `wwwroot/index.html`.
-- Packages: `MudBlazor 7.*`, `MudBlazor.Extensions 7.*`.
+- Packages: `MudBlazor 9.*`, `MudBlazor.Extensions 9.*`.
 - The project is embedded in `DnsServerCore` at runtime; standalone dev mode is also supported via `Program.cs`.
 
 #### Blazor integration points
