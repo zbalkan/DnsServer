@@ -660,7 +660,7 @@ CREATE TABLE IF NOT EXISTS dns_logs
             }
         }
 
-        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response)
+        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata = null)
         {
             if (_enableLogging)
                 _channelWriter?.TryWrite(new LogEntry(timestamp, request, remoteEP, protocol, response));

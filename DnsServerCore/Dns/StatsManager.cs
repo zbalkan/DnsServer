@@ -156,10 +156,7 @@ namespace DnsServerCore.Dns
                         {
                             try
                             {
-                                if (logger is IDnsQueryLoggerEx loggerEx)
-                                    _ = loggerEx.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response, logMetadata);
-                                else
-                                    _ = logger.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response);
+                                _ = logger.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response, logMetadata);
                             }
                             catch (Exception ex)
                             {
