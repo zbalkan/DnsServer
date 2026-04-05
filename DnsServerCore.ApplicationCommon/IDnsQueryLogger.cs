@@ -55,10 +55,14 @@ namespace DnsServerCore.ApplicationCommon
     }
 
     /// <summary>
-    /// Carrier stored in <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/> by the DNS server
-    /// core.  Replaces the raw <see cref="DnsServerResponseType"/> value so that blocking apps can
-    /// attach <see cref="DnsQueryLogMetadata"/> that survives through to
-    /// <see cref="IDnsQueryLogger.InsertLogAsync"/>.
+    /// Carrier that may be stored in <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/> by the
+    /// DNS server core to provide structured response details for logging.
+    /// During the current transition, consumers must handle both a raw
+    /// <see cref="DnsServerResponseType"/> value and a <see cref="DnsResponseTag"/> instance in
+    /// <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/>. When present, this carrier allows
+    /// blocking apps to attach <see cref="DnsQueryLogMetadata"/> that survives through to
+    /// <see cref="IDnsQueryLogger.InsertLogAsync"/>. Use <see cref="GetResponseType"/> to decode the
+    /// tag safely regardless of which shape is present.
     /// </summary>
     public sealed class DnsResponseTag
     {
@@ -69,6 +73,21 @@ namespace DnsServerCore.ApplicationCommon
         /// Optional metadata populated by a blocking app; <c>null</c> for non-blocking responses.
         /// </summary>
         public DnsQueryLogMetadata? Metadata { get; init; }
+
+        /// <summary>
+        /// Decodes the response type from a <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/>
+        /// value, handling both the new <see cref="DnsResponseTag"/> carrier and the legacy boxed
+        /// <see cref="DnsServerResponseType"/> enum value that the core still emits on many code paths.
+        /// Falls back to <see cref="DnsServerResponseType.Recursive"/> when the tag is absent or of
+        /// an unrecognised type.
+        /// </summary>
+        /// <param name="tag">The value of <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/>.</param>
+        public static DnsServerResponseType GetResponseType(object? tag) => tag switch
+        {
+            DnsResponseTag dnsResponseTag => dnsResponseTag.ResponseType,
+            DnsServerResponseType dnsServerResponseType => dnsServerResponseType,
+            _ => DnsServerResponseType.Recursive
+        };
     }
 
     /// <summary>

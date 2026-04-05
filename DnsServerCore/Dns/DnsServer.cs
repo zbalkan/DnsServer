@@ -4265,16 +4265,25 @@ namespace DnsServerCore.Dns
                 }
             }
 
-            DnsResponseTag? existingResponseTag = response.Tag as DnsResponseTag;
-            if (existingResponseTag is null)
+            switch (response.Tag)
             {
-                if (response.IsBlockedResponse())
-                    response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlocked };
-            }
-            else if (existingResponseTag.ResponseType == DnsServerResponseType.Cached)
-            {
-                if (response.IsBlockedResponse())
-                    response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlockedCached, Metadata = existingResponseTag.Metadata };
+                case DnsResponseTag { ResponseType: DnsServerResponseType.Cached } cachedTag:
+                    if (response.IsBlockedResponse())
+                        response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlockedCached, Metadata = cachedTag.Metadata };
+                    break;
+
+                case DnsServerResponseType.Cached:
+                    if (response.IsBlockedResponse())
+                        response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlockedCached };
+                    break;
+
+                case DnsResponseTag _:
+                    break; //already a non-Cached DnsResponseTag; preserve it
+
+                default:
+                    if (response.IsBlockedResponse())
+                        response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlocked };
+                    break;
             }
 
             return response;

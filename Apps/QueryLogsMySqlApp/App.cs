@@ -248,7 +248,7 @@ namespace QueryLogsMySql
                             paramClientIp.Value = log.RemoteEP.Address.ToString();
                             paramProtocol.Value = (byte)log.Protocol;
 
-                            DnsServerResponseType responseType = (log.Response.Tag as DnsResponseTag)?.ResponseType ?? DnsServerResponseType.Recursive;
+                            DnsServerResponseType responseType = DnsResponseTag.GetResponseType(log.Response.Tag);
 
                             paramResponseType.Value = (byte)responseType;
 

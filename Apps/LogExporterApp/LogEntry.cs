@@ -41,7 +41,7 @@ namespace LogExporter
             // Extract client information
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
-            ResponseType = (response.Tag as DnsResponseTag)?.ResponseType ?? DnsServerResponseType.Recursive;
+            ResponseType = DnsResponseTag.GetResponseType(response.Tag);
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
                 ResponseRtt = response.Metadata.RoundTripTime;

@@ -142,7 +142,7 @@ namespace DnsServerCore.Dns
                             if (item._response is null)
                                 responseType = DnsServerResponseType.Dropped;
                             else
-                                responseType = (item._response.Tag as DnsResponseTag)?.ResponseType ?? DnsServerResponseType.Recursive;
+                                responseType = DnsResponseTag.GetResponseType(item._response.Tag);
 
                             statCounter.Update(query, item._response is null ? DnsResponseCode.NoError : item._response.RCODE, responseType, item._remoteEP.Address, item._protocol, item._rateLimited);
                         }
