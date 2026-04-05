@@ -664,7 +664,7 @@ CREATE TABLE IF NOT EXISTS dns_logs
         {
             if (_enableLogging)
                 _channelWriter?.TryWrite(new LogEntry(timestamp, request, remoteEP, protocol, response));
-
+            // metadata is intentionally not persisted: the MySQL schema has no metadata columns.
             return Task.CompletedTask;
         }
 

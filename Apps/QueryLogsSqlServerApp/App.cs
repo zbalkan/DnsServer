@@ -560,7 +560,7 @@ END
         {
             if (_enableLogging)
                 _channelWriter?.TryWrite(new LogEntry(timestamp, request, remoteEP, protocol, response));
-
+            // metadata is intentionally not persisted: the SQL Server schema has no metadata columns.
             return Task.CompletedTask;
         }
 
