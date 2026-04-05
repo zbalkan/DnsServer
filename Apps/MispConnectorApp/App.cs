@@ -151,6 +151,7 @@ namespace MispConnector
 
             DnsResponseTag metadataTag = new DnsResponseTag
             {
+                ResponseType = DnsServerResponseType.Blocked,
                 Metadata = new DnsQueryLogMetadata
                 {
                     Source = "MispConnector",

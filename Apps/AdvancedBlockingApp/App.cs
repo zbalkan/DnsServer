@@ -630,6 +630,7 @@ namespace AdvancedBlocking
 
             DnsResponseTag metadataTag = new DnsResponseTag
             {
+                ResponseType = DnsServerResponseType.Blocked,
                 Metadata = GetMetadata()
             };
 

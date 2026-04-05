@@ -4280,6 +4280,9 @@ namespace DnsServerCore.Dns
                 case DnsResponseTag _:
                     break; //already a non-Cached DnsResponseTag; preserve it
 
+                case DnsServerResponseType _:
+                    break; //legacy non-Cached enum tag; preserve it
+
                 default:
                     if (response.IsBlockedResponse())
                         response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlocked };
