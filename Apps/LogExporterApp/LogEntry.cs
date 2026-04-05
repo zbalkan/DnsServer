@@ -42,7 +42,7 @@ namespace LogExporter
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
             ResponseType = DnsServerResponseTag.GetResponseType(response.Tag);
-            BlockingReport = metadata?.BlockingReport;
+            BlockingMetadata = metadata?.Values;
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
                 ResponseRtt = response.Metadata.RoundTripTime;
@@ -97,7 +97,7 @@ namespace LogExporter
 
         public List<DnsResourceRecord> Answers { get; private set; }
         public string ClientIp { get; private set; }
-        public string? BlockingReport { get; private set; }
+        public IReadOnlyDictionary<string, string>? BlockingMetadata { get; private set; }
         public List<EDNSLog> EDNS { get; private set; }
         public DnsTransportProtocol Protocol { get; private set; }
         public DnsQuestion? Question { get; private set; }

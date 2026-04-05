@@ -18,6 +18,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using TechnitiumLibrary.Net.Dns;
@@ -26,15 +28,55 @@ namespace DnsServerCore.ApplicationCommon
 {
     public sealed class DnsQueryLogMetadata
     {
-        public DnsQueryLogMetadata(string? blockingReport = null)
+        public DnsQueryLogMetadata(IReadOnlyDictionary<string, string>? values = null)
         {
-            BlockingReport = blockingReport;
+            Values = values is null ? new Dictionary<string, string>(0) : new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
         }
 
         /// <summary>
-        /// The blocking metadata report (example: <c>source=blocked-zone; domain=example.com</c>).
+        /// Structured metadata key/value pairs (example keys: <c>source</c>, <c>domain</c>, <c>blockListUrl</c>).
         /// </summary>
-        public string? BlockingReport { get; }
+        public IReadOnlyDictionary<string, string> Values { get; }
+
+        public string ToReportString()
+        {
+            if (Values.Count < 1)
+                return string.Empty;
+
+            return string.Join("; ", Values.Select(kv => kv.Key + "=" + kv.Value));
+        }
+
+        public static DnsQueryLogMetadata? ParseReportString(string? report)
+        {
+            if (string.IsNullOrWhiteSpace(report))
+                return null;
+
+            string[] parts = report.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1)
+                return null;
+
+            Dictionary<string, string> values = new Dictionary<string, string>(parts.Length, StringComparer.OrdinalIgnoreCase);
+
+            foreach (string part in parts)
+            {
+                int separatorIndex = part.IndexOf('=');
+                if ((separatorIndex < 1) || (separatorIndex >= (part.Length - 1)))
+                    continue;
+
+                string key = part[..separatorIndex].Trim();
+                string value = part[(separatorIndex + 1)..].Trim();
+
+                if ((key.Length < 1) || (value.Length < 1))
+                    continue;
+
+                values[key] = value;
+            }
+
+            if (values.Count < 1)
+                return null;
+
+            return new DnsQueryLogMetadata(values);
+        }
     }
 
     public sealed class DnsServerResponseMetadata

@@ -4026,7 +4026,7 @@ namespace DnsServerCore.Dns
                         if ((firstAuthority is not null) && (firstAuthority.Type == DnsResourceRecordType.SOA))
                             blockedDomain = firstAuthority.Name;
 
-                        response.Tag = new DnsServerResponseMetadata(DnsServerResponseType.Blocked, new DnsQueryLogMetadata("source=block-list-zone; domain=" + blockedDomain));
+                        response.Tag = new DnsServerResponseMetadata(DnsServerResponseType.Blocked, new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase) { ["source"] = "block-list-zone", ["domain"] = blockedDomain }));
                         return response;
                     }
 
@@ -4050,9 +4050,9 @@ namespace DnsServerCore.Dns
                     {
                         //return meta data
                         string blockedDomain = GetBlockedDomain();
-                        DnsQueryLogMetadata logMetadata = new DnsQueryLogMetadata("source=blocked-zone; domain=" + blockedDomain);
+                        DnsQueryLogMetadata logMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase) { ["source"] = "blocked-zone", ["domain"] = blockedDomain });
 
-                        IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData(logMetadata.BlockingReport))];
+                        IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData(logMetadata.ToReportString()))];
 
                         return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = new DnsServerResponseMetadata(DnsServerResponseType.Blocked, logMetadata) };
                     }
@@ -4060,11 +4060,11 @@ namespace DnsServerCore.Dns
                     {
                         string blockedDomain = GetBlockedDomain();
                         EDnsOption[] options = null;
-                        DnsQueryLogMetadata logMetadata = new DnsQueryLogMetadata("source=blocked-zone; domain=" + blockedDomain);
+                        DnsQueryLogMetadata logMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase) { ["source"] = "blocked-zone", ["domain"] = blockedDomain });
 
                         if (_allowTxtBlockingReport && (request.EDNS is not null))
                         {
-                            options = [new EDnsOption(EDnsOptionCode.EXTENDED_DNS_ERROR, new EDnsExtendedDnsErrorOptionData(EDnsExtendedDnsErrorCode.Blocked, logMetadata.BlockingReport))];
+                            options = [new EDnsOption(EDnsOptionCode.EXTENDED_DNS_ERROR, new EDnsExtendedDnsErrorOptionData(EDnsExtendedDnsErrorCode.Blocked, logMetadata.ToReportString()))];
                         }
 
                         IReadOnlyCollection<DnsARecordData> aRecords;

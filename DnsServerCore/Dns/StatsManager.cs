@@ -564,7 +564,7 @@ namespace DnsServerCore.Dns
                         {
                             string txtString = txtData.ToString();
                             if (txtString.Contains("source=", StringComparison.Ordinal))
-                                return new DnsQueryLogMetadata(txtString);
+                                return DnsQueryLogMetadata.ParseReportString(txtString);
                         }
                     }
                 }
@@ -580,9 +580,9 @@ namespace DnsServerCore.Dns
                     string optionString = option.Data.ToString();
                     int separatorIndex = optionString.IndexOf(':');
                     if ((separatorIndex > -1) && (separatorIndex < (optionString.Length - 1)))
-                        return new DnsQueryLogMetadata(optionString[(separatorIndex + 1)..].Trim().TrimEnd(']'));
+                        return DnsQueryLogMetadata.ParseReportString(optionString[(separatorIndex + 1)..].Trim().TrimEnd(']'));
 
-                    return new DnsQueryLogMetadata(optionString);
+                    return DnsQueryLogMetadata.ParseReportString(optionString);
                 }
             }
 
