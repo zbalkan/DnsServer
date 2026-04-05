@@ -42,7 +42,11 @@ namespace LogExporter
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
             ResponseType = DnsServerResponseTag.GetResponseType(response.Tag);
-            BlockingMetadata = metadata?.Values;
+
+            if (metadata is not null)
+                BlockingMetadata = metadata.Values.Count > 0 ? metadata.Values : null;
+            else if (ResponseType is DnsServerResponseType.Blocked or DnsServerResponseType.UpstreamBlocked or DnsServerResponseType.UpstreamBlockedCached)
+                BlockingMetadata = ExtractInlineBlockingMetadata(response)?.Values;
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
                 ResponseRtt = response.Metadata.RoundTripTime;
@@ -108,6 +112,33 @@ namespace LogExporter
         public override string ToString()
         {
             return JsonSerializer.Serialize(this, DnsLogSerializerOptions.Default);
+        }
+
+        private static DnsQueryLogMetadata? ExtractInlineBlockingMetadata(DnsDatagram response)
+        {
+            foreach (DnsResourceRecord answer in response.Answer)
+            {
+                if (answer.Type == DnsResourceRecordType.TXT && answer.RDATA is DnsTXTRecordData txtData)
+                {
+                    string txt = txtData.ToString();
+                    if (txt.Contains("source=", StringComparison.Ordinal))
+                        return DnsQueryLogMetadata.ParseReportString(txt);
+                }
+            }
+
+            if (response.EDNS is not null)
+            {
+                foreach (EDnsOption option in response.EDNS.Options)
+                {
+                    if (option.Code == EDnsOptionCode.EXTENDED_DNS_ERROR &&
+                        option.Data is EDnsExtendedDnsErrorOptionData ede &&
+                        ede.InfoCode == EDnsExtendedDnsErrorCode.Blocked &&
+                        ede.ExtraText is not null)
+                        return DnsQueryLogMetadata.ParseReportString(ede.ExtraText);
+                }
+            }
+
+            return null;
         }
 
         public static class DnsLogSerializerOptions
