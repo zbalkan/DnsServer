@@ -249,12 +249,7 @@ namespace QueryLogsSqlServer
                             paramClientIp.Value = log.RemoteEP.Address.ToString();
                             paramProtocol.Value = (byte)log.Protocol;
 
-                            DnsServerResponseType responseType;
-
-                            if (log.Response.Tag == null)
-                                responseType = DnsServerResponseType.Recursive;
-                            else
-                                responseType = (DnsServerResponseType)log.Response.Tag;
+                            DnsServerResponseType responseType = (log.Response.Tag as DnsResponseTag)?.ResponseType ?? DnsServerResponseType.Recursive;
 
                             paramResponseType.Value = (byte)responseType;
 
@@ -561,7 +556,7 @@ END
             }
         }
 
-        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response)
+        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata = null)
         {
             if (_enableLogging)
                 _channelWriter?.TryWrite(new LogEntry(timestamp, request, remoteEP, protocol, response));

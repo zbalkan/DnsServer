@@ -2375,7 +2375,7 @@ namespace DnsServerCore.Dns
                 {
                     _log.Write(remoteEP, protocol, "DNS Server received a request that failed TSIG signature verification (RCODE: " + errorResponse.RCODE + "; TSIG Error: " + errorResponse.TsigError + ")");
 
-                    errorResponse.Tag = DnsServerResponseType.Authoritative;
+                    errorResponse.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Authoritative };
                     return errorResponse;
                 }
 
@@ -3434,7 +3434,7 @@ namespace DnsServerCore.Dns
             {
                 if ((authResponse.RCODE != DnsResponseCode.NoError) || (authResponse.Answer.Count > 0) || (authResponse.Authority.Count == 0) || authResponse.IsFirstAuthoritySOA())
                 {
-                    authResponse.Tag = DnsServerResponseType.Authoritative;
+                    authResponse.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Authoritative };
                     return authResponse;
                 }
             }
@@ -3456,7 +3456,7 @@ namespace DnsServerCore.Dns
                             if ((appResponse.RCODE != DnsResponseCode.NoError) || (appResponse.Answer.Count > 0) || (appResponse.Authority.Count == 0) || appResponse.IsFirstAuthoritySOA())
                             {
                                 if (appResponse.Tag is null)
-                                    appResponse.Tag = DnsServerResponseType.Authoritative;
+                                    appResponse.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Authoritative };
 
                                 return appResponse;
                             }
@@ -3554,7 +3554,7 @@ namespace DnsServerCore.Dns
                     else
                     {
                         if (appResponse.AuthoritativeAnswer)
-                            appResponse.Tag = DnsServerResponseType.Authoritative;
+                            appResponse.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Authoritative };
 
                         return appResponse; //return app response
                     }
@@ -4021,7 +4021,7 @@ namespace DnsServerCore.Dns
                     if (response is not null)
                     {
                         //domain is blocked in block list zone
-                        response.Tag = DnsServerResponseType.Blocked;
+                        response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked };
                         return response;
                     }
 
@@ -4048,7 +4048,7 @@ namespace DnsServerCore.Dns
 
                         IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData("source=blocked-zone; domain=" + blockedDomain))];
 
-                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = DnsServerResponseType.Blocked };
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked } };
                     }
                     else
                     {
@@ -4084,7 +4084,7 @@ namespace DnsServerCore.Dns
                                 if (parentDomain is null)
                                     parentDomain = string.Empty;
 
-                                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _blockingAnswerTtl, _blockedZoneManager.DnsSOARecord)], null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseType.Blocked };
+                                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _blockingAnswerTtl, _blockedZoneManager.DnsSOARecord)], null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked } };
 
                             default:
                                 throw new InvalidOperationException();
@@ -4141,7 +4141,7 @@ namespace DnsServerCore.Dns
                                 break;
                         }
 
-                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseType.Blocked };
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked } };
                     }
                 }
             }
@@ -4153,8 +4153,7 @@ namespace DnsServerCore.Dns
                     DnsDatagram appBlockedResponse = await blockingHandler.ProcessRequestAsync(request, remoteEP);
                     if (appBlockedResponse is not null)
                     {
-                        if (appBlockedResponse.Tag is null)
-                            appBlockedResponse.Tag = DnsServerResponseType.Blocked;
+                        appBlockedResponse.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = (appBlockedResponse.Tag as DnsResponseTag)?.Metadata };
 
                         return appBlockedResponse;
                     }
@@ -4246,15 +4245,16 @@ namespace DnsServerCore.Dns
                 }
             }
 
-            if (response.Tag is null)
+            DnsResponseTag? existingResponseTag = response.Tag as DnsResponseTag;
+            if (existingResponseTag is null)
             {
                 if (response.IsBlockedResponse())
-                    response.Tag = DnsServerResponseType.UpstreamBlocked;
+                    response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlocked };
             }
-            else if ((DnsServerResponseType)response.Tag == DnsServerResponseType.Cached)
+            else if (existingResponseTag.ResponseType == DnsServerResponseType.Cached)
             {
                 if (response.IsBlockedResponse())
-                    response.Tag = DnsServerResponseType.UpstreamBlockedCached;
+                    response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlockedCached, Metadata = existingResponseTag.Metadata };
             }
 
             return response;
@@ -5454,7 +5454,7 @@ namespace DnsServerCore.Dns
             {
                 if ((cacheResponse.RCODE != DnsResponseCode.NoError) || (cacheResponse.Answer.Count > 0) || (cacheResponse.Authority.Count == 0) || cacheResponse.IsFirstAuthoritySOA())
                 {
-                    cacheResponse.Tag = DnsServerResponseType.Cached;
+                    cacheResponse.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Cached };
 
                     return cacheResponse;
                 }

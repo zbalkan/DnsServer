@@ -33,7 +33,7 @@ namespace LogExporter
 {
     public class LogEntry
     {
-        public LogEntry(DateTime timestamp, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response, bool ednsLogging = false)
+        public LogEntry(DateTime timestamp, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response, bool ednsLogging = false, DnsQueryLogMetadata? metadata = null)
         {
             // Assign timestamp and ensure it's in UTC
             Timestamp = timestamp.Kind == DateTimeKind.Utc ? timestamp : timestamp.ToUniversalTime();
@@ -41,12 +41,16 @@ namespace LogExporter
             // Extract client information
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
-            ResponseType = response.Tag == null ? DnsServerResponseType.Recursive : (DnsServerResponseType)response.Tag;
+            ResponseType = (response.Tag as DnsResponseTag)?.ResponseType ?? DnsServerResponseType.Recursive;
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
                 ResponseRtt = response.Metadata.RoundTripTime;
 
             ResponseCode = response.RCODE;
+
+            // Populate metadata fields when provided by a blocking app
+            SourcePlugin = metadata?.SourcePlugin;
+            BlockingReason = metadata?.BlockingReason;
 
             // Extract request information
             if (request.Question.Count > 0)
@@ -95,6 +99,7 @@ namespace LogExporter
         }
 
         public List<DnsResourceRecord> Answers { get; private set; }
+        public Dictionary<string, string>? BlockingReason { get; private set; }
         public string ClientIp { get; private set; }
         public List<EDNSLog> EDNS { get; private set; }
         public DnsTransportProtocol Protocol { get; private set; }
@@ -102,6 +107,7 @@ namespace LogExporter
         public DnsResponseCode ResponseCode { get; private set; }
         public double? ResponseRtt { get; private set; }
         public DnsServerResponseType ResponseType { get; private set; }
+        public string? SourcePlugin { get; private set; }
         public DateTime Timestamp { get; private set; }
         public override string ToString()
         {

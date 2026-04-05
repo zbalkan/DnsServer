@@ -137,12 +137,12 @@ namespace LogExporter
             return Task.CompletedTask;
         }
 
-        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response)
+        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata = null)
         {
             if (_enableLogging)
             {
                 if (_queuedLogs.Count < _config!.MaxQueueSize)
-                    _queuedLogs.Enqueue(new LogEntry(timestamp, remoteEP, protocol, request, response, _config.EnableEdnsLogging));
+                    _queuedLogs.Enqueue(new LogEntry(timestamp, remoteEP, protocol, request, response, _config.EnableEdnsLogging, metadata));
             }
 
             return Task.CompletedTask;

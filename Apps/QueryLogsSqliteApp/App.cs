@@ -245,12 +245,7 @@ namespace QueryLogsSqlite
                                 paramClientIp.Value = log.RemoteEP.Address.ToString();
                                 paramProtocol.Value = (int)log.Protocol;
 
-                                DnsServerResponseType responseType;
-
-                                if (log.Response.Tag == null)
-                                    responseType = DnsServerResponseType.Recursive;
-                                else
-                                    responseType = (DnsServerResponseType)log.Response.Tag;
+                                DnsServerResponseType responseType = (log.Response.Tag as DnsResponseTag)?.ResponseType ?? DnsServerResponseType.Recursive;
 
                                 paramResponseType.Value = (int)responseType;
 
@@ -522,7 +517,7 @@ CREATE TABLE IF NOT EXISTS dns_logs
             }
         }
 
-        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response)
+        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata = null)
         {
             if (_enableLogging)
                 _channelWriter?.TryWrite(new LogEntry(timestamp, request, remoteEP, protocol, response));

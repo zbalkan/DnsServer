@@ -149,7 +149,20 @@ namespace MispConnector
                 return Task.FromResult<DnsDatagram>(null);
             }
 
-            string blockingReport = $"source=misp-connector;domain={blockedDomain}";
+            Dictionary<string, string> blockingReason = new Dictionary<string, string>
+            {
+                ["source"] = "misp-connector",
+                ["domain"] = blockedDomain
+            };
+
+            DnsResponseTag metadataTag = new DnsResponseTag
+            {
+                Metadata = new DnsQueryLogMetadata
+                {
+                    SourcePlugin = "MispConnector",
+                    BlockingReason = blockingReason
+                }
+            };
 
             EDnsOption[] options = null;
             if (_config.AddExtendedDnsError && request.EDNS is not null)
@@ -178,7 +191,7 @@ namespace MispConnector
                                     udpPayloadSize: request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize,
                                     ednsFlags: EDnsHeaderFlags.None,
                                     options: options
-                                ));
+                                ) { Tag = metadataTag });
             }
 
             DnsResourceRecord[] authority = { new DnsResourceRecord(question.Name, DnsResourceRecordType.SOA, question.Class, 60, _soaRecord) };
@@ -200,7 +213,7 @@ namespace MispConnector
                             udpPayloadSize: request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize,
                             ednsFlags: EDnsHeaderFlags.None,
                             options: options
-                        ));
+                        ) { Tag = metadataTag });
         }
 
         #endregion public

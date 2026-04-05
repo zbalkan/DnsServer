@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 using TechnitiumLibrary.Net.Dns;
@@ -36,6 +37,41 @@ namespace DnsServerCore.ApplicationCommon
     }
 
     /// <summary>
+    /// Carries optional enriched metadata about a DNS response, intended for logging purposes only.
+    /// This object does not affect the DNS wire format in any way.
+    /// </summary>
+    public sealed class DnsQueryLogMetadata
+    {
+        /// <summary>
+        /// The name of the DNS application that produced this response (e.g. "MispConnector").
+        /// </summary>
+        public string? SourcePlugin { get; init; }
+
+        /// <summary>
+        /// Structured key/value pairs describing why the request was blocked or otherwise handled.
+        /// Serialises as a JSON object so consumers can read individual fields without string splitting.
+        /// </summary>
+        public Dictionary<string, string>? BlockingReason { get; init; }
+    }
+
+    /// <summary>
+    /// Carrier stored in <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/> by the DNS server
+    /// core.  Replaces the raw <see cref="DnsServerResponseType"/> value so that blocking apps can
+    /// attach <see cref="DnsQueryLogMetadata"/> that survives through to
+    /// <see cref="IDnsQueryLogger.InsertLogAsync"/>.
+    /// </summary>
+    public sealed class DnsResponseTag
+    {
+        /// <summary>The categorised response type set by the DNS server core.</summary>
+        public DnsServerResponseType ResponseType { get; init; }
+
+        /// <summary>
+        /// Optional metadata populated by a blocking app; <c>null</c> for non-blocking responses.
+        /// </summary>
+        public DnsQueryLogMetadata? Metadata { get; init; }
+    }
+
+    /// <summary>
     /// Allows a DNS App to log incoming DNS requests and their corresponding responses.
     /// </summary>
     public interface IDnsQueryLogger
@@ -48,6 +84,7 @@ namespace DnsServerCore.ApplicationCommon
         /// <param name="remoteEP">The end point (IP address and port) of the client making the request.</param>
         /// <param name="protocol">The protocol using which the request was received.</param>
         /// <param name="response">The DNS response that was sent.</param>
-        Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response);
+        /// <param name="metadata">Optional enriched metadata provided by a blocking app; <c>null</c> when not available.</param>
+        Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata = null);
     }
 }

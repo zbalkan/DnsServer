@@ -141,10 +141,8 @@ namespace DnsServerCore.Dns
 
                             if (item._response is null)
                                 responseType = DnsServerResponseType.Dropped;
-                            else if (item._response.Tag is null)
-                                responseType = DnsServerResponseType.Recursive;
                             else
-                                responseType = (DnsServerResponseType)item._response.Tag;
+                                responseType = (item._response.Tag as DnsResponseTag)?.ResponseType ?? DnsServerResponseType.Recursive;
 
                             statCounter.Update(query, item._response is null ? DnsResponseCode.NoError : item._response.RCODE, responseType, item._remoteEP.Address, item._protocol, item._rateLimited);
                         }
@@ -156,7 +154,7 @@ namespace DnsServerCore.Dns
                         {
                             try
                             {
-                                _ = logger.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response);
+                                _ = logger.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response, item._metadata);
                             }
                             catch (Exception ex)
                             {
@@ -2658,6 +2656,7 @@ namespace DnsServerCore.Dns
             public readonly DnsTransportProtocol _protocol;
             public readonly DnsDatagram _response;
             public readonly bool _rateLimited;
+            public readonly DnsQueryLogMetadata? _metadata;
 
             #endregion
 
@@ -2672,6 +2671,7 @@ namespace DnsServerCore.Dns
                 _protocol = protocol;
                 _response = response;
                 _rateLimited = rateLimited;
+                _metadata = (response?.Tag as DnsResponseTag)?.Metadata;
             }
 
             #endregion
