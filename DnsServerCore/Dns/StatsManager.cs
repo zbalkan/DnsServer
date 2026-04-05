@@ -32,6 +32,7 @@ using System.Threading.Channels;
 using TechnitiumLibrary.IO;
 using TechnitiumLibrary.Net;
 using TechnitiumLibrary.Net.Dns;
+using TechnitiumLibrary.Net.Dns.EDnsOptions;
 using TechnitiumLibrary.Net.Dns.ResourceRecords;
 
 namespace DnsServerCore.Dns
@@ -141,10 +142,8 @@ namespace DnsServerCore.Dns
 
                             if (item._response is null)
                                 responseType = DnsServerResponseType.Dropped;
-                            else if (item._response.Tag is null)
-                                responseType = DnsServerResponseType.Recursive;
                             else
-                                responseType = (DnsServerResponseType)item._response.Tag;
+                                responseType = DnsServerResponseTag.GetResponseType(item._response.Tag);
 
                             statCounter.Update(query, item._response is null ? DnsResponseCode.NoError : item._response.RCODE, responseType, item._remoteEP.Address, item._protocol, item._rateLimited);
                         }
@@ -156,7 +155,12 @@ namespace DnsServerCore.Dns
                         {
                             try
                             {
-                                _ = logger.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response);
+                                DnsQueryLogMetadata? logMetadata = DnsServerResponseTag.GetLogMetadata(item._response.Tag) ?? GetInlineLogMetadata(item._response);
+
+                                if (logger is IDnsQueryLoggerEx loggerEx)
+                                    _ = loggerEx.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response, logMetadata);
+                                else
+                                    _ = logger.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response);
                             }
                             catch (Exception ex)
                             {
@@ -542,6 +546,47 @@ namespace DnsServerCore.Dns
 
             _hourlyStatsCache.Clear();
             _dailyStatsCache.Clear();
+        }
+
+        #endregion
+
+        #region helper methods
+
+        private static DnsQueryLogMetadata? GetInlineLogMetadata(DnsDatagram response)
+        {
+            if (response.Answer.Count > 0)
+            {
+                foreach (DnsResourceRecord answer in response.Answer)
+                {
+                    if (answer.Type == DnsResourceRecordType.TXT)
+                    {
+                        if (answer.RDATA is DnsTXTRecordData txtData)
+                        {
+                            string txtString = txtData.ToString();
+                            if (txtString.Contains("source=", StringComparison.Ordinal))
+                                return new DnsQueryLogMetadata(txtString);
+                        }
+                    }
+                }
+            }
+
+            if (response.EDNS is not null)
+            {
+                foreach (EDnsOption option in response.EDNS.Options)
+                {
+                    if (option.Code != EDnsOptionCode.EXTENDED_DNS_ERROR)
+                        continue;
+
+                    string optionString = option.Data.ToString();
+                    int separatorIndex = optionString.IndexOf(':');
+                    if ((separatorIndex > -1) && (separatorIndex < (optionString.Length - 1)))
+                        return new DnsQueryLogMetadata(optionString[(separatorIndex + 1)..].Trim().TrimEnd(']'));
+
+                    return new DnsQueryLogMetadata(optionString);
+                }
+            }
+
+            return null;
         }
 
         #endregion

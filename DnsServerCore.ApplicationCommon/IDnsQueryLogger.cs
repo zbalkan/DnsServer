@@ -24,6 +24,56 @@ using TechnitiumLibrary.Net.Dns;
 
 namespace DnsServerCore.ApplicationCommon
 {
+    public sealed class DnsQueryLogMetadata
+    {
+        public DnsQueryLogMetadata(string? blockingReport = null)
+        {
+            BlockingReport = blockingReport;
+        }
+
+        /// <summary>
+        /// The blocking metadata report (example: <c>source=blocked-zone; domain=example.com</c>).
+        /// </summary>
+        public string? BlockingReport { get; }
+    }
+
+    public sealed class DnsServerResponseMetadata
+    {
+        public DnsServerResponseMetadata(DnsServerResponseType responseType, DnsQueryLogMetadata? logMetadata = null)
+        {
+            ResponseType = responseType;
+            LogMetadata = logMetadata;
+        }
+
+        public DnsServerResponseType ResponseType { get; }
+        public DnsQueryLogMetadata? LogMetadata { get; }
+    }
+
+    public static class DnsServerResponseTag
+    {
+        public static DnsServerResponseType GetResponseType(object? tag)
+        {
+            if (tag is null)
+                return DnsServerResponseType.Recursive;
+
+            if (tag is DnsServerResponseType responseType)
+                return responseType;
+
+            if (tag is DnsServerResponseMetadata responseMetadata)
+                return responseMetadata.ResponseType;
+
+            return DnsServerResponseType.Recursive;
+        }
+
+        public static DnsQueryLogMetadata? GetLogMetadata(object? tag)
+        {
+            if (tag is DnsServerResponseMetadata responseMetadata)
+                return responseMetadata.LogMetadata;
+
+            return null;
+        }
+    }
+
     public enum DnsServerResponseType : byte
     {
         Authoritative = 1,
@@ -49,5 +99,22 @@ namespace DnsServerCore.ApplicationCommon
         /// <param name="protocol">The protocol using which the request was received.</param>
         /// <param name="response">The DNS response that was sent.</param>
         Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response);
+    }
+
+    /// <summary>
+    /// Allows a DNS App to receive extended query log metadata.
+    /// </summary>
+    public interface IDnsQueryLoggerEx : IDnsQueryLogger
+    {
+        /// <summary>
+        /// Allows a DNS App to log incoming DNS requests and responses, including metadata that may not be present in the wire response.
+        /// </summary>
+        /// <param name="timestamp">The time stamp of the log entry.</param>
+        /// <param name="request">The incoming DNS request that was received.</param>
+        /// <param name="remoteEP">The end point (IP address and port) of the client making the request.</param>
+        /// <param name="protocol">The protocol using which the request was received.</param>
+        /// <param name="response">The DNS response that was sent.</param>
+        /// <param name="metadata">Optional metadata for logging.</param>
+        Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata);
     }
 }
