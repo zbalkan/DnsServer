@@ -32,7 +32,6 @@ using System.Threading.Channels;
 using TechnitiumLibrary.IO;
 using TechnitiumLibrary.Net;
 using TechnitiumLibrary.Net.Dns;
-using TechnitiumLibrary.Net.Dns.EDnsOptions;
 using TechnitiumLibrary.Net.Dns.ResourceRecords;
 
 namespace DnsServerCore.Dns
@@ -155,7 +154,7 @@ namespace DnsServerCore.Dns
                         {
                             try
                             {
-                                DnsQueryLogMetadata? logMetadata = DnsServerResponseTag.GetLogMetadata(item._response.Tag) ?? GetInlineLogMetadata(item._response);
+                                DnsQueryLogMetadata? logMetadata = DnsServerResponseTag.GetLogMetadata(item._response.Tag);
 
                                 if (logger is IDnsQueryLoggerEx loggerEx)
                                     _ = loggerEx.InsertLogAsync(item._timestamp, item._request, item._remoteEP, item._protocol, item._response, logMetadata);
@@ -546,47 +545,6 @@ namespace DnsServerCore.Dns
 
             _hourlyStatsCache.Clear();
             _dailyStatsCache.Clear();
-        }
-
-        #endregion
-
-        #region helper methods
-
-        private static DnsQueryLogMetadata? GetInlineLogMetadata(DnsDatagram response)
-        {
-            if (response.Answer.Count > 0)
-            {
-                foreach (DnsResourceRecord answer in response.Answer)
-                {
-                    if (answer.Type == DnsResourceRecordType.TXT)
-                    {
-                        if (answer.RDATA is DnsTXTRecordData txtData)
-                        {
-                            string txtString = txtData.ToString();
-                            if (txtString.Contains("source=", StringComparison.Ordinal))
-                                return DnsQueryLogMetadata.ParseReportString(txtString);
-                        }
-                    }
-                }
-            }
-
-            if (response.EDNS is not null)
-            {
-                foreach (EDnsOption option in response.EDNS.Options)
-                {
-                    if (option.Code != EDnsOptionCode.EXTENDED_DNS_ERROR)
-                        continue;
-
-                    string optionString = option.Data.ToString();
-                    int separatorIndex = optionString.IndexOf(':');
-                    if ((separatorIndex > -1) && (separatorIndex < (optionString.Length - 1)))
-                        return DnsQueryLogMetadata.ParseReportString(optionString[(separatorIndex + 1)..].Trim().TrimEnd(']'));
-
-                    return DnsQueryLogMetadata.ParseReportString(optionString);
-                }
-            }
-
-            return null;
         }
 
         #endregion
