@@ -41,7 +41,7 @@ namespace LogExporter
             // Extract client information
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
-            ResponseType = DnsServerResponseTag.GetResponseType(response.Tag);
+            ResponseType = DnsResponseTag.GetResponseType(response.Tag);
 
             // Populate blocking metadata when provided
             if (metadata is not null)

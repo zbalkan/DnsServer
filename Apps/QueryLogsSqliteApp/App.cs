@@ -245,7 +245,7 @@ namespace QueryLogsSqlite
                                 paramClientIp.Value = log.RemoteEP.Address.ToString();
                                 paramProtocol.Value = (int)log.Protocol;
 
-                                DnsServerResponseType responseType = DnsServerResponseTag.GetResponseType(log.Response.Tag);
+                                DnsServerResponseType responseType = DnsResponseTag.GetResponseType(log.Response.Tag);
 
                                 paramResponseType.Value = (int)responseType;
 

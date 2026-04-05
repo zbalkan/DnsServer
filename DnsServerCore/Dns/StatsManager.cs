@@ -142,7 +142,7 @@ namespace DnsServerCore.Dns
                             if (item._response is null)
                                 responseType = DnsServerResponseType.Dropped;
                             else
-                                responseType = DnsServerResponseTag.GetResponseType(item._response.Tag);
+                                responseType = DnsResponseTag.GetResponseType(item._response.Tag);
 
                             statCounter.Update(query, item._response is null ? DnsResponseCode.NoError : item._response.RCODE, responseType, item._remoteEP.Address, item._protocol, item._rateLimited);
                         }
@@ -150,7 +150,7 @@ namespace DnsServerCore.Dns
                         if ((item._request is null) || (item._response is null))
                             continue; //skip dropped requests for apps to prevent DoS
 
-                        DnsQueryLogMetadata? logMetadata = DnsServerResponseTag.GetLogMetadata(item._response.Tag);
+                        DnsQueryLogMetadata? logMetadata = (item._response.Tag as DnsResponseTag)?.Metadata;
 
                         foreach (IDnsQueryLogger logger in _dnsServer.DnsApplicationManager.DnsQueryLoggers)
                         {

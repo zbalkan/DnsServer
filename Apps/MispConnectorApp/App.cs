@@ -151,15 +151,19 @@ namespace MispConnector
 
             string blockingReport = $"source=misp-connector;domain={blockedDomain}";
 
-            DnsServerResponseMetadata metadataTag = new DnsServerResponseMetadata(DnsServerResponseType.Blocked, new DnsQueryLogMetadata
+            DnsResponseTag metadataTag = new DnsResponseTag
             {
-                Source = "MispConnectorApp",
-                Reason = "misp-connector",
-                AdditionalData = new Dictionary<string, string>
+                ResponseType = DnsServerResponseType.Blocked,
+                Metadata = new DnsQueryLogMetadata
                 {
-                    ["domain"] = blockedDomain
+                    Source = "MispConnector",
+                    Reason = "misp-connector",
+                    AdditionalData = new Dictionary<string, string>
+                    {
+                        ["domain"] = blockedDomain
+                    }
                 }
-            });
+            };
 
             EDnsOption[] options = null;
             if (_config.AddExtendedDnsError && request.EDNS is not null)

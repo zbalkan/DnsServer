@@ -4259,17 +4259,28 @@ namespace DnsServerCore.Dns
                 }
             }
 
-            DnsServerResponseType responseType = DnsServerResponseTag.GetResponseType(response.Tag);
+            switch (response.Tag)
+            {
+                case DnsResponseTag { ResponseType: DnsServerResponseType.Cached } cachedTag:
+                    if (response.IsBlockedResponse())
+                        response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlockedCached, Metadata = cachedTag.Metadata };
+                    break;
 
-            if (response.Tag is null)
-            {
-                if (response.IsBlockedResponse())
-                    response.Tag = DnsServerResponseType.UpstreamBlocked;
-            }
-            else if (responseType == DnsServerResponseType.Cached)
-            {
-                if (response.IsBlockedResponse())
-                    response.Tag = DnsServerResponseType.UpstreamBlockedCached;
+                case DnsServerResponseType.Cached:
+                    if (response.IsBlockedResponse())
+                        response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlockedCached };
+                    break;
+
+                case DnsResponseTag _:
+                    break; //already a non-Cached DnsResponseTag; preserve it
+
+                case DnsServerResponseType _:
+                    break; //legacy non-Cached enum tag; preserve it
+
+                default:
+                    if (response.IsBlockedResponse())
+                        response.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.UpstreamBlocked };
+                    break;
             }
 
             return response;
@@ -5469,7 +5480,7 @@ namespace DnsServerCore.Dns
             {
                 if ((cacheResponse.RCODE != DnsResponseCode.NoError) || (cacheResponse.Answer.Count > 0) || (cacheResponse.Authority.Count == 0) || cacheResponse.IsFirstAuthoritySOA())
                 {
-                    cacheResponse.Tag = DnsServerResponseType.Cached;
+                    cacheResponse.Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Cached };
 
                     return cacheResponse;
                 }

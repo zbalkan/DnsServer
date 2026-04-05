@@ -628,7 +628,7 @@ namespace AdvancedBlocking
                 };
             }
 
-            DnsServerResponseMetadata metadataTag = new DnsServerResponseMetadata(DnsServerResponseType.Blocked, GetMetadata());
+            DnsResponseTag metadataTag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = GetMetadata() };
 
             if (group.AllowTxtBlockingReport && (question.Type == DnsResourceRecordType.TXT))
             {
