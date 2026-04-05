@@ -57,41 +57,40 @@ namespace DnsServerCore.ApplicationCommon
         public IReadOnlyDictionary<string, string>? AdditionalData { get; init; }
     }
 
-    public sealed class DnsServerResponseMetadata
+    /// <summary>
+    /// Carrier that may be stored in <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/> by the
+    /// DNS server core to provide structured response details for logging.
+    /// During the current transition, consumers must handle both a raw
+    /// <see cref="DnsServerResponseType"/> value and a <see cref="DnsResponseTag"/> instance in
+    /// <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/>. When present, this carrier allows
+    /// blocking apps to attach <see cref="DnsQueryLogMetadata"/> that survives through to
+    /// <see cref="IDnsQueryLogger.InsertLogAsync"/>. Use <see cref="GetResponseType"/> to decode the
+    /// tag safely regardless of which shape is present.
+    /// </summary>
+    public sealed class DnsResponseTag
     {
-        public DnsServerResponseMetadata(DnsServerResponseType responseType, DnsQueryLogMetadata? logMetadata = null)
+        /// <summary>The categorised response type set by the DNS server core.</summary>
+        public DnsServerResponseType ResponseType { get; init; }
+
+        /// <summary>
+        /// Optional metadata populated by a blocking app; <c>null</c> for non-blocking responses.
+        /// </summary>
+        public DnsQueryLogMetadata? Metadata { get; init; }
+
+        /// <summary>
+        /// Decodes the response type from a <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/>
+        /// value, handling both the new <see cref="DnsResponseTag"/> carrier and the legacy boxed
+        /// <see cref="DnsServerResponseType"/> enum value that the core still emits on some code paths.
+        /// Falls back to <see cref="DnsServerResponseType.Recursive"/> when the tag is absent or of
+        /// an unrecognised type.
+        /// </summary>
+        /// <param name="tag">The value of <see cref="TechnitiumLibrary.Net.Dns.DnsDatagram.Tag"/>.</param>
+        public static DnsServerResponseType GetResponseType(object? tag) => tag switch
         {
-            ResponseType = responseType;
-            LogMetadata = logMetadata;
-        }
-
-        public DnsServerResponseType ResponseType { get; }
-        public DnsQueryLogMetadata? LogMetadata { get; }
-    }
-
-    public static class DnsServerResponseTag
-    {
-        public static DnsServerResponseType GetResponseType(object? tag)
-        {
-            if (tag is null)
-                return DnsServerResponseType.Recursive;
-
-            if (tag is DnsServerResponseType responseType)
-                return responseType;
-
-            if (tag is DnsServerResponseMetadata responseMetadata)
-                return responseMetadata.ResponseType;
-
-            return DnsServerResponseType.Recursive;
-        }
-
-        public static DnsQueryLogMetadata? GetLogMetadata(object? tag)
-        {
-            if (tag is DnsServerResponseMetadata responseMetadata)
-                return responseMetadata.LogMetadata;
-
-            return null;
-        }
+            DnsResponseTag dnsResponseTag => dnsResponseTag.ResponseType,
+            DnsServerResponseType dnsServerResponseType => dnsServerResponseType,
+            _ => DnsServerResponseType.Recursive
+        };
     }
 
     public enum DnsServerResponseType : byte
