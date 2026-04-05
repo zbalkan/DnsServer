@@ -149,18 +149,16 @@ namespace MispConnector
                 return Task.FromResult<DnsDatagram>(null);
             }
 
-            Dictionary<string, string> blockingReason = new Dictionary<string, string>
-            {
-                ["source"] = "misp-connector",
-                ["domain"] = blockedDomain
-            };
-
             DnsResponseTag metadataTag = new DnsResponseTag
             {
                 Metadata = new DnsQueryLogMetadata
                 {
-                    SourcePlugin = "MispConnector",
-                    BlockingReason = blockingReason
+                    Source = "MispConnector",
+                    Reason = "misp-connector",
+                    AdditionalData = new Dictionary<string, string>
+                    {
+                        ["domain"] = blockedDomain
+                    }
                 }
             };
 

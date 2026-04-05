@@ -605,39 +605,32 @@ namespace AdvancedBlocking
                 return blockingReport;
             }
 
-            Dictionary<string, string> GetBlockingReason()
+            DnsQueryLogMetadata GetMetadata()
             {
-                Dictionary<string, string> reason = new Dictionary<string, string>
+                string? reference = blockListUrl?.Uri?.AbsoluteUri;
+
+                Dictionary<string, string> additionalData = new Dictionary<string, string>
                 {
-                    ["source"] = "advanced-blocking-app",
                     ["group"] = group.Name
                 };
 
                 if (blockedRegex is null)
-                {
-                    if (blockListUrl!.Uri is not null)
-                        reason["blockListUrl"] = blockListUrl.Uri.AbsoluteUri;
-
-                    reason["domain"] = blockedDomain!;
-                }
+                    additionalData["domain"] = blockedDomain!;
                 else
+                    additionalData["regex"] = blockedRegex;
+
+                return new DnsQueryLogMetadata
                 {
-                    if (blockListUrl!.Uri is not null)
-                        reason["regexBlockListUrl"] = blockListUrl.Uri.AbsoluteUri;
-
-                    reason["regex"] = blockedRegex;
-                }
-
-                return reason;
+                    Source = "AdvancedBlockingApp",
+                    Reason = "advanced-blocking-app",
+                    Reference = reference,
+                    AdditionalData = additionalData
+                };
             }
 
             DnsResponseTag metadataTag = new DnsResponseTag
             {
-                Metadata = new DnsQueryLogMetadata
-                {
-                    SourcePlugin = "AdvancedBlockingApp",
-                    BlockingReason = GetBlockingReason()
-                }
+                Metadata = GetMetadata()
             };
 
             if (group.AllowTxtBlockingReport && (question.Type == DnsResourceRecordType.TXT))

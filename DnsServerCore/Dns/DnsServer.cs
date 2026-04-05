@@ -4031,10 +4031,10 @@ namespace DnsServerCore.Dns
                             ResponseType = DnsServerResponseType.Blocked,
                             Metadata = new DnsQueryLogMetadata
                             {
-                                SourcePlugin = "DnsServer",
-                                BlockingReason = new Dictionary<string, string>
+                                Source = "DnsServer",
+                                Reason = "block-list-zone",
+                                AdditionalData = new Dictionary<string, string>
                                 {
-                                    ["source"] = "block-list-zone",
                                     ["domain"] = blockListBlockedDomain
                                 }
                             }
@@ -4065,7 +4065,7 @@ namespace DnsServerCore.Dns
 
                         IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData("source=blocked-zone; domain=" + blockedDomain))];
 
-                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = new DnsQueryLogMetadata { SourcePlugin = "DnsServer", BlockingReason = new Dictionary<string, string> { ["source"] = "blocked-zone", ["domain"] = blockedDomain } } } };
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = new DnsQueryLogMetadata { Source = "DnsServer", Reason = "blocked-zone", AdditionalData = new Dictionary<string, string> { ["domain"] = blockedDomain } } } };
                     }
                     else
                     {
@@ -4101,7 +4101,7 @@ namespace DnsServerCore.Dns
                                 if (parentDomain is null)
                                     parentDomain = string.Empty;
 
-                                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _blockingAnswerTtl, _blockedZoneManager.DnsSOARecord)], null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = new DnsQueryLogMetadata { SourcePlugin = "DnsServer", BlockingReason = new Dictionary<string, string> { ["source"] = "blocked-zone", ["domain"] = blockedDomain } } } };
+                                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _blockingAnswerTtl, _blockedZoneManager.DnsSOARecord)], null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = new DnsQueryLogMetadata { Source = "DnsServer", Reason = "blocked-zone", AdditionalData = new Dictionary<string, string> { ["domain"] = blockedDomain } } } };
 
                             default:
                                 throw new InvalidOperationException();
@@ -4161,7 +4161,7 @@ namespace DnsServerCore.Dns
                         if (blockedDomain is null)
                             blockedDomain = GetBlockedDomain();
 
-                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = new DnsQueryLogMetadata { SourcePlugin = "DnsServer", BlockingReason = new Dictionary<string, string> { ["source"] = "blocked-zone", ["domain"] = blockedDomain } } } };
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = new DnsResponseTag { ResponseType = DnsServerResponseType.Blocked, Metadata = new DnsQueryLogMetadata { Source = "DnsServer", Reason = "blocked-zone", AdditionalData = new Dictionary<string, string> { ["domain"] = blockedDomain } } } };
                     }
                 }
             }

@@ -49,8 +49,10 @@ namespace LogExporter
             ResponseCode = response.RCODE;
 
             // Populate metadata fields when provided by a blocking app
-            SourcePlugin = metadata?.SourcePlugin;
-            BlockingReason = metadata?.BlockingReason;
+            Source = metadata?.Source;
+            Reason = metadata?.Reason;
+            Reference = metadata?.Reference;
+            AdditionalData = metadata?.AdditionalData;
 
             // Extract request information
             if (request.Question.Count > 0)
@@ -99,15 +101,17 @@ namespace LogExporter
         }
 
         public List<DnsResourceRecord> Answers { get; private set; }
-        public Dictionary<string, string>? BlockingReason { get; private set; }
+        public IReadOnlyDictionary<string, string>? AdditionalData { get; private set; }
         public string ClientIp { get; private set; }
         public List<EDNSLog> EDNS { get; private set; }
         public DnsTransportProtocol Protocol { get; private set; }
         public DnsQuestion? Question { get; private set; }
+        public string? Reason { get; private set; }
+        public string? Reference { get; private set; }
         public DnsResponseCode ResponseCode { get; private set; }
         public double? ResponseRtt { get; private set; }
         public DnsServerResponseType ResponseType { get; private set; }
-        public string? SourcePlugin { get; private set; }
+        public string? Source { get; private set; }
         public DateTime Timestamp { get; private set; }
         public override string ToString()
         {

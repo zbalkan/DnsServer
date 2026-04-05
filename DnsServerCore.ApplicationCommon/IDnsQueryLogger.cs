@@ -43,15 +43,28 @@ namespace DnsServerCore.ApplicationCommon
     public sealed class DnsQueryLogMetadata
     {
         /// <summary>
-        /// The name of the DNS application that produced this response (e.g. "MispConnector").
+        /// The source that produced this response — a DNS application name (e.g. "AdvancedBlockingApp")
+        /// or an internal mechanism identifier (e.g. "DnsServer").
         /// </summary>
-        public string? SourcePlugin { get; init; }
+        public string? Source { get; init; }
 
         /// <summary>
-        /// Structured key/value pairs describing why the request was blocked or otherwise handled.
-        /// Serialises as a JSON object so consumers can read individual fields without string splitting.
+        /// A brief description of the reason for the blocking decision
+        /// (e.g. "blocked-zone", "block-list-zone", "advanced-blocking-app").
         /// </summary>
-        public Dictionary<string, string>? BlockingReason { get; init; }
+        public string? Reason { get; init; }
+
+        /// <summary>
+        /// An optional external reference associated with the blocking rule, such as a block list URL
+        /// or a threat-intelligence event identifier.
+        /// </summary>
+        public string? Reference { get; init; }
+
+        /// <summary>
+        /// Additional source-specific key/value pairs that do not map to the named properties above
+        /// (e.g. "domain", "group", "regex"). Serialises as a JSON object.
+        /// </summary>
+        public IReadOnlyDictionary<string, string>? AdditionalData { get; init; }
     }
 
     /// <summary>
