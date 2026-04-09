@@ -44,9 +44,11 @@
                                 </MudText>
                                 @if (SessionService.CanModify("Logs"))
                                 {
-                                    <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                                   Color="Color.Error"
-                                                   OnClick="@(() => DeleteLogAsync(f.FileName))" />
+                                    <span @onclick:stopPropagation="true">
+                                        <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                                       Color="Color.Error"
+                                                       OnClick="@(() => DeleteLogAsync(f.FileName))" />
+                                    </span>
                                 }
                             </div>
                         }
@@ -88,6 +90,22 @@
     @* ── Query Logs tab ── *@
     <MudTabPanel Text="Query Logs" @ref="_queryLogsPanel">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
+            <MudSelect T="string" @bind-Value="_queryAppName" Label="App" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Style="max-width:200px;"
+                       ValueChanged="OnQueryAppChanged">
+                @foreach (var a in _queryLogApps)
+                {
+                    <MudSelectItem Value="@a.Name">@a.Name</MudSelectItem>
+                }
+            </MudSelect>
+            <MudSelect T="string" @bind-Value="_queryClassPath" Label="Class Path" Variant="Variant.Outlined"
+                       Margin="Margin.Dense" Style="max-width:260px;"
+                       Disabled="@(string.IsNullOrEmpty(_queryAppName))">
+                @foreach (var c in _queryLogClasses)
+                {
+                    <MudSelectItem Value="@c.ClassPath">@c.ClassPath</MudSelectItem>
+                }
+            </MudSelect>
             <MudTextField @bind-Value="_qSearch" Label="Domain filter" Variant="Variant.Outlined"
                           Margin="Margin.Dense" Style="max-width:280px;" />
             <MudTextField @bind-Value="_qClient" Label="Client IP filter" Variant="Variant.Outlined"
@@ -102,7 +120,8 @@
                 <MudSelectItem Value="@("QUIC")">QUIC</MudSelectItem>
             </MudSelect>
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       Disabled="@_qLoading" OnClick="QueryLogsAsync">Search</MudButton>
+                       Disabled="@(_qLoading || string.IsNullOrEmpty(_queryAppName) || string.IsNullOrEmpty(_queryClassPath))"
+                       OnClick="QueryLogsAsync">Search</MudButton>
         </div>
 
         @if (_qLoading)
@@ -149,12 +168,21 @@
     // ── Query logs ─────────────────────────────────────────────────────
     private MudTabPanel? _queryLogsPanel;
     private bool         _qLoading;
-    private string       _qSearch   = string.Empty;
-    private string       _qClient   = string.Empty;
-    private string       _qProtocol = string.Empty;
+    private string       _qSearch      = string.Empty;
+    private string       _qClient      = string.Empty;
+    private string       _qProtocol    = string.Empty;
     private List<QueryLogEntry> _qLogs = [];
 
-    protected override async Task OnInitializedAsync() => await LoadFileListAsync();
+    // App + classPath selectors for query logs
+    private List<DnsApp>      _queryLogApps    = [];
+    private List<DnsAppClass> _queryLogClasses = [];
+    private string            _queryAppName    = string.Empty;
+    private string            _queryClassPath  = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await Task.WhenAll(LoadFileListAsync(), LoadQueryAppsAsync());
+    }
 
     private async Task LoadFileListAsync()
     {
@@ -202,14 +230,39 @@
     }
 
     // ── Query Logs ─────────────────────────────────────────────────────
+    private async Task LoadQueryAppsAsync()
+    {
+        var result = await Api.GetAsync<AppsListResponse>("api/apps/list");
+        if (result.IsOk && result.Data?.Apps is { } apps)
+        {
+            _queryLogApps = apps
+                .Where(a => a.DnsApps.Any(c => c.IsQueryLogs))
+                .ToList();
+        }
+    }
+
+    private void OnQueryAppChanged(string appName)
+    {
+        _queryAppName   = appName;
+        _queryClassPath = string.Empty;
+        _queryLogClasses = _queryLogApps
+            .FirstOrDefault(a => a.Name == appName)
+            ?.DnsApps.Where(c => c.IsQueryLogs).ToList()
+            ?? [];
+
+        if (_queryLogClasses.Count == 1)
+            _queryClassPath = _queryLogClasses[0].ClassPath;
+    }
+
     private async Task QueryLogsAsync()
     {
         _qLoading = true;
-        var url = "api/logs/query?" +
-            (string.IsNullOrEmpty(_qSearch)   ? "" : $"qname={Uri.EscapeDataString(_qSearch)}&") +
-            (string.IsNullOrEmpty(_qClient)   ? "" : $"clientIpAddress={Uri.EscapeDataString(_qClient)}&") +
-            (string.IsNullOrEmpty(_qProtocol) ? "" : $"protocol={_qProtocol}&") +
-            "entriesPerPage=200";
+        var url = $"api/logs/query?name={Uri.EscapeDataString(_queryAppName)}" +
+                  $"&classPath={Uri.EscapeDataString(_queryClassPath)}" +
+                  (string.IsNullOrEmpty(_qSearch)   ? "" : $"&qname={Uri.EscapeDataString(_qSearch)}") +
+                  (string.IsNullOrEmpty(_qClient)   ? "" : $"&clientIpAddress={Uri.EscapeDataString(_qClient)}") +
+                  (string.IsNullOrEmpty(_qProtocol) ? "" : $"&protocol={_qProtocol}") +
+                  "&entriesPerPage=200";
 
         var result = await Api.GetAsync<QueryLogsResponse>(url);
         _qLoading = false;

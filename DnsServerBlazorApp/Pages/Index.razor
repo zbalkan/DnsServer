@@ -256,7 +256,7 @@ else
             StartAutoRefresh();
 
             // Prompt default password change (mirrors original JS)
-            if (!sd.TotpEnabled && _loginUser == "admin" && _loginPass == "admin")
+            if (!sd.TotpEnabled && string.Equals(_loginUser, "admin", StringComparison.OrdinalIgnoreCase) && _loginPass == "admin")
                 await ShowChangePasswordAsync();
 
             _loginPass = string.Empty;
@@ -320,7 +320,15 @@ else
         await DialogService.ShowAsync<Dialogs.ChangePasswordDialog>("Change Password", p);
     }
 
-    private void OnSessionChanged() => InvokeAsync(StateHasChanged);
+    private void OnSessionChanged()
+    {
+        if (!SessionService.IsAuthenticated)
+        {
+            _refreshTimer?.Dispose();
+            _refreshTimer = null;
+        }
+        InvokeAsync(StateHasChanged);
+    }
 
     public void Dispose()
     {

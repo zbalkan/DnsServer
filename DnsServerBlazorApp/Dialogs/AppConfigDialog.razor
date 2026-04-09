@@ -9,12 +9,13 @@
                 <MudProgressCircular Indeterminate="true" Color="Color.Primary" />
             </div>
         }
-        else if (_error is not null)
-        {
-            <MudAlert Severity="Severity.Error">@_error</MudAlert>
-        }
         else
         {
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mb-2" ShowCloseIcon="true"
+                          CloseIconClicked="@(() => _error = null)">@_error</MudAlert>
+            }
             <MudTextField @bind-Value="_config" Lines="20"
                           Variant="Variant.Outlined" Margin="Margin.Dense"
                           Style="font-family:monospace;font-size:13px;"

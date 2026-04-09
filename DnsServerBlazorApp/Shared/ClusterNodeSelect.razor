@@ -24,11 +24,22 @@
     private record NodeItem(string Value, string Label);
     private List<NodeItem> _items = [];
 
-    protected override void OnInitialized() => Build();
+    protected override async Task OnInitializedAsync()
+    {
+        var defaultValue = Build();
+        if (defaultValue is not null)
+            await ValueChanged.InvokeAsync(defaultValue);
+    }
 
-    protected override void OnParametersSet() => Build();
+    protected override async Task OnParametersSetAsync()
+    {
+        var defaultValue = Build();
+        if (defaultValue is not null)
+            await ValueChanged.InvokeAsync(defaultValue);
+    }
 
-    private void Build()
+    /// <summary>Rebuilds _items and returns the default value if the current Value is not in the list.</summary>
+    private string? Build()
     {
         _items = [];
         if (IncludeAll)
@@ -37,17 +48,11 @@
         foreach (var n in SessionService.ClusterNodes)
             _items.Add(new(n.Name, n.IsPrimary ? $"{n.Name} (primary)" : n.Name));
 
-        // Default to first item if current value is not in list
         if (_items.Count > 0 && !_items.Any(i => i.Value == Value))
-        {
-            Value = _items[0].Value;
-            _ = ValueChanged.InvokeAsync(Value);
-        }
+            return _items[0].Value;
+
+        return null;
     }
 
-    private Task OnValueChanged(string v)
-    {
-        Value = v;
-        return ValueChanged.InvokeAsync(v);
-    }
+    private Task OnValueChanged(string v) => ValueChanged.InvokeAsync(v);
 }

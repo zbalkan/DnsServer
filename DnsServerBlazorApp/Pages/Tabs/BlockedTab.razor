@@ -51,9 +51,11 @@
                         <MudText Typo="Typo.body2" Style="flex:1;">@z</MudText>
                         @if (SessionService.CanModify("Blocked"))
                         {
-                            <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                           Color="Color.Error"
-                                           OnClick="@(() => DeleteZoneAsync(z))" />
+                            <span @onclick:stopPropagation="true">
+                                <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
+                                               Color="Color.Error"
+                                               OnClick="@(() => DeleteZoneAsync(z))" />
+                            </span>
                         }
                     </div>
                 }
