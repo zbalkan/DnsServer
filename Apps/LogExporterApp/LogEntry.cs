@@ -42,7 +42,8 @@ namespace LogExporter
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
             ResponseType = DnsServerResponseTag.GetResponseType(response.Tag);
-            BlockingMetadata = metadata?.Values;
+            DnsQueryLogMetadata? logMetadata = metadata ?? DnsServerResponseTag.GetLogMetadata(response.Tag);
+            BlockingMetadata = logMetadata?.Values;
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
                 ResponseRtt = response.Metadata.RoundTripTime;

@@ -781,7 +781,7 @@ ORDER BY row_num" + (descendingOrder ? " DESC" : "");
                 RemoteEP = remoteEP;
                 Protocol = protocol;
                 Response = response;
-                Metadata = metadata;
+                Metadata = metadata ?? DnsServerResponseTag.GetLogMetadata(response.Tag);
             }
 
             #endregion
