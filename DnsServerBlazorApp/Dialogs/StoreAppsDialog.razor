@@ -100,21 +100,27 @@
     private async Task InstallAsync(StoreApp app)
     {
         _installing.Add(app.Name);
-        var form = new Dictionary<string, string>
+        try
         {
-            ["name"] = app.Name,
-            ["url"]  = app.Url ?? string.Empty,
-            ["node"] = Node,
-        };
-        var result = await Api.PostAsync<object>("api/apps/downloadAndInstall", form);
-        _installing.Remove(app.Name);
+            var form = new Dictionary<string, string>
+            {
+                ["name"] = app.Name,
+                ["url"]  = app.Url ?? string.Empty,
+                ["node"] = Node,
+            };
+            var result = await Api.PostAsync<object>("api/apps/downloadAndInstall", form);
 
-        if (result.IsOk)
-        {
-            _installed = true;
-            Snackbar.Add($"'{app.Name}' installed.", Severity.Success);
+            if (result.IsOk)
+            {
+                _installed = true;
+                Snackbar.Add($"'{app.Name}' installed.", Severity.Success);
+            }
+            else
+                Snackbar.Add(result.DisplayError, Severity.Error);
         }
-        else
-            Snackbar.Add(result.DisplayError, Severity.Error);
+        finally
+        {
+            _installing.Remove(app.Name);
+        }
     }
 }

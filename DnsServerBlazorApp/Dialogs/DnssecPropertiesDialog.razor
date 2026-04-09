@@ -104,56 +104,81 @@
 
     private async Task SignAsync()
     {
+        if (_saving) return;
         _saving = true;
-        var form = new Dictionary<string, string>
+        try
         {
-            ["zone"]      = Zone,
-            ["algorithm"] = _algorithm,
-            ["node"]      = Node,
-        };
-        var res = await Api.PostAsync<object>("api/zones/dnssec/sign", form);
-        _saving = false;
+            var form = new Dictionary<string, string>
+            {
+                ["zone"]      = Zone,
+                ["algorithm"] = _algorithm,
+                ["node"]      = Node,
+            };
+            var res = await Api.PostAsync<object>("api/zones/dnssec/sign", form);
 
-        if (res.IsOk)
-        {
-            Snackbar.Add("Zone signed.", Severity.Success);
-            await LoadAsync();
+            if (res.IsOk)
+            {
+                Snackbar.Add("Zone signed.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+                _error = res.DisplayError;
         }
-        else
-            _error = res.DisplayError;
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private async Task UnsignAsync()
     {
-        var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
-        var res = await Api.PostAsync<object>("api/zones/dnssec/unsign", form);
-        if (res.IsOk)
+        if (_saving) return;
+        _saving = true;
+        try
         {
-            Snackbar.Add("Zone unsigned.", Severity.Success);
-            await LoadAsync();
+            var form = new Dictionary<string, string> { ["zone"] = Zone, ["node"] = Node };
+            var res = await Api.PostAsync<object>("api/zones/dnssec/unsign", form);
+            if (res.IsOk)
+            {
+                Snackbar.Add("Zone unsigned.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+                _error = res.DisplayError;
         }
-        else
-            _error = res.DisplayError;
+        finally
+        {
+            _saving = false;
+        }
     }
 
     private async Task RolloverKskAsync()
     {
+        if (_saving) return;
         var ksk = _keys.FirstOrDefault(k => k.IsKsk);
         if (ksk is null) { _error = "No KSK key found."; return; }
 
-        var form = new Dictionary<string, string>
+        _saving = true;
+        try
         {
-            ["zone"]   = Zone,
-            ["node"]   = Node,
-            ["keyTag"] = ksk.KeyTag.ToString(),
-        };
-        var res = await Api.PostAsync<object>("api/zones/dnssec/properties/rolloverDnsKey", form);
-        if (res.IsOk)
-        {
-            Snackbar.Add("KSK rollover initiated.", Severity.Success);
-            await LoadAsync();
+            var form = new Dictionary<string, string>
+            {
+                ["zone"]   = Zone,
+                ["node"]   = Node,
+                ["keyTag"] = ksk.KeyTag.ToString(),
+            };
+            var res = await Api.PostAsync<object>("api/zones/dnssec/properties/rolloverDnsKey", form);
+            if (res.IsOk)
+            {
+                Snackbar.Add("KSK rollover initiated.", Severity.Success);
+                await LoadAsync();
+            }
+            else
+                _error = res.DisplayError;
         }
-        else
-            _error = res.DisplayError;
+        finally
+        {
+            _saving = false;
+        }
     }
 }

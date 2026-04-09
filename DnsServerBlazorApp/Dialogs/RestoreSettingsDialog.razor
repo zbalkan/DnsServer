@@ -42,13 +42,11 @@
     {
         if (_file is null) return;
         _busy = true;
-
-        var mp = new MultipartFormDataContent();
-        var stream = _file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
-        mp.Add(new StreamContent(stream), "backup", _file.Name);
-
         try
         {
+            var mp = new MultipartFormDataContent();
+            await using var stream = _file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024);
+            mp.Add(new StreamContent(stream), "backup", _file.Name);
             var result = await Api.PostMultipartAsync<object>("api/settings/restore", mp);
             if (result.IsOk)
             {

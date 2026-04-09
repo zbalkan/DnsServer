@@ -41,20 +41,27 @@
 
     private async Task DownloadAsync()
     {
+        if (_busy) return;
         _busy = true;
-        var url = "api/settings/backup?" +
-                  $"blockLists={_blockLists.ToString().ToLower()}&" +
-                  $"logs={_logs.ToString().ToLower()}&" +
-                  $"scopes={_scopes.ToString().ToLower()}&" +
-                  $"apps={_apps.ToString().ToLower()}&" +
-                  $"stats={_stats.ToString().ToLower()}&" +
-                  $"zones={_zones.ToString().ToLower()}&" +
-                  $"allowedZones={_allowedZones.ToString().ToLower()}&" +
-                  $"blockedZones={_blockedZones.ToString().ToLower()}";
+        try
+        {
+            var url = "api/settings/backup?" +
+                      $"blockLists={_blockLists.ToString().ToLower()}&" +
+                      $"logs={_logs.ToString().ToLower()}&" +
+                      $"scopes={_scopes.ToString().ToLower()}&" +
+                      $"apps={_apps.ToString().ToLower()}&" +
+                      $"stats={_stats.ToString().ToLower()}&" +
+                      $"zones={_zones.ToString().ToLower()}&" +
+                      $"allowedZones={_allowedZones.ToString().ToLower()}&" +
+                      $"blockedZones={_blockedZones.ToString().ToLower()}";
 
-        var fullUrl = Api.BuildDownloadUrl(url);
-        await JS.InvokeVoidAsync("open", fullUrl, "_blank");
-        _busy = false;
-        MudDialog.Close();
+            var fullUrl = Api.BuildDownloadUrl(url);
+            await JS.InvokeVoidAsync("open", fullUrl, "_blank");
+            MudDialog.Close();
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 }

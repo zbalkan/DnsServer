@@ -55,40 +55,46 @@
 
     private async Task InstallAsync()
     {
+        if (_busy) return;
         if (string.IsNullOrWhiteSpace(_name)) { _error = "App name is required."; return; }
         _busy = true;
-
-        ApiResult<object> result;
-
-        if (_tabIndex == 0)
+        try
         {
-            if (string.IsNullOrWhiteSpace(_url)) { _error = "URL is required."; _busy = false; return; }
-            var form = new Dictionary<string, string>
+            ApiResult<object> result;
+
+            if (_tabIndex == 0)
             {
-                ["name"] = _name,
-                ["url"]  = _url,
-                ["node"] = Node,
-            };
-            result = await Api.PostAsync<object>("api/apps/downloadAndInstall", form);
-        }
-        else
-        {
-            if (_file is null) { _error = "Select a file."; _busy = false; return; }
-            var mp = new MultipartFormDataContent();
-            mp.Add(new StringContent(_name), "name");
-            mp.Add(new StringContent(Node),  "node");
-            var stream = _file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
-            mp.Add(new StreamContent(stream), "appFile", _file.Name);
-            result = await Api.PostMultipartAsync<object>("api/apps/install", mp);
-        }
-        _busy = false;
+                if (string.IsNullOrWhiteSpace(_url)) { _error = "URL is required."; return; }
+                var form = new Dictionary<string, string>
+                {
+                    ["name"] = _name,
+                    ["url"]  = _url,
+                    ["node"] = Node,
+                };
+                result = await Api.PostAsync<object>("api/apps/downloadAndInstall", form);
+            }
+            else
+            {
+                if (_file is null) { _error = "Select a file."; return; }
+                var mp = new MultipartFormDataContent();
+                mp.Add(new StringContent(_name), "name");
+                mp.Add(new StringContent(Node),  "node");
+                await using var stream = _file.OpenReadStream(maxAllowedSize: 50 * 1024 * 1024);
+                mp.Add(new StreamContent(stream), "appFile", _file.Name);
+                result = await Api.PostMultipartAsync<object>("api/apps/install", mp);
+            }
 
-        if (result.IsOk)
-        {
-            Snackbar.Add($"'{_name}' installed.", Severity.Success);
-            MudDialog.Close(DialogResult.Ok(true));
+            if (result.IsOk)
+            {
+                Snackbar.Add($"'{_name}' installed.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+                _error = result.DisplayError;
         }
-        else
-            _error = result.DisplayError;
+        finally
+        {
+            _busy = false;
+        }
     }
 }

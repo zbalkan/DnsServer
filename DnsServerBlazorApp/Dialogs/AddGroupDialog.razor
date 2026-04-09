@@ -10,7 +10,7 @@
         }
         <MudTextField @bind-Value="_name" Label="Group Name" Variant="Variant.Outlined"
                       Margin="Margin.Dense" Class="mb-2"
-                      OnKeyUp="@(e => { if(e.Key=="Enter") _ = SaveAsync(); })" />
+                      OnKeyUp="@(async e => { if(e.Key=="Enter") await SaveAsync(); })" />
         <MudTextField @bind-Value="_description" Label="Description" Variant="Variant.Outlined"
                       Margin="Margin.Dense" />
     </DialogContent>
@@ -34,22 +34,29 @@
 
     private async Task SaveAsync()
     {
+        if (_busy) return;
         if (string.IsNullOrWhiteSpace(_name)) { _error = "Group name required."; return; }
         _busy = true;
-        var form = new Dictionary<string, string>
+        try
         {
-            ["group"]       = _name,
-            ["description"] = _description,
-        };
-        var result = await Api.PostAsync<object>("api/admin/groups/create", form);
-        _busy = false;
+            var form = new Dictionary<string, string>
+            {
+                ["group"]       = _name,
+                ["description"] = _description,
+            };
+            var result = await Api.PostAsync<object>("api/admin/groups/create", form);
 
-        if (result.IsOk)
-        {
-            Snackbar.Add($"Group '{_name}' created.", Severity.Success);
-            MudDialog.Close(DialogResult.Ok(true));
+            if (result.IsOk)
+            {
+                Snackbar.Add($"Group '{_name}' created.", Severity.Success);
+                MudDialog.Close(DialogResult.Ok(true));
+            }
+            else
+                _error = result.DisplayError;
         }
-        else
-            _error = result.DisplayError;
+        finally
+        {
+            _busy = false;
+        }
     }
 }

@@ -90,6 +90,7 @@
 
     private async Task EnableAsync()
     {
+        if (_busy) return;
         if (string.IsNullOrWhiteSpace(_totp)) { _error = "Enter the TOTP code."; return; }
         _busy = true;
         var form = new Dictionary<string, string> { ["totp"] = _totp };
