@@ -43,7 +43,7 @@ namespace DnsServerCore.ApplicationCommon
             if (Values.Count < 1)
                 return string.Empty;
 
-            return string.Join("; ", Values.Select(kv => kv.Key + "=" + kv.Value));
+            return string.Join("; ", Values.Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value)));
         }
 
         public static DnsQueryLogMetadata? ParseReportString(string? report)
@@ -65,6 +65,16 @@ namespace DnsServerCore.ApplicationCommon
 
                 string key = part[..separatorIndex].Trim();
                 string value = part[(separatorIndex + 1)..].Trim();
+
+                try
+                {
+                    key = Uri.UnescapeDataString(key);
+                    value = Uri.UnescapeDataString(value);
+                }
+                catch
+                {
+                    continue;
+                }
 
                 if ((key.Length < 1) || (value.Length < 1))
                     continue;

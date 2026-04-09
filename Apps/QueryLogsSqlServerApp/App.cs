@@ -390,7 +390,7 @@ BEGIN
         qtype SMALLINT,
         qclass SMALLINT,
         answer VARCHAR(4000),
-        blocking_metadata VARCHAR(MAX)
+        blocking_metadata NVARCHAR(MAX)
     );
 END
 
@@ -401,7 +401,18 @@ END
 
 IF NOT EXISTS(SELECT * FROM sys.columns WHERE name = 'blocking_metadata' AND object_id = OBJECT_ID('dns_logs'))
 BEGIN
-    ALTER TABLE dns_logs ADD blocking_metadata VARCHAR(MAX);
+    ALTER TABLE dns_logs ADD blocking_metadata NVARCHAR(MAX);
+END
+ELSE IF EXISTS
+(
+    SELECT *
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID('dns_logs')
+      AND name = 'blocking_metadata'
+      AND system_type_id = 167
+)
+BEGIN
+    ALTER TABLE dns_logs ALTER COLUMN blocking_metadata NVARCHAR(MAX);
 END
 
 IF NOT EXISTS(SELECT * FROM sys.indexes WHERE name = 'index_server' AND object_id = OBJECT_ID('dns_logs'))
