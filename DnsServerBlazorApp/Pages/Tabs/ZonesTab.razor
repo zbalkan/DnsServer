@@ -75,17 +75,17 @@
                 <MudTd Style="text-align:right">
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                    OnClick="@(() => OpenEditZone(context))"
-                                   Title="Edit zone" />
+                                   title="Edit zone" />
                     @if (SessionService.CanModify("Zones"))
                     {
                         <MudIconButton Icon="@(context.Disabled ? Icons.Material.Filled.PlayArrow : Icons.Material.Filled.Pause)"
                                        Size="Size.Small"
                                        OnClick="@(() => ToggleZoneAsync(context))"
-                                       Title="@(context.Disabled ? "Enable" : "Disable")" />
+                                       title="@(context.Disabled ? "Enable" : "Disable")" />
                         <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                        Color="Color.Error"
                                        OnClick="@(() => DeleteZoneAsync(context))"
-                                       Title="Delete zone" />
+                                       title="Delete zone" />
                     }
                 </MudTd>
             </RowTemplate>

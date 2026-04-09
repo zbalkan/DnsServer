@@ -4,7 +4,7 @@
 @inject ISnackbar      Snackbar
 
 <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
-         PanelClass="pt-2" SliderColor="Color.Primary">
+         TabPanelsClass="pt-2" SliderColor="Color.Primary">
 
     @* ── Leases ── *@
     <MudTabPanel Text="Leases">
@@ -15,7 +15,7 @@
                           Immediate="true" />
             <MudSpacer />
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                           OnClick="LoadLeasesAsync" Title="Refresh" />
+                           OnClick="LoadLeasesAsync" title="Refresh" />
         </div>
 
         @if (_loadingLeases)
@@ -55,10 +55,10 @@
                     {
                         <MudTd Style="text-align:right;">
                             <MudIconButton Icon="@Icons.Material.Filled.BookmarkAdd" Size="Size.Small"
-                                           Title="Convert to reservation"
+                                           title="Convert to reservation"
                                            OnClick="@(() => ConvertLeaseAsync(context))" />
                             <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                           Color="Color.Error" Title="Remove lease"
+                                           Color="Color.Error" title="Remove lease"
                                            OnClick="@(() => RemoveLeaseAsync(context))" />
                         </MudTd>
                     }
@@ -79,7 +79,7 @@
                            OnClick="AddScopeAsync">Add Scope</MudButton>
             }
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                           OnClick="LoadScopesAsync" Title="Refresh" />
+                           OnClick="LoadScopesAsync" title="Refresh" />
         </div>
 
         @if (_loadingScopes)

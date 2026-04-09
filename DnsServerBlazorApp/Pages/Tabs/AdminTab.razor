@@ -4,14 +4,14 @@
 @inject ISnackbar      Snackbar
 
 <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
-         PanelClass="pt-2" SliderColor="Color.Primary">
+         TabPanelsClass="pt-2" SliderColor="Color.Primary">
 
     @* ── Sessions ── *@
     <MudTabPanel Text="Sessions">
         <div class="dns-toolbar">
             <MudSpacer />
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                           OnClick="LoadSessionsAsync" Title="Refresh" />
+                           OnClick="LoadSessionsAsync" title="Refresh" />
         </div>
 
         @if (_loadingSessions)
@@ -46,7 +46,7 @@
                         @if (!context.IsCurrentSession)
                         {
                             <MudIconButton Icon="@Icons.Material.Filled.Logout" Size="Size.Small"
-                                           Color="Color.Error" Title="Revoke session"
+                                           Color="Color.Error" title="Revoke session"
                                            OnClick="@(() => RevokeSessionAsync(context))" />
                         }
                     </MudTd>
@@ -66,7 +66,7 @@
                            OnClick="AddUserAsync">Add User</MudButton>
             }
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                           OnClick="LoadUsersAsync" Title="Refresh" />
+                           OnClick="LoadUsersAsync" title="Refresh" />
         </div>
 
         @if (_loadingUsers)
@@ -128,7 +128,7 @@
                            OnClick="AddGroupAsync">Add Group</MudButton>
             }
             <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                           OnClick="LoadGroupsAsync" Title="Refresh" />
+                           OnClick="LoadGroupsAsync" title="Refresh" />
         </div>
 
         @if (_loadingGroups)
@@ -171,7 +171,7 @@
             <div class="dns-toolbar">
                 <MudSpacer />
                 <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                               OnClick="LoadClusterAsync" Title="Refresh" />
+                               OnClick="LoadClusterAsync" title="Refresh" />
             </div>
 
             @if (_loadingCluster)

@@ -7,11 +7,11 @@
         <MudText Typo="Typo.subtitle2" Style="flex:1">Cached Zones</MudText>
         <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
         <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                       Title="Refresh" OnClick="RefreshListAsync" />
+                       title="Refresh" OnClick="RefreshListAsync" />
         @if (SessionService.CanModify("Cache"))
         {
             <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small"
-                           Color="Color.Error" Title="Flush all cache"
+                           Color="Color.Error" title="Flush all cache"
                            OnClick="FlushAllAsync" />
         }
     </div>

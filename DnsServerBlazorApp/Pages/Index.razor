@@ -81,7 +81,7 @@ else
 
         @* ── Main tab set ──────────────────────────────────────────── *@
         <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
-                 PanelClass="pt-2" @ref="_tabs" ActivePanelIndexChanged="OnTabChanged"
+                 TabPanelsClass="pt-2" @ref="_tabs" ActivePanelIndexChanged="OnTabChanged"
                  SliderColor="Color.Primary">
 
             @if (SessionService.CanView("Dashboard"))
@@ -94,75 +94,75 @@ else
             @if (SessionService.CanView("Zones"))
             {
                 <MudTabPanel Text="Zones" ID="@("Zones")">
-                    <Pages.Tabs.ZonesTab />
+                    <ZonesTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("Cache"))
             {
                 <MudTabPanel Text="Cache" ID="@("Cache")">
-                    <Pages.Tabs.CacheTab />
+                    <CacheTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("Allowed"))
             {
                 <MudTabPanel Text="Allowed" ID="@("Allowed")">
-                    <Pages.Tabs.AllowedTab />
+                    <AllowedTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("Blocked"))
             {
                 <MudTabPanel Text="Blocked" ID="@("Blocked")">
-                    <Pages.Tabs.BlockedTab />
+                    <BlockedTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("Apps"))
             {
                 <MudTabPanel Text="Apps" ID="@("Apps")">
-                    <Pages.Tabs.AppsTab />
+                    <AppsTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("DnsClient"))
             {
                 <MudTabPanel Text="DNS Client" ID="@("DnsClient")">
-                    <Pages.Tabs.DnsClientTab />
+                    <DnsClientTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("Settings"))
             {
                 <MudTabPanel Text="Settings" ID="@("Settings")">
-                    <Pages.Tabs.SettingsTab />
+                    <SettingsTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("DhcpServer"))
             {
                 <MudTabPanel Text="DHCP" ID="@("Dhcp")">
-                    <Pages.Tabs.DhcpTab />
+                    <DhcpTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("Administration"))
             {
                 <MudTabPanel Text="Administration" ID="@("Admin")">
-                    <Pages.Tabs.AdminTab />
+                    <AdminTab />
                 </MudTabPanel>
             }
 
             @if (SessionService.CanView("Logs"))
             {
                 <MudTabPanel Text="Logs" ID="@("Logs")">
-                    <Pages.Tabs.LogsTab />
+                    <LogsTab />
                 </MudTabPanel>
             }
 
             <MudTabPanel Text="About" ID="@("About")">
-                <Pages.Tabs.AboutTab />
+                <AboutTab />
             </MudTabPanel>
 
         </MudTabs>
@@ -185,7 +185,7 @@ else
     // Main panel
     private string? _updateInfo;
     private MudTabs? _tabs;
-    private Pages.Tabs.DashboardTab? _dashboardTab;
+    private DashboardTab? _dashboardTab;
 
     // Auto-refresh (mirrors the original setInterval every 60s)
     private System.Threading.Timer? _refreshTimer;

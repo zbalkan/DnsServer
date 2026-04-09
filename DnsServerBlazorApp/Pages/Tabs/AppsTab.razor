@@ -16,7 +16,7 @@
                    OnClick="InstallLocalAsync">Install</MudButton>
     }
     <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                   OnClick="LoadAsync" Title="Refresh" />
+                   OnClick="LoadAsync" title="Refresh" />
 </div>
 
 @if (_loading)
@@ -74,15 +74,15 @@ else
                 @if (SessionService.CanModify("Apps"))
                 {
                     <MudIconButton Icon="@Icons.Material.Filled.Settings" Size="Size.Small"
-                                   Title="Configure" OnClick="@(() => ConfigureAsync(context))" />
+                                   title="Configure" OnClick="@(() => ConfigureAsync(context))" />
                     @if (context.UpdateVersion is not null)
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.Update" Size="Size.Small"
-                                       Color="Color.Warning" Title="Update"
+                                       Color="Color.Warning" title="Update"
                                        OnClick="@(() => UpdateAsync(context))" />
                     }
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
-                                   Color="Color.Error" Title="Uninstall"
+                                   Color="Color.Error" title="Uninstall"
                                    OnClick="@(() => UninstallAsync(context))" />
                 }
             </MudTd>

@@ -6,7 +6,7 @@
 @* ── Breadcrumb / toolbar ── *@
 <div class="dns-toolbar">
     <MudIconButton Icon="@Icons.Material.Filled.ArrowBack" OnClick="@(() => OnClose.InvokeAsync())"
-                   Title="Back to zones" />
+                   title="Back to zones" />
     <MudText Typo="Typo.h6" Style="flex:1">@Zone.Name</MudText>
     <MudChip T="string" Size="Size.Small" Color="@DnsStyling.ZoneTypeColor(Zone.Type)"
              Variant="Variant.Filled">@Zone.Type</MudChip>
@@ -82,11 +82,11 @@ else
                 <MudTd Style="text-align:right;white-space:nowrap;">
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                    OnClick="@(() => EditRecordAsync(context))"
-                                   Title="Edit record" />
+                                   title="Edit record" />
                     <MudIconButton Icon="@Icons.Material.Filled.Delete" Size="Size.Small"
                                    Color="Color.Error"
                                    OnClick="@(() => DeleteRecordAsync(context))"
-                                   Title="Delete record" />
+                                   title="Delete record" />
                 </MudTd>
             }
         </RowTemplate>

@@ -61,6 +61,7 @@ public static class BlazorHostingExtensions
     /// </summary>
     public static IEndpointRouteBuilder MapDnsBlazorApp(this IEndpointRouteBuilder endpoints)
     {
+        endpoints.MapStaticAssets();
         endpoints.MapRazorComponents<App>()
                  .AddInteractiveServerRenderMode();
         return endpoints;

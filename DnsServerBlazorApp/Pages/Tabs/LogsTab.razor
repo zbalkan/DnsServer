@@ -4,7 +4,7 @@
 @inject IJSRuntime     JS
 
 <MudTabs Elevation="0" Rounded="false" ApplyEffectsToContainer="false"
-         PanelClass="pt-2" SliderColor="Color.Primary">
+         TabPanelsClass="pt-2" SliderColor="Color.Primary">
 
     @* ── Log Files tab ── *@
     <MudTabPanel Text="Log Files">
@@ -17,11 +17,11 @@
                     @if (SessionService.CanModify("Logs"))
                     {
                         <MudIconButton Icon="@Icons.Material.Filled.DeleteSweep" Size="Size.Small"
-                                       Color="Color.Error" Title="Delete all logs"
+                                       Color="Color.Error" title="Delete all logs"
                                        OnClick="DeleteAllLogsAsync" />
                     }
                     <MudIconButton Icon="@Icons.Material.Filled.Refresh" Size="Size.Small"
-                                   OnClick="LoadFileListAsync" Title="Refresh" />
+                                   OnClick="LoadFileListAsync" title="Refresh" />
                 </div>
                 <div style="overflow-y:auto;flex:1;">
                     @if (_loadingFiles)
