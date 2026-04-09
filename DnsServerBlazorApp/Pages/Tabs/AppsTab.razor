@@ -124,8 +124,18 @@ else
 
     private async Task UpdateAsync(DnsApp app)
     {
-        var form = new Dictionary<string, string> { ["name"] = app.Name, ["node"] = _node };
-        var res = await Api.PostAsync<object>("api/apps/update", form);
+        if (string.IsNullOrEmpty(app.UpdateUrl))
+        {
+            Snackbar.Add("No update URL available for this app.", Severity.Warning);
+            return;
+        }
+        var form = new Dictionary<string, string>
+        {
+            ["name"] = app.Name,
+            ["url"]  = app.UpdateUrl,
+            ["node"] = _node,
+        };
+        var res = await Api.PostAsync<object>("api/apps/downloadAndUpdate", form);
         if (res.IsOk)
         {
             Snackbar.Add($"'{app.Name}' updated.", Severity.Success);

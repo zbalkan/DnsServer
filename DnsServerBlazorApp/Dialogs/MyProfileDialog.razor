@@ -45,22 +45,28 @@
 
     private async Task SaveDisplayNameAsync()
     {
+        if (_busy) return;
         _busy = true;
-        var form = new Dictionary<string, string>
+        try
         {
-            ["user"]        = SessionService.Username,
-            ["displayName"] = _displayName,
-        };
-        var result = await Api.PostAsync<object>("api/user/update", form);
-        _busy = false;
+            var form = new Dictionary<string, string>
+            {
+                ["displayName"] = _displayName,
+            };
+            var result = await Api.PostAsync<object>("api/user/profile/set", form);
 
-        if (result.IsOk)
-        {
-            SessionService.UpdateDisplayName(_displayName);
-            Snackbar.Add("Display name updated.", Severity.Success);
-            MudDialog.Close();
+            if (result.IsOk)
+            {
+                SessionService.UpdateDisplayName(_displayName);
+                Snackbar.Add("Display name updated.", Severity.Success);
+                MudDialog.Close();
+            }
+            else
+                _saveError = result.DisplayError;
         }
-        else
-            _saveError = result.DisplayError;
+        finally
+        {
+            _busy = false;
+        }
     }
 }

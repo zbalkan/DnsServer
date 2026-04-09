@@ -257,7 +257,7 @@ else if (_s is not null)
 
     private async Task UpdateBlockListAsync()
     {
-        var res = await Api.PostAsync<object>("api/settings/updateBlockListUrls",
+        var res = await Api.PostAsync<object>("api/settings/forceUpdateBlockLists",
             new Dictionary<string, string>());
         if (res.IsOk) Snackbar.Add("Block list update triggered.", Severity.Success);
         else          Snackbar.Add(res.DisplayError, Severity.Error);
