@@ -4,6 +4,8 @@
 // in BlazorHostingExtensions.  This file lets developers run the UI on its own
 // against a separately-running DNS API server.
 
+using DnsServerBlazorApp;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddDnsBlazorServices();

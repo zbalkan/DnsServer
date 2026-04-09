@@ -199,7 +199,7 @@ else
 
     private async Task DeleteZoneAsync(ZoneInfo zone)
     {
-        var confirm = await DialogService.ShowMessageBox(
+        var confirm = await DialogService.ShowMessageBoxAsync(
             "Delete Zone",
             $"Delete zone '{zone.Name}'? This cannot be undone.",
             yesText: "Delete", cancelText: "Cancel");

@@ -290,7 +290,7 @@
 
     private async Task DeleteUserAsync(UserInfo user)
     {
-        var confirm = await DialogService.ShowMessageBox(
+        var confirm = await DialogService.ShowMessageBoxAsync(
             "Delete User", $"Delete user '{user.Username}'?",
             yesText: "Delete", cancelText: "Cancel");
         if (confirm is not true) return;
@@ -338,7 +338,7 @@
 
     private async Task DeleteGroupAsync(GroupInfo group)
     {
-        var confirm = await DialogService.ShowMessageBox(
+        var confirm = await DialogService.ShowMessageBoxAsync(
             "Delete Group", $"Delete group '{group.Name}'?",
             yesText: "Delete", cancelText: "Cancel");
         if (confirm is not true) return;

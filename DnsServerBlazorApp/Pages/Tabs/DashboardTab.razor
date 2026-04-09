@@ -210,9 +210,9 @@ else if (_stats is not null)
     private DashboardStats?     _stats;
 
     // Chart data
-    private ChartSeries<double>[]  _lineSeries  = [];
+    private List<ChartSeries<double>>  _lineSeries  = new();
     private string[]               _lineLabels  = [];
-    private ChartOptions   _lineOptions = new() { YAxisTicks = 5 };
+    private ChartOptions   _lineOptions = new();
 
     private double[] _pie1Data = []; private string[] _pie1Labels = [];
     private double[] _pie2Data = []; private string[] _pie2Labels = [];

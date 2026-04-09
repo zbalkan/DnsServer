@@ -87,7 +87,7 @@ else
             @if (SessionService.CanView("Dashboard"))
             {
                 <MudTabPanel Text="Dashboard" ID="@("Dashboard")">
-                    <Pages.Tabs.DashboardTab @ref="_dashboardTab" />
+                    <DashboardTab @ref="_dashboardTab" />
                 </MudTabPanel>
             }
 
