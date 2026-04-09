@@ -840,8 +840,10 @@ namespace DnsServerCore.Dns.ZoneManagers
             return IsZoneAllowed(request.Question[0].Name);
         }
 
-        public DnsDatagram Query(DnsDatagram request)
+        public DnsDatagram Query(DnsDatagram request, out DnsQueryLogMetadata logMetadata)
         {
+            logMetadata = null;
+
             if (_blockListZone.Count < 1)
                 return null;
 
@@ -864,6 +866,7 @@ namespace DnsServerCore.Dns.ZoneManagers
             }
 
             DnsServerResponseMetadata responseMetadata = new DnsServerResponseMetadata(DnsServerResponseType.Blocked, new DnsQueryLogMetadata(metadataValues));
+            logMetadata = responseMetadata.LogMetadata;
 
             //zone is blocked
             if (_dnsServer.AllowTxtBlockingReport && (question.Type == DnsResourceRecordType.TXT))
