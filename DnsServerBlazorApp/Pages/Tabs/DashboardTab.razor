@@ -16,10 +16,10 @@
     @if (_range == "custom")
     {
         <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-            <MudDateTimePicker @bind-Date="_customStart" Label="Start"
-                               Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <MudDateTimePicker @bind-Date="_customEnd" Label="End"
-                               Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudDatePicker @bind-Date="_customStart" Label="Start"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" />
+            <MudDatePicker @bind-Date="_customEnd" Label="End"
+                           Variant="Variant.Outlined" Margin="Margin.Dense" />
             <MudButton Variant="Variant.Filled" Color="Color.Primary"
                        Size="Size.Small" OnClick="RefreshAsync">Show</MudButton>
         </MudStack>
@@ -55,7 +55,7 @@ else if (_stats is not null)
     @* ── Main line chart ── *@
     @if (_lineLabels.Length > 0)
     {
-        <MudChart ChartType="ChartType.Line"
+        <MudChart T="double" ChartType="ChartType.Line"
                   ChartSeries="@_lineSeries"
                   XAxisLabels="@_lineLabels"
                   Height="320px"
@@ -82,7 +82,7 @@ else if (_stats is not null)
             {
                 <MudPaper Elevation="1" Class="pa-2 mb-3">
                     <MudText Typo="Typo.subtitle2" Class="mb-1">Response Types</MudText>
-                    <MudChart ChartType="ChartType.Donut"
+                    <MudChart T="double" ChartType="ChartType.Donut"
                               InputData="@_pie1Data" InputLabels="@_pie1Labels"
                               Height="200px" Width="100%" />
                 </MudPaper>
@@ -91,7 +91,7 @@ else if (_stats is not null)
             {
                 <MudPaper Elevation="1" Class="pa-2 mb-3">
                     <MudText Typo="Typo.subtitle2" Class="mb-1">Query Types</MudText>
-                    <MudChart ChartType="ChartType.Donut"
+                    <MudChart T="double" ChartType="ChartType.Donut"
                               InputData="@_pie2Data" InputLabels="@_pie2Labels"
                               Height="200px" Width="100%" />
                 </MudPaper>
@@ -100,7 +100,7 @@ else if (_stats is not null)
             {
                 <MudPaper Elevation="1" Class="pa-2">
                     <MudText Typo="Typo.subtitle2" Class="mb-1">Protocols</MudText>
-                    <MudChart ChartType="ChartType.Donut"
+                    <MudChart T="double" ChartType="ChartType.Donut"
                               InputData="@_pie3Data" InputLabels="@_pie3Labels"
                               Height="200px" Width="100%" />
                 </MudPaper>
@@ -210,8 +210,8 @@ else if (_stats is not null)
     private DashboardStats?     _stats;
 
     // Chart data
-    private ChartSeries[]  _lineSeries  = [];
-    private string[]       _lineLabels  = [];
+    private ChartSeries<double>[]  _lineSeries  = [];
+    private string[]               _lineLabels  = [];
     private ChartOptions   _lineOptions = new() { YAxisTicks = 5 };
 
     private double[] _pie1Data = []; private string[] _pie1Labels = [];
@@ -270,11 +270,11 @@ else if (_stats is not null)
         _lineLabels = s.MainChartData.Select(d => d.Timestamp.ToLocalTime().ToString("HH:mm")).ToArray();
         _lineSeries =
         [
-            new ChartSeries { Name = "Total",      Data = s.MainChartData.Select(d => (double)d.TotalQueries).ToArray() },
-            new ChartSeries { Name = "No Error",   Data = s.MainChartData.Select(d => (double)d.TotalNoError).ToArray() },
-            new ChartSeries { Name = "Cached",     Data = s.MainChartData.Select(d => (double)d.TotalCacheHit).ToArray() },
-            new ChartSeries { Name = "Blocked",    Data = s.MainChartData.Select(d => (double)d.TotalBlocked).ToArray() },
-            new ChartSeries { Name = "Recursive",  Data = s.MainChartData.Select(d => (double)d.TotalRecursions).ToArray() },
+            new ChartSeries<double> { Name = "Total",      Data = s.MainChartData.Select(d => (double)d.TotalQueries).ToArray() },
+            new ChartSeries<double> { Name = "No Error",   Data = s.MainChartData.Select(d => (double)d.TotalNoError).ToArray() },
+            new ChartSeries<double> { Name = "Cached",     Data = s.MainChartData.Select(d => (double)d.TotalCacheHit).ToArray() },
+            new ChartSeries<double> { Name = "Blocked",    Data = s.MainChartData.Select(d => (double)d.TotalBlocked).ToArray() },
+            new ChartSeries<double> { Name = "Recursive",  Data = s.MainChartData.Select(d => (double)d.TotalRecursions).ToArray() },
         ];
 
         // ── Pie charts ────────────────────────────────────────────────

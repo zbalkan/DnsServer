@@ -190,6 +190,7 @@ else
         if (res.IsOk)
         {
             _records.Remove(record);
+            UpdateFilteredRecords();
             Snackbar.Add("Record deleted.", Severity.Success);
         }
         else

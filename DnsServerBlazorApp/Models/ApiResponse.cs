@@ -1,3 +1,4 @@
+using DnsServerBlazorApp.Models.Auth;
 using System.Text.Json.Serialization;
 
 namespace DnsServerBlazorApp.Models;

@@ -71,7 +71,7 @@
                         <MudChip T="string" Size="Size.Small" Color="Color.Success" Variant="Variant.Filled">Enabled</MudChip>
                     }
                 </MudTd>
-                <MudTd DataLabel="Records" Style="text-align:right">@context.DnssecStatus</MudTd>
+                <MudTd DataLabel="DNSSEC" Style="text-align:right">@context.DnssecStatus</MudTd>
                 <MudTd Style="text-align:right">
                     <MudIconButton Icon="@Icons.Material.Filled.Edit" Size="Size.Small"
                                    OnClick="@(() => OpenEditZone(context))"
@@ -210,6 +210,7 @@ else
         if (res.IsOk)
         {
             _zones.Remove(zone);
+            UpdateFiltered();
             Snackbar.Add($"Zone '{zone.Name}' deleted.", Severity.Success);
         }
         else
