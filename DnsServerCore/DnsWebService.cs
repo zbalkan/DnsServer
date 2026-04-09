@@ -2001,12 +2001,9 @@ namespace DnsServerCore
                     }
                     else
                     {
-                        HttpResponse response = context.Response;
-                        response.StatusCode = StatusCodes.Status404NotFound;
-                        response.ContentLength = 0;
-                        response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
-                        response.Headers.Pragma = "no-cache";
-                        response.Headers.Expires = "0";
+                        // Non-API request: let UseStaticFiles, MapStaticAssets, and
+                        // MapRazorComponents (Blazor) handle it — do not short-circuit here.
+                        await next(context);
                         return;
                     }
 
