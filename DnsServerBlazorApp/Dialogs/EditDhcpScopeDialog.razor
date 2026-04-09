@@ -101,7 +101,7 @@
             ["leaseTimeMinutes"] = _scope.LeaseTimeMinutes.ToString(),
         };
         if (!string.IsNullOrWhiteSpace(_scope.Router))
-            form["router"] = _scope.Router;
+            form["routerAddress"] = _scope.Router;
         if (!string.IsNullOrWhiteSpace(_scope.DomainName))
             form["domainName"] = _scope.DomainName;
         if (!string.IsNullOrWhiteSpace(_dnsServers))
