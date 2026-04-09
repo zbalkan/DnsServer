@@ -1531,6 +1531,9 @@ namespace DnsServerCore
                 UsePollingFileWatcher = true
             };
 
+            // FIXME: Since we got rid of JS-based UI and replaced it with Blazor, we removed the wwwroot folder,
+            // and it throws an error when Kestrel tries to watch the wwwroot folder that doesn't exist. We should find a better solution for this.
+            // FIXME: In this class we need something to initiate the Blazor project. Now it is built but not served.
             builder.Environment.WebRootFileProvider = new PhysicalFileProvider(Path.Combine(_appFolder, "wwwroot"))
             {
                 UseActivePolling = true,
