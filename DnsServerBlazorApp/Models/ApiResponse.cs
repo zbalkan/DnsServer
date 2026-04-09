@@ -7,7 +7,7 @@ namespace DnsServerBlazorApp.Models;
 /// Envelope returned by every Technitium API call.
 /// status: "ok" | "error" | "invalid-token" | "2fa-required"
 /// </summary>
-public sealed class ApiResponse<T>
+public class ApiResponse<T>
 {
     [JsonPropertyName("status")]
     public string Status { get; set; } = string.Empty;

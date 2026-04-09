@@ -90,7 +90,7 @@
     @* ── Query Logs tab ── *@
     <MudTabPanel Text="Query Logs" @ref="_queryLogsPanel">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px;">
-            <MudSelect T="string" @bind-Value="_queryAppName" Label="App" Variant="Variant.Outlined"
+            <MudSelect T="string" Value="@_queryAppName" Label="App" Variant="Variant.Outlined"
                        Margin="Margin.Dense" Style="max-width:200px;"
                        ValueChanged="OnQueryAppChanged">
                 @foreach (var a in _queryLogApps)
