@@ -2,453 +2,283 @@
 
 ## Overview
 
-Technitium DNS Server exposes two separate web frontends, both served by the same embedded HTTP server (`DnsServerCore.HttpApi`):
+The Technitium DNS Server admin console is a **Blazor Web App** with Interactive Server rendering, hosted inside `DnsServerCore`. The previous jQuery/Bootstrap SPA (`DnsServerCore/www/`) and the DoH info page (`DnsServerCore/dohwww/`) have been removed and replaced by this Blazor application.
 
-| Frontend | Path | Purpose |
+| Project | SDK | Role |
 |---|---|---|
-| **Admin Console** | `DnsServerCore/www/` | Full management SPA for authenticated administrators |
-| **DoH Info Page** | `DnsServerCore/dohwww/` | Public informational page for DNS-over-HTTPS users |
+| `DnsServerBlazorApp` | `Microsoft.NET.Sdk.Web` | Admin console UI (Blazor components, services, models) |
+| `DnsServerCore` | `Microsoft.NET.Sdk` | DNS/DHCP engine + embedded ASP.NET Core host |
+| `DnsServerApp` | `Microsoft.NET.Sdk` | Console entry point; starts `DnsWebService` |
 
-Both are static file trees (HTML + CSS + JS). There is no build step, bundler, or framework — everything is plain HTML5, vanilla JavaScript, and jQuery.
+`DnsServerCore` references `DnsServerBlazorApp` as a project reference, embedding the UI into the server's own process.
 
 ---
 
-## 1. Admin Console (`www/`)
+## 1. Render Mode
 
-### 1.1 File Inventory
-
-```
-www/
-├── index.html              ← Single HTML file; all UI lives here
-├── css/
-│   ├── bootstrap.min.css   ← Bootstrap 3 grid/components
-│   ├── font-awesome.min.css← Icons
-│   └── main.css            ← Custom application styles + dark mode
-├── img/
-│   ├── logo25x25.png       ← Header logo
-│   ├── loader.gif          ← AJAX loading spinner
-│   └── loader-small.gif    ← Inline loading spinner
-├── json/
-│   ├── dnsclient-server-list-builtin.json  ← Built-in DNS server presets
-│   └── dnsclient-server-list-custom.json   ← Optional user-defined presets
-└── js/
-    ├── jquery.min.js       ← jQuery (DOM, AJAX)
-    ├── bootstrap.min.js    ← Bootstrap 3 JS (modals, tabs, dropdowns)
-    ├── Chart.min.js        ← Chart.js (dashboard charts)
-    ├── moment.min.js       ← Moment.js (date/time formatting)
-    ├── common.js           ← Shared utilities
-    ├── auth.js             ← Authentication & user management
-    ├── main.js             ← App bootstrap, routing, settings, dashboard
-    ├── zone.js             ← DNS zone & record management
-    ├── other-zones.js      ← Cache, Allowed, Blocked zones
-    ├── apps.js             ← DNS application (plugin) management
-    ├── dnsclient.js        ← Interactive DNS query tool
-    ├── dhcp.js             ← DHCP leases & scopes
-    ├── logs.js             ← Log viewer & query logs
-    └── cluster.js          ← Multi-node cluster management
-```
-
-### 1.2 Script Loading Order
-
-`index.html` loads scripts in this fixed order, establishing the dependency chain:
+All components use `@rendermode InteractiveServer` (SignalR-based). There is no WebAssembly download. The HTML root is `App.razor`; there is no `wwwroot/index.html`.
 
 ```
-jquery.min.js
-  └─ bootstrap.min.js
-  └─ Chart.min.js
-  └─ moment.min.js
-  └─ common.js          ← must load before any module that calls HTTPRequest/showAlert
-       └─ main.js       ← defines showPageLogin/showPageMain; loaded first of app scripts
-       └─ auth.js       ← reads/writes sessionData; calls showPageMain/showPageLogin
-       └─ cluster.js    ← calls updateAllClusterNodeDropDowns (used by main.js)
-       └─ zone.js       ← calls showPageLogin on invalid token
-       └─ other-zones.js
-       └─ apps.js
-       └─ dnsclient.js
-       └─ dhcp.js
-       └─ logs.js
+Browser ──(HTTP)──► DnsServerCore (port 5380)
+                     │
+                     ├─ /api/*   → REST API handlers (WebService*.cs partial classes)
+                     │
+                     └─ /*       → Blazor middleware
+                                    ├─ Kestrel serves static assets (_content/*, _framework/*)
+                                    └─ SignalR hub (/_blazor) keeps component state server-side
 ```
 
 ---
 
-## 2. SPA Navigation Model
+## 2. Hosting Integration
 
-The application is a **zero-router SPA**: there is a single URL (`/`) and navigation is achieved entirely by toggling CSS `display` on pre-rendered `<div>` elements. There is no hash routing, no History API, and no dynamic HTML loading.
+### 2.1 Registration (`AddDnsBlazorServices`)
 
-### 2.1 Page-Level Containers
+Called from `DnsWebService.StartWebServiceAsync()` on the `IServiceCollection`:
 
-```
-<body>
- ├─ #header              ← Logo + user dropdown menu (populated by main.js at init)
- ├─ #content
- │   ├─ .AlertPlaceholder  ← Global alert banner slot
- │   ├─ #pageLogin          ← Login form (visible when logged out)
- │   └─ #pageMain           ← Main panel (visible when logged in)
- │       └─ .panel
- │           ├─ .panel-heading  ← "DNS Server — <domain>" + update link
- │           └─ .panel-body
- │               └─ Bootstrap tab set (ul.nav-tabs + div.tab-content)
- └─ (modals scattered at document root)
+```csharp
+services.AddRazorComponents().AddInteractiveServerComponents();
+services.AddScoped<HttpClient>(...);   // base address from NavigationManager.BaseUri
+services.AddMudServices(...);          // snackbar, dialog, theming
+services.AddMudExtensions();
+services.AddScoped<SessionService>();
+services.AddScoped<ApiService>();
+services.AddScoped<ThemeService>();
 ```
 
-### 2.2 Main Tab Panels
+### 2.2 Endpoint mapping (`MapDnsBlazorApp`)
 
-Each tab maps to a feature module:
+Called after all `/api/*` routes are registered:
 
-```
-ul.nav-tabs
- ├─ #mainPanelTabListDashboard      → #mainPanelTabPaneDashboard   [main.js]
- ├─ #mainPanelTabListZones          → #mainPanelTabPaneZones        [zone.js]
- ├─ #mainPanelTabListCachedZones    → #mainPanelTabPaneCachedZones  [other-zones.js]
- ├─ #mainPanelTabListAllowedZones   → #mainPanelTabPaneAllowedZones [other-zones.js]
- ├─ #mainPanelTabListBlockedZones   → #mainPanelTabPaneBlockedZones [other-zones.js]
- ├─ #mainPanelTabListApps           → #mainPanelTabPaneApps         [apps.js]
- ├─ #mainPanelTabListDnsClient      → #mainPanelTabPaneDnsClient    [dnsclient.js]
- ├─ #mainPanelTabListSettings       → #mainPanelTabPaneSettings      [main.js]
- ├─ #mainPanelTabListDhcp           → #mainPanelTabPaneDhcp         [dhcp.js]
- ├─ #mainPanelTabListAdmin          → #mainPanelTabPaneAdmin         [auth.js]
- ├─ #mainPanelTabListLogs           → #mainPanelTabPaneLogs         [logs.js]
- └─ #mainPanelTabListAbout          → #mainPanelTabPaneAbout         [main.js]
+```csharp
+// Serve fingerprinted static web assets (MudBlazor CSS/JS, _framework/*)
+// Only when the build manifest exists (requires StaticWebAssetsEnabled=true in DnsServerApp.csproj)
+if (File.Exists(manifest)) endpoints.MapStaticAssets();
+
+// Mount Blazor as the fallback for all non-API requests
+endpoints.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 ```
 
-Tab visibility is controlled at login time based on `sessionData.info.permissions.*`.
+**Middleware order** (enforced in `DnsWebService.cs`):
+```
+UseStaticFiles          ← physical wwwroot (css/app.css, js/app.js, favicon.ico)
+UseAntiforgery          ← must be after UseStaticFiles, before MapRazorComponents
+[API routes]            ← /api/* handlers
+MapStaticAssets()       ← fingerprinted assets (_content/*, _framework/*)
+MapRazorComponents<App> ← Blazor fallback
+```
 
 ---
 
-## 3. JavaScript Module Responsibilities
-
-### 3.1 Module Dependency Diagram
+## 3. Project Layout
 
 ```
-                        ┌─────────────┐
-                        │  common.js  │
-                        │  ─────────  │
-                        │ HTTPRequest │
-                        │ showAlert   │
-                        │ hideAlert   │
-                        │ htmlEncode  │
-                        │ sortTable   │
-                        │ serializeT… │
-                        │ cleanTextL… │
-                        └──────┬──────┘
-                               │  used by all modules below
-          ┌─────────────┬──────┴───────┬──────────────┬───────────────┐
-          │             │              │               │               │
-     ┌────▼────┐  ┌─────▼────┐  ┌─────▼─────┐  ┌─────▼─────┐  ┌─────▼─────┐
-     │ auth.js │  │  main.js │  │  zone.js  │  │other-zones│  │  apps.js  │
-     └─────────┘  └──────────┘  └───────────┘  └───────────┘  └───────────┘
-          │             │
-          │       ┌─────┴──────────────┬────────────────┬────────────┐
-          │       │                    │                │            │
-     ┌────▼────┐  │             ┌──────▼──┐  ┌─────────▼──┐  ┌──────▼───┐
-     │cluster.j│  │             │ dhcp.js │  │dnsclient.js│  │  logs.js │
-     └─────────┘  │             └─────────┘  └────────────┘  └──────────┘
-                  │
-            ┌─────▼──────────────────┐
-            │  Chart.js / moment.js  │
-            │  (dashboard rendering) │
-            └────────────────────────┘
+DnsServerBlazorApp/
+├── App.razor                   # HTML root (<head> + <body>, loads CSS/JS)
+├── Routes.razor                # <Router> — maps URLs to page components
+├── _Imports.razor              # Global @using for all components
+├── BlazorHostingExtensions.cs  # AddDnsBlazorServices() + MapDnsBlazorApp()
+├── Program.cs                  # Standalone dev entry point (dotnet run)
+├── Layout/
+│   └── MainLayout.razor        # MudAppBar, user menu, alert banner, footer
+├── Pages/
+│   ├── Index.razor             # Login form + authenticated tab panel
+│   └── Tabs/
+│       ├── DashboardTab.razor
+│       ├── ZonesTab.razor      # Zone list with EditZoneView sub-view
+│       ├── EditZoneView.razor  # Record editor (embedded in ZonesTab)
+│       ├── CacheTab.razor
+│       ├── AllowedTab.razor
+│       ├── BlockedTab.razor
+│       ├── AppsTab.razor
+│       ├── DnsClientTab.razor
+│       ├── SettingsTab.razor
+│       ├── AdminTab.razor
+│       ├── DhcpTab.razor
+│       ├── LogsTab.razor
+│       └── AboutTab.razor
+├── Shared/
+│   ├── ClusterNodeSelect.razor # Node dropdown for cluster-aware tabs
+│   ├── StatsCard.razor
+│   └── ZoneStatsCard.razor
+├── Dialogs/                    # ~18 MudBlazor modal dialogs
+├── Services/
+│   ├── ApiService.cs           # HTTP wrapper (token, envelope, error handling)
+│   ├── SessionService.cs       # Auth state + localStorage persistence
+│   └── ThemeService.cs         # Dark/light theme + localStorage + JS interop
+├── Models/                     # 13 model files grouped by domain
+│   ├── ApiResponse.cs          # ApiResponse<T> JSON envelope + ApiResult<T>
+│   ├── Auth/                   # SessionData, UserModels, Permissions, ClusterNodeRef
+│   ├── Dashboard/              # DashboardStats
+│   ├── Zones/                  # ZoneModels (ZoneInfo, ZoneRecord, ZoneOptions, …)
+│   ├── Settings/               # DnsSettings, ProxySettings, TsigKeyEntry, …
+│   ├── Dhcp/                   # DhcpModels (DhcpScope, DhcpLease, …)
+│   ├── Apps/                   # AppModels
+│   ├── Cluster/                # ClusterModels
+│   ├── Logs/                   # LogModels
+│   ├── Cache/                  # CacheModels
+│   └── DnsClient/              # DnsClientModels
+├── Styles/
+│   └── DnsStyling.cs           # MudTheme builder, zone-type colour map
+└── wwwroot/
+    ├── css/app.css             # Custom MudBlazor overrides + Blazor error UI
+    ├── js/app.js               # window.dnsApp.setBodyClass() for dark mode
+    └── favicon.ico             # Browser tab icon
 ```
-
-### 3.2 Module Descriptions
-
-| Module | Key Functions | API Namespaces |
-|---|---|---|
-| **common.js** | `HTTPRequest()`, `showAlert()`, `hideAlert()`, `htmlEncode()`, `htmlDecode()`, `sortTable()`, `serializeTableData()`, `cleanTextList()` | — |
-| **auth.js** | `login()`, `logout()`, session restore on load, `showChangePasswordModal()`, `showConfigure2FAModal()`, `enable2FA()`, `disable2FA()`, `showMyProfileModal()`, user CRUD, group CRUD, permission management | `api/user/*`, `api/admin/users/*`, `api/admin/groups/*`, `api/admin/permissions/*`, `api/admin/sessions/*` |
-| **main.js** | `showPageLogin()`, `showPageMain()`, `refreshDnsSettings()`, `saveDnsSettings()`, `refreshDashboard()`, `showTopStats()`, `checkForUpdate()`, `loadQuickBlockLists()`, `toggleTheme()`, `backupSettings()`, `restoreSettings()`, settings form event wiring | `api/settings/*`, `api/dashboard/*`, `api/user/checkForUpdate` |
-| **zone.js** | `refreshZones()`, `addZone()`, `deleteZone()`, `enableZone()`, `disableZone()`, zone options, `editZone()` (sub-view), `addRecord()`, `editRecord()`, `deleteRecord()`, DNSSEC sign/unsign/properties, TSIG key management, zone import/export | `api/zones/*` |
-| **other-zones.js** | `refreshCachedZonesList()`, `deleteCachedZone()`, `flushDnsCache()`, `refreshAllowedZonesList()`, `allowZone()`, `deleteAllowedZone()`, `importAllowedZones()`, `refreshBlockedZonesList()`, `blockZone()`, `deleteBlockedZone()`, `importBlockedZones()` | `api/cache/*`, `api/allowed/*`, `api/blocked/*` |
-| **apps.js** | `refreshApps()`, `installApp()`, `updateApp()`, `uninstallApp()`, `showStoreAppsModal()`, `installStoreApp()`, `updateStoreApp()`, `showAppConfigModal()`, `saveAppConfig()` | `api/apps/*` |
-| **dnsclient.js** | `resolveQuery()`, `queryDnsServer()`, `loadServerList()` (reads JSON presets), dropdown list interaction | `api/dnsClient/resolve` |
-| **dhcp.js** | `refreshDhcpTab()`, `refreshDhcpLeases()`, `convertToReservedLease()`, `convertToDynamicLease()`, `refreshDhcpScopes()`, `editDhcpScope()`, `saveDhcpScope()`, `deleteDhcpScope()` | `api/dhcp/*` |
-| **logs.js** | `refreshLogsTab()`, `refreshLogFilesList()`, log file viewer (download/delete), `refreshQueryLogsTab()`, `queryLogs()` | `api/logs/*` |
-| **cluster.js** | `refreshAdminCluster()`, `updateSelfClusterNode()`, `updatePrimaryClusterNode()`, `removeSecondaryClusterNode()`, `promoteToPrimaryClusterNode()`, `initializeNewCluster()`, `initializeJoinCluster()`, `updateAllClusterNodeDropDowns()` | `api/admin/cluster/*` |
 
 ---
 
-## 4. Authentication & Session Flow
+## 4. Service Layer
+
+### 4.1 ApiService
+
+- Appends `?token=<value>` to every request.
+- Deserialises JSON into `ApiResponse<T>` (`status`, `errorMessage`, `response`, `token`, `displayName`, `info`).
+- Returns `ApiResult<T>` with flags: `IsOk`, `IsInvalidToken`, `Is2FARequired`, `IsError`, `IsNetworkError`.
+- Key methods: `GetAsync<T>`, `PostAsync<T>`, `PostMultipartAsync<T>`, `BuildDownloadUrl`.
+
+### 4.2 SessionService
+
+- Holds the authenticated session in memory; persists `token` in `localStorage`.
+- Properties: `IsAuthenticated`, `Token`, `DisplayName`, `Username`, `TotpEnabled`, `Permissions`, `ClusterNodes`.
+- Raises `Action? OnChange` on state change; subscribers call `InvokeAsync(StateHasChanged)`.
+- Permission helpers: `CanView(section)` / `CanModify(section)`.
+
+### 4.3 ThemeService
+
+- Persists `"theme"` (`"dark"` / `"light"`) in `localStorage`.
+- Applies `body.dark-mode` CSS class via `dnsApp.setBodyClass()` JS interop.
+- Must call `InitAsync()` from `OnAfterRenderAsync(firstRender)` (JSInterop unavailable during pre-render).
+
+---
+
+## 5. Authentication & Session Flow
 
 ```
-Browser loads /
+Browser requests /
        │
        ▼
-auth.js: $(function(){...})
+Index.razor: OnAfterRenderAsync(firstRender)
        │
-       ├─ localStorage has "token"?
-       │       YES → GET api/user/session/get?token=...
-       │               ├─ 200 ok  → sessionData = response
-       │               │            showPageMain()
-       │               └─ error   → showPageLogin()
+       ├─ SessionService.LoadStoredTokenAsync()
+       │       └─ localStorage has token?
+       │               YES → GET api/user/session/get?token=...
+       │                       ├─ ok          → IsAuthenticated = true; show tab panel
+       │                       ├─ invalid-tok → ClearSessionAsync(); show login
+       │                       └─ 2fa-req     → show TOTP input
        │
-       └─ NO → showPageLogin()
-               └─ auto-attempt login("admin","admin")
-                       ├─ success → sessionData set
-                       │           localStorage.setItem("token", ...)
-                       │           showPageMain()
-                       ├─ error   → hideAlert() (silent fail, user must log in)
-                       └─ 2fa-required → show OTP input
+       └─ NO → show login form
+               └─ user submits → POST api/user/login
+                       ├─ ok          → SaveSessionAsync(); show tab panel
+                       ├─ error       → show error message
+                       └─ 2fa-req     → show TOTP input
 ```
 
 **Token lifecycle:**
 - Stored in `localStorage["token"]`
-- Appended to every API call as `?token=<value>`
-- On `invalid-token` response: `window.location = "/"` (full page reload → login screen)
-- On logout: `api/user/logout` called, token removed, `showPageLogin()` called
-
-**Global session state:**
-```javascript
-var sessionData = {
-    token: "...",
-    username: "...",
-    displayName: "...",
-    totpEnabled: false,
-    info: {
-        version: "...",
-        dnsServerDomain: "...",
-        uptimestamp: "...",
-        useSoaSerialDateScheme: false,
-        dnssecValidation: true,
-        permissions: {
-            Dashboard:      { canView, canModify, canDelete },
-            Zones:          { canView, canModify, canDelete },
-            Cache:          { canView, canModify, canDelete },
-            Allowed:        { canView, canModify, canDelete },
-            Blocked:        { canView, canModify, canDelete },
-            Apps:           { canView, canModify, canDelete },
-            DnsClient:      { canView, canModify, canDelete },
-            Settings:       { canView, canModify, canDelete },
-            DhcpServer:     { canView, canModify, canDelete },
-            Administration: { canView, canModify, canDelete },
-            Logs:           { canView, canModify, canDelete }
-        }
-    }
-}
-```
+- Appended to every API call as `?token=<value>` by `ApiService`
+- On `invalid-token` response: `SessionService.ClearSessionAsync()` + `StateHasChanged`
+- On logout: `ClearSessionAsync()` called, then `NavigateTo("/")`
 
 ---
 
-## 5. HTTP Communication Layer
+## 6. REST API Communication
 
-All API calls go through the single `HTTPRequest()` function defined in `common.js`. It wraps `$.ajax()` and normalises the server response envelope.
+All API calls go through `ApiService`. The server REST API is documented in `APIDOCS.md`.
 
-### 5.1 Request Pattern
+### 6.1 Request Pattern
 
 ```
-GET  api/<domain>/<action>?token=<token>&param1=value1...
-POST api/<domain>/<action>?token=<token>
-     body: param1=value1&param2=value2   (application/x-www-form-urlencoded)
-           OR FormData                   (for file uploads)
+GET  /api/<module>/<action>?token=<token>&param=value
+POST /api/<module>/<action>
+     Content-Type: application/x-www-form-urlencoded
+     body: token=<token>&param1=value1&param2=value2
+     OR: multipart/form-data  (file uploads)
 ```
 
-### 5.2 Response Envelope
-
-Every API endpoint returns:
+### 6.2 Response Envelope
 
 ```json
 {
     "status": "ok" | "error" | "invalid-token" | "2fa-required",
     "errorMessage": "...",
-    "innerErrorMessage": "...",
     "response": { ... }
 }
 ```
 
-### 5.3 HTTPRequest() Callback Map
+Login response also carries top-level `token`, `displayName`, `username`, `totpEnabled`, `info`.
 
-```
-HTTPRequest({
-    url:                  string,
-    method:               "GET" | "POST",     // default GET
-    data:                 string | FormData,
-    isTextResponse:       boolean,            // skip JSON parse
-    success:              fn(responseJSON),
-    error:                fn(),               // network/HTTP error
-    invalidToken:         fn(),               // status == "invalid-token"
-    twoFactorAuthRequired:fn(),               // status == "2fa-required"
-    objAlertPlaceholder:  jQuery,             // where to show error alerts
-    objLoaderPlaceholder: jQuery,             // where to show spinner
-    processData:          boolean,
-    contentType:          string,
-    dontHideAlert:        boolean,
-    showInnerError:       boolean
-})
-```
+### 6.3 API Module Summary
 
-### 5.4 API Namespace Summary
-
-| Namespace | Module | Operations |
+| Module | Used by | Operations |
 |---|---|---|
-| `api/user/` | auth.js | login, logout, session get, password change, 2FA, token create, profile, update check |
-| `api/admin/users/` | auth.js | list, get, create, set, delete |
-| `api/admin/groups/` | auth.js | list, get, create, set, delete |
-| `api/admin/permissions/` | auth.js | list, get, set |
-| `api/admin/sessions/` | auth.js | list, delete, createToken |
-| `api/admin/cluster/` | cluster.js | state, init, initJoin, updateIpAddress, primary/secondary operations |
-| `api/settings/` | main.js | get, set, backup, restore, forceUpdateBlockLists, temporaryDisableBlocking, getTsigKeyNames |
-| `api/dashboard/` | main.js | stats/get, stats/getTop, stats/deleteAll |
-| `api/zones/` | zone.js | list, create, delete, enable, disable, clone, convert, import, export, resync, options/get, options/set, records/*, dnssec/*, permissions/*, catalogs/list |
-| `api/cache/` | other-zones.js | list, flush, delete |
-| `api/allowed/` | other-zones.js | list, add, delete, flush, import, export |
-| `api/blocked/` | other-zones.js | list, add, delete, flush, import, export |
-| `api/apps/` | apps.js | list, install, update, uninstall, downloadAndInstall, downloadAndUpdate, listStoreApps, config/get, config/set |
-| `api/dnsClient/` | dnsclient.js | resolve |
-| `api/dhcp/leases/` | dhcp.js | list, convertToReserved, convertToDynamic, remove |
-| `api/dhcp/scopes/` | dhcp.js | list, get, set, enable, disable, delete |
-| `api/logs/` | logs.js | list, download, delete, deleteAll, query, export |
+| `api/user/` | SessionService, dialogs | login, logout, session get/update, password change, 2FA, token create, profile |
+| `api/admin/users/` | AdminTab, AddUserDialog | list, create, set, delete |
+| `api/admin/groups/` | AdminTab, AddGroupDialog | list, create, set, delete |
+| `api/admin/permissions/` | AdminTab | list, get, set |
+| `api/admin/sessions/` | AdminTab | list, revoke |
+| `api/admin/cluster/` | AdminTab | state, init, initJoin, update, promote |
+| `api/settings/` | SettingsTab | get, set, forceUpdateBlockLists, backup, restore |
+| `api/dashboard/` | DashboardTab | stats/get, stats/getTop, stats/deleteAll |
+| `api/zones/` | ZonesTab, EditZoneView, dialogs | list, create, delete, enable, disable, options/get, options/set, records/add, records/update, records/delete, dnssec/*, resync |
+| `api/cache/` | CacheTab | list, flush, delete |
+| `api/allowed/` | AllowedTab, ImportZoneListDialog | list, add, delete, flush, import, export |
+| `api/blocked/` | BlockedTab, ImportZoneListDialog | list, add, delete, flush, import, export |
+| `api/apps/` | AppsTab, StoreAppsDialog | list, install, update, uninstall, listStoreApps, config/get, config/set |
+| `api/dnsClient/` | DnsClientTab | resolve |
+| `api/dhcp/leases/` | DhcpTab | list, convertToReserved, convertToDynamic, remove |
+| `api/dhcp/scopes/` | DhcpTab, EditDhcpScopeDialog | list, get, set, enable, disable, delete |
+| `api/logs/` | LogsTab | list, download, delete, deleteAll, query |
 
 ---
 
-## 6. UI Patterns
+## 7. UI Patterns
 
-### 6.1 Loader / Content Toggle
+### 7.1 Tab Visibility (Permissions)
 
-Every data panel follows the same two-div pattern:
+`Index.razor` wraps each `<MudTabPanel>` in `@if (SessionService.CanView("Section"))`. Permissions are populated from the login response and stored in `SessionService.Permissions`.
 
-```html
-<div id="divXxxLoader">  ← spinner placeholder (shown during fetch)
-<div id="divXxx">        ← actual content (shown after fetch)
+### 7.2 Cluster-Aware Tabs
+
+Every major tab contains a `<ClusterNodeSelect>` dropdown allowing the operator to target a specific node or "All Nodes (cluster)". The selected value is passed as `node=` in API calls.
+
+### 7.3 Sub-Views
+
+`ZonesTab` embeds `<EditZoneView>` for the record editor, toggled by `_selectedZone` being null/non-null. The same pattern applies to DHCP scopes in `DhcpTab`.
+
+### 7.4 Dialogs
+
+Transient operations use MudBlazor modal dialogs opened via `IDialogService.ShowAsync<TDialog>(...)`. Each dialog has a `[CascadingParameter] IMudDialogInstance` and closes via `MudDialog.Close()` or `MudDialog.Cancel()`.
+
+### 7.5 Filtered Lists
+
+List tabs cache filtered results in a separate `_filtered` field, never using a computed property:
+
+```csharp
+private List<ZoneInfo> _filtered = [];
+
+private void UpdateFiltered()
+    => _filtered = _zones.Where(z => /* search/filter */).ToList();
+
+// UpdateFiltered() called after: loading data, deleting items, filter input changes
 ```
 
-`HTTPRequest`'s `objLoaderPlaceholder` injects `<img src='img/loader.gif'>` automatically.
+### 7.6 Persistence via localStorage
 
-### 6.2 Dynamic Table Rendering
-
-All list data is rendered as HTML strings concatenated in a loop and injected via `.html()`:
-
-```javascript
-var tableHtmlRows = "";
-for (var i = 0; i < items.length; i++) {
-    tableHtmlRows += "<tr>...</tr>";
-}
-$("#tableXxxBody").html(tableHtmlRows);
-```
-
-Row IDs use `btoa(name).replace(/=/g, "")` to create stable anchors for in-place updates.
-
-### 6.3 Sub-Views (Zone Editor)
-
-The Zones tab has an internal sub-view pattern: a list view (`#divViewZones`) and an edit view (`#divEditZone`) are toggled by show/hide, not by tab switching. The same pattern exists in DHCP (`#divDhcpViewScopes` / `#divDhcpEditScope`).
-
-### 6.4 Bootstrap Modals
-
-Transient operations (add record, edit zone options, change password, app config, etc.) use Bootstrap 3 modals. They are permanently present in the DOM and activated with `$("#modalXxx").modal("show")`. Alert placeholders inside each modal (`#divXxxAlert`) are scoped to that modal.
-
-### 6.5 Cluster-Aware Dropdowns
-
-Every major section contains a `<select class="cluster-node-dropdown">` allowing the operator to target a specific cluster node. The special value `""` means "all nodes" (write operations) or "the current node" (read operations). `cluster.js` maintains `updateAllClusterNodeDropDowns()` to keep all dropdowns in sync after cluster topology changes.
-
-### 6.6 Persistence via localStorage
-
-| Key | Purpose |
-|---|---|
-| `"token"` | Session token (persists across page reloads) |
-| `"theme"` | `"dark"` or absent (light mode) |
-| `"chart_<id>_legend"` | Per-chart legend visibility filters (dashboard) |
-| `"optQueryLogsEntriesPerPage"` | Query logs page size preference |
+| Key | Service | Purpose |
+|---|---|---|
+| `"token"` | SessionService | Session token (survives page reloads) |
+| `"theme"` | ThemeService | `"dark"` or `"light"` |
 
 ---
 
-## 7. Dashboard & Charting
+## 8. Static Assets
 
-`main.js` contains `refreshDashboard()` which calls `api/dashboard/stats/get` and renders three types of Chart.js charts:
+| Asset type | Mechanism | Path |
+|---|---|---|
+| App CSS/JS | Physical `wwwroot/` + `UseStaticFiles()` | `css/app.css`, `js/app.js` |
+| MudBlazor CSS/JS | RCL embedded via `MapStaticAssets()` | `_content/MudBlazor/*` |
+| Blazor SignalR client | Framework via `MapStaticAssets()` | `_framework/blazor.web.js` |
+| Favicon | Physical `wwwroot/favicon.ico` | `favicon.ico` |
 
-```
-canvasDashboardMain    ← Line chart: queries over time (multi-series)
-canvasDashboardPie     ← Doughnut: response type distribution
-canvasDashboardPie2    ← Doughnut: query type distribution (top N)
-canvasDashboardPie3    ← Doughnut: top clients
-```
-
-A 60-second `setInterval` (stored in `refreshTimerHandle`) auto-refreshes when "Last Hour" is selected.
-
----
-
-## 8. DNS-over-HTTPS Info Page (`dohwww/`)
-
-This is a minimal, separate two-file frontend:
-
-```
-dohwww/
-├── index.html   ← Static informational page
-└── js/
-    └── main.js  ← 8-line script; constructs DoH URL from window.location.hostname
-```
-
-It references CSS and images from the parent `/css/` and `/img/` paths (served by the same HTTP server). Its only dynamic behaviour:
-
-```javascript
-$(function () {
-    var link = "https://" + window.location.hostname + "/dns-query";
-    $("#lnkDoH").text(link).attr("href", link);
-});
-```
-
-This page does **not** share any JS with the admin console.
-
----
-
-## 9. Entity Relationship Diagram
-
-```
-┌───────────────────────────────────────────────────────┐
-│                     index.html                         │
-│  (single page; all markup rendered at document load)   │
-│                                                        │
-│  ┌──────────┐   ┌─────────────────────────────────┐   │
-│  │ #pageLogin│   │           #pageMain              │   │
-│  │           │   │  ┌──────────────────────────┐   │   │
-│  │ [Login    │   │  │   Bootstrap Tab Set       │   │   │
-│  │  Form]    │   │  │  Dashboard│Zones│Settings │   │   │
-│  └──────────┘   │  │  Cache│Allowed│Blocked│…  │   │   │
-│                 │  └──────────────────────────┘   │   │
-│                 │  ┌─────────────────────────┐    │   │
-│                 │  │  Bootstrap Modals (×30+) │    │   │
-│                 │  └─────────────────────────┘    │   │
-│                 └─────────────────────────────────┘   │
-└───────────────────────────────────────────────────────┘
-        │                          │
-        │ DOM manipulation         │ $.ajax (via HTTPRequest)
-        ▼                          ▼
-┌───────────────┐        ┌──────────────────────┐
-│  JS Modules   │        │  Backend HTTP API     │
-│ ─────────────-│        │  ────────────────     │
-│ common.js     │        │  api/user/…           │
-│ auth.js       │        │  api/admin/…          │
-│ main.js       │        │  api/settings/…       │
-│ zone.js       │        │  api/dashboard/…      │
-│ other-zones.js│        │  api/zones/…          │
-│ apps.js       │        │  api/cache/…          │
-│ dhcp.js       │        │  api/allowed/…        │
-│ dnsclient.js  │        │  api/blocked/…        │
-│ logs.js       │        │  api/apps/…           │
-│ cluster.js    │        │  api/dnsClient/…      │
-└───────────────┘        │  api/dhcp/…           │
-        │                │  api/logs/…           │
-        │ reads/writes   └──────────────────────┘
-        ▼
-┌───────────────┐
-│ localStorage  │
-│ ─────────────-│
-│ token         │
-│ theme         │
-│ chart legends │
-│ page sizes    │
-└───────────────┘
-```
-
----
-
-## 10. Key Architectural Observations
-
-1. **No build toolchain.** Scripts are concatenated by the browser's sequential `<script>` loading. There is no module system, no imports, no bundler.
-
-2. **Global namespace coupling.** All JS functions are global. Modules communicate implicitly through global variables (`sessionData`, `zoneOptionsAvailableTsigKeyNames`, `editZoneInfo`, `appsList`, etc.) and by directly calling functions from other modules.
-
-3. **Token-in-URL pattern.** The auth token is passed as a query-string parameter on every request rather than in an HTTP header. This is a deliberate design choice for compatibility with simple HTTP clients and the backup/download endpoints (`window.open()`).
-
-4. **Permission-driven visibility.** The first action after successful login is reading `sessionData.info.permissions` to show or hide every tab. The server enforces permissions on every API call; the UI hides inaccessible tabs as a UX improvement only.
-
-5. **Cluster-awareness is pervasive.** Every section includes a node selector, and most API calls forward a `node=` parameter. Reads default to the current node; writes go to all nodes or a specific one.
-
-6. **No reactivity layer.** There is no virtual DOM, observable, or data-binding. DOM updates are fully manual: fetch → build HTML string → `$("#target").html(newHtml)`.
+`DnsServerApp.csproj` must have `<StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>` to generate the `staticwebassets.endpoints.json` manifest that `MapStaticAssets()` requires.

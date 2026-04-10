@@ -48,11 +48,14 @@
         _busy = true;
         try
         {
+            // APIDOCS: allowedZones / blockedZones accept comma-separated values only.
+            var normalized = string.Join(",",
+                _text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
             var url       = $"api/{ZoneType}/import";
             var paramName = ZoneType == "allowed" ? "allowedZones" : "blockedZones";
             var form = new Dictionary<string, string>
             {
-                [paramName] = _text,
+                [paramName] = normalized,
                 ["node"]    = Node,
             };
             var result = await Api.PostAsync<object>(url, form);

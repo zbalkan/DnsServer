@@ -60,9 +60,10 @@ else if (_s is not null)
             @* Optional Protocols *@
             <MudPaper Elevation="1" Class="pa-3 mb-3">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Optional Protocols</MudText>
-                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp"  Label="DNS-over-HTTP (DoH)"   Dense="true" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp"  Label="DNS-over-HTTP (DoH)"    Dense="true" />
                 <MudCheckBox @bind-Value="_s.EnableDnsOverTls"   Label="DNS-over-TLS (DoT)"    Dense="true" />
-                <MudCheckBox @bind-Value="_s.EnableDnsOverHttps" Label="DNS-over-HTTPS (DoH3)" Dense="true" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttps" Label="DNS-over-HTTPS (DoH)"  Dense="true" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp3" Label="DNS-over-HTTPS/3 (DoH3)" Dense="true" />
                 <MudCheckBox @bind-Value="_s.EnableDnsOverQuic"  Label="DNS-over-QUIC (DoQ)"   Dense="true" />
             </MudPaper>
 
@@ -182,7 +183,17 @@ else if (_s is not null)
                                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
                     <MudTextField @bind-Value="_s.Proxy.Port" Label="Proxy Port"
                                   Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  InputType="InputType.Number" />
+                                  InputType="InputType.Number" Class="mb-2" />
+                    <MudTextField @bind-Value="_s.Proxy.Username" Label="Username (optional)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                    <MudTextField @bind-Value="_s.Proxy.Password" Label="Password (optional)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  InputType="InputType.Password" Class="mb-2" />
+                    <MudTextField Value="@ListToLines(_s.Proxy.Bypass)"
+                                  ValueChanged="@((string v) => _s.Proxy.Bypass = LinesToList(v))"
+                                  Label="Bypass (optional)" Variant="Variant.Outlined"
+                                  Margin="Margin.Dense" Lines="2"
+                                  HelperText="One host/CIDR per line to bypass proxy" />
                 }
             </MudPaper>
 
@@ -293,7 +304,7 @@ else if (_s is not null)
         void Str(string k, string? v)       { if (v is not null) f[k] = v; }
         void Int(string k, int v)           { f[k] = v.ToString(); }
         void Bool(string k, bool v)         { f[k] = v ? "true" : "false"; }
-        void Lines(string k, List<string>? v) { if (v?.Count > 0) f[k] = string.Join(",", v); }
+        void Lines(string k, List<string>? v) { f[k] = v?.Count > 0 ? string.Join(",", v) : string.Empty; }
 
         Str("dnsServerDomain",           s.DnsServerDomain);
         Lines("dnsServerLocalEndPoints", s.DnsServerLocalEndPoints);
@@ -309,6 +320,7 @@ else if (_s is not null)
         Bool("enableDnsOverHttp",        s.EnableDnsOverHttp);
         Bool("enableDnsOverTls",         s.EnableDnsOverTls);
         Bool("enableDnsOverHttps",       s.EnableDnsOverHttps);
+        Bool("enableDnsOverHttp3",       s.EnableDnsOverHttp3);
         Bool("enableDnsOverQuic",        s.EnableDnsOverQuic);
         Str("forwarderProtocol",         s.ForwarderProtocol);
         Lines("forwarders",              s.Forwarders);
@@ -335,6 +347,9 @@ else if (_s is not null)
             f["proxyType"]    = p.Type;
             f["proxyAddress"] = p.Address;
             f["proxyPort"]    = p.Port.ToString();
+            if (p.Username is not null) f["proxyUsername"] = p.Username;
+            if (p.Password is not null) f["proxyPassword"] = p.Password;
+            if (p.Bypass?.Count > 0)   f["proxyBypass"]   = string.Join(",", p.Bypass);
         }
         else
         {

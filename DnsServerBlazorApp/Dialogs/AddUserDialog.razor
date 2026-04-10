@@ -42,6 +42,7 @@
     {
         if (_busy) return;
         if (string.IsNullOrWhiteSpace(_username)) { _error = "Username required."; return; }
+        if (string.IsNullOrWhiteSpace(_password)) { _error = "Password required."; return; }
         if (_password != _confirm) { _error = "Passwords do not match."; return; }
 
         _busy = true;
