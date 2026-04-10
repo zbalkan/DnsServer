@@ -1607,8 +1607,6 @@ namespace DnsServerCore
                 ServeUnknownFileTypes = true
             });
 
-            _webService.UseAntiforgery();
-
             ConfigureWebServiceRoutes();
 
             _webService.MapDnsBlazorApp();
@@ -1675,6 +1673,12 @@ namespace DnsServerCore
             _webService.Use(WebServiceApiMiddleware);
 
             _webService.UseRouting();
+
+            // UseAntiforgery() must come after UseRouting() (and after any
+            // UseAuthentication/UseAuthorization if present).
+            // Blazor's MapRazorComponents adds anti-forgery metadata to the
+            // endpoint, so this middleware must be in the pipeline.
+            _webService.UseAntiforgery();
 
             //user auth
             _webService.MapGetAndPost("/api/user/login", delegate (HttpContext context) { return _authApi.LoginAsync(context, UserSessionType.Standard); });
