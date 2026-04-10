@@ -16,7 +16,7 @@
                       Margin="Margin.Dense" InputType="InputType.Password" Class="mb-2" />
         <MudTextField @bind-Value="_confirm" Label="Confirm Password" Variant="Variant.Outlined"
                       Margin="Margin.Dense" InputType="InputType.Password"
-                      OnKeyUp="@(e => { if(e.Key=="Enter") _ = SaveAsync(); })" />
+                      OnKeyUp="@(async e => { if(e.Key=="Enter") await SaveAsync(); })" />
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>

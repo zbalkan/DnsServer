@@ -137,12 +137,15 @@
         {
             var cts = new CancellationTokenSource();
             _alertCts = cts;
-            _ = Task.Delay(5000, cts.Token).ContinueWith(t =>
-            {
-                if (t.IsCompletedSuccessfully)
-                    InvokeAsync(() => { ClearAlert(); StateHasChanged(); });
-            }, TaskScheduler.Default);
+            _ = AutoDismissAlertAsync(cts.Token);
         }
+    }
+
+    private async Task AutoDismissAlertAsync(CancellationToken ct)
+    {
+        try { await Task.Delay(5000, ct); }
+        catch (OperationCanceledException) { return; }
+        await InvokeAsync(() => { ClearAlert(); StateHasChanged(); });
     }
 
     public void ClearAlert()
@@ -156,8 +159,8 @@
 
     private async Task LogoutAsync()
     {
-        Nav.NavigateTo("/", forceLoad: false);
         await SessionService.ClearSessionAsync();
+        Nav.NavigateTo("/", forceLoad: false);
     }
 
     private Task ShowDialog<TDialog>() where TDialog : ComponentBase

@@ -190,16 +190,22 @@
 
     private async Task SaveAsync()
     {
+        if (_busy) return;
         _busy = true;
-        var form = BuildForm();
-        var url  = IsEdit ? "api/zones/records/update" : "api/zones/records/add";
-        var result = await Api.PostAsync<object>(url, form);
-        _busy = false;
-
-        if (result.IsOk)
-            MudDialog.Close(DialogResult.Ok(true));
-        else
-            _error = result.DisplayError;
+        try
+        {
+            var form = BuildForm();
+            var url  = IsEdit ? "api/zones/records/update" : "api/zones/records/add";
+            var result = await Api.PostAsync<object>(url, form);
+            if (result.IsOk)
+                MudDialog.Close(DialogResult.Ok(true));
+            else
+                _error = result.DisplayError;
+        }
+        finally
+        {
+            _busy = false;
+        }
     }
 
     private Dictionary<string, string> BuildForm()

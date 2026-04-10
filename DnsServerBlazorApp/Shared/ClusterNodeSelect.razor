@@ -24,13 +24,6 @@
     private record NodeItem(string Value, string Label);
     private List<NodeItem> _items = [];
 
-    protected override async Task OnInitializedAsync()
-    {
-        var defaultValue = Build();
-        if (defaultValue is not null)
-            await ValueChanged.InvokeAsync(defaultValue);
-    }
-
     protected override async Task OnParametersSetAsync()
     {
         var defaultValue = Build();
