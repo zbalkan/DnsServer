@@ -7,10 +7,14 @@ The Technitium DNS Server admin console is a **Blazor Web App** with Interactive
 | Project | SDK | Role |
 |---|---|---|
 | `DnsServerBlazorApp` | `Microsoft.NET.Sdk.Web` | Admin console UI (Blazor components, services, models) |
-| `DnsServerCore` | `Microsoft.NET.Sdk` | DNS/DHCP engine + embedded ASP.NET Core host |
-| `DnsServerApp` | `Microsoft.NET.Sdk` | Console entry point; starts `DnsWebService` |
+| `DnsServerCore` | `Microsoft.NET.Sdk` (`StaticWebAssetsEnabled=true`) | DNS/DHCP engine + embedded ASP.NET Core host |
+| `DnsServerApp` | `Microsoft.NET.Sdk.Web` | Console entry point; starts `DnsWebService` |
 
-`DnsServerCore` references `DnsServerBlazorApp` as a project reference, embedding the UI into the server's own process.
+`DnsServerApp` uses `Microsoft.NET.Sdk.Web` so the build generates the
+`DnsServerApp.staticwebassets.endpoints.json` manifest required by
+`MapStaticAssets()`. `DnsServerCore` sets `StaticWebAssetsEnabled=true` to
+propagate static web assets from `DnsServerBlazorApp` through the intermediate
+class library to `DnsServerApp`.
 
 ---
 
@@ -281,4 +285,7 @@ private void UpdateFiltered()
 | Blazor SignalR client | Framework via `MapStaticAssets()` | `_framework/blazor.web.js` |
 | Favicon | Physical `wwwroot/favicon.ico` | `favicon.ico` |
 
-`DnsServerApp.csproj` must have `<StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>` to generate the `staticwebassets.endpoints.json` manifest that `MapStaticAssets()` requires.
+`DnsServerApp` uses `Microsoft.NET.Sdk.Web`, which automatically generates the
+`DnsServerApp.staticwebassets.endpoints.json` manifest required by `MapStaticAssets()`.
+`DnsServerCore` (an intermediate class-library project) sets `<StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>`
+to propagate static web assets from `DnsServerBlazorApp` through the reference chain to `DnsServerApp`.
