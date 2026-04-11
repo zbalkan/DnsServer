@@ -190,9 +190,9 @@ All API calls go through `ApiService`. The server REST API is documented in `API
 
 ```
 GET  /api/<module>/<action>?token=<token>&param=value
-POST /api/<module>/<action>
+POST /api/<module>/<action>?token=<token>
      Content-Type: application/x-www-form-urlencoded
-     body: token=<token>&param1=value1&param2=value2
+     body: param1=value1&param2=value2
      OR: multipart/form-data  (file uploads)
 ```
 

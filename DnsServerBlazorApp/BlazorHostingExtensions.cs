@@ -64,18 +64,9 @@ public static class BlazorHostingExtensions
         // MapStaticAssets() serves _content/* (MudBlazor CSS/JS), _framework/blazor.web.js,
         // and all other static web assets. It requires a build-time manifest generated when
         // DnsServerApp, DnsServerCore, and DnsServerBlazorApp all have StaticWebAssetsEnabled=true.
-        // We catch InvalidOperationException so the app still starts if the manifest is absent
-        // (e.g. first run before a clean rebuild). In that case _content/* and framework files
-        // will be unavailable, but the DNS engine itself keeps running.
-        try
-        {
-            endpoints.MapStaticAssets();
-        }
-        catch (InvalidOperationException)
-        {
-            // Manifest not present — do a clean rebuild to generate
-            // {EntryAssembly}.staticwebassets.endpoints.json.
-        }
+        // If the manifest is absent the exception is intentionally allowed to propagate so the
+        // broken-UI condition is visible immediately rather than silently at runtime.
+        endpoints.MapStaticAssets();
 
         endpoints.MapRazorComponents<App>()
                  .AddInteractiveServerRenderMode();
