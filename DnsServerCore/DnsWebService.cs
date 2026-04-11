@@ -1523,13 +1523,14 @@ namespace DnsServerCore
 
         private async Task StartWebServiceAsync(bool httpOnlyMode)
         {
-            WebApplicationBuilder builder = WebApplication.CreateBuilder();
-
-            builder.Environment.ContentRootFileProvider = new PhysicalFileProvider(_appFolder)
+            // Pass ContentRootPath via WebApplicationOptions so StaticWebAssetsLoader
+            // (invoked during Build()) can locate {ApplicationName}.staticwebassets.runtime.json
+            // in _appFolder.  Setting ContentRootFileProvider alone does NOT update
+            // ContentRootPath, so the loader would otherwise search in the wrong directory.
+            WebApplicationBuilder builder = WebApplication.CreateBuilder(new WebApplicationOptions
             {
-                UseActivePolling = true,
-                UsePollingFileWatcher = true
-            };
+                ContentRootPath = _appFolder
+            });
 
             // Use a physical wwwroot only when the directory exists; otherwise let ASP.NET Core
             // default to NullFileProvider so Kestrel doesn't throw on a missing folder.
