@@ -57,7 +57,7 @@ else if (_stats is not null)
     {
         <MudChart T="double" ChartType="ChartType.Line"
                   ChartSeries="@_lineSeries"
-                  XAxisLabels="@_lineLabels"
+                  xAxisLabels="@_lineLabels"
                   Height="320px"
                   Width="100%"
                   ChartOptions="@_lineOptions" />
@@ -83,7 +83,7 @@ else if (_stats is not null)
                 <MudPaper Elevation="1" Class="pa-2 mb-3">
                     <MudText Typo="Typo.subtitle2" Class="mb-1">Response Types</MudText>
                     <MudChart T="double" ChartType="ChartType.Donut"
-                              InputData="@_pie1Data" InputLabels="@_pie1Labels"
+                              inputData="@_pie1Data" inputLabels="@_pie1Labels"
                               Height="200px" Width="100%" />
                 </MudPaper>
             }
@@ -92,7 +92,7 @@ else if (_stats is not null)
                 <MudPaper Elevation="1" Class="pa-2 mb-3">
                     <MudText Typo="Typo.subtitle2" Class="mb-1">Query Types</MudText>
                     <MudChart T="double" ChartType="ChartType.Donut"
-                              InputData="@_pie2Data" InputLabels="@_pie2Labels"
+                              inputData="@_pie2Data" inputLabels="@_pie2Labels"
                               Height="200px" Width="100%" />
                 </MudPaper>
             }
@@ -101,7 +101,7 @@ else if (_stats is not null)
                 <MudPaper Elevation="1" Class="pa-2">
                     <MudText Typo="Typo.subtitle2" Class="mb-1">Protocols</MudText>
                     <MudChart T="double" ChartType="ChartType.Donut"
-                              InputData="@_pie3Data" InputLabels="@_pie3Labels"
+                              inputData="@_pie3Data" inputLabels="@_pie3Labels"
                               Height="200px" Width="100%" />
                 </MudPaper>
             }

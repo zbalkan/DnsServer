@@ -29,6 +29,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.AspNetCore.Hosting.StaticWebAssets;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.ResponseCompression;
@@ -1532,6 +1533,10 @@ namespace DnsServerCore
                 ContentRootPath = _appFolder
             });
 
+            StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
+
+            builder.Configuration["ASPNETCORE_DETAILEDERRORS"] = "true";
+
             // Use a physical wwwroot only when the directory exists; otherwise let ASP.NET Core
             // default to NullFileProvider so Kestrel doesn't throw on a missing folder.
             // Blazor static assets (JS, CSS) are served via MapStaticAssets() in MapDnsBlazorApp().
@@ -1906,6 +1911,18 @@ namespace DnsServerCore
         private async Task WebServiceApiMiddleware(HttpContext context, RequestDelegate next)
         {
             HttpRequest request = context.Request;
+
+            // Blazor interactive endpoints and static web assets must bypass the API middleware.
+            // If these requests are intercepted, the Blazor circuit never connects and the UI
+            // remains prerendered/non-interactive.
+            PathString path = request.Path;
+            if (path.StartsWithSegments("/_blazor", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWithSegments("/_framework", StringComparison.OrdinalIgnoreCase) ||
+                path.StartsWithSegments("/_content", StringComparison.OrdinalIgnoreCase))
+            {
+                await next(context);
+                return;
+            }
 
             if (_clusterManager.ClusterInitialized)
             {

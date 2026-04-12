@@ -6,11 +6,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>DnsServerBlazorApp</RootNamespace>
     <AssemblyName>DnsServerBlazorApp</AssemblyName>
+    <StaticWebAssetsEnabled>true</StaticWebAssetsEnabled>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="MudBlazor" Version="9.2.0" />
     <PackageReference Include="MudBlazor.Extensions" Version="9.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="wwwroot\js\" />
   </ItemGroup>
 
 </Project>

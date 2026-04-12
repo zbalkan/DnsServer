@@ -1,7 +1,6 @@
 using DnsServerBlazorApp.Services;
-using Microsoft.AspNetCore.Components;
-using Microsoft.AspNetCore.Routing;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.AspNetCore.Components.Server.Circuits;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using MudBlazor;
 using MudBlazor.Extensions;
 using MudBlazor.Services;
@@ -23,16 +22,14 @@ public static class BlazorHostingExtensions
     /// </summary>
     public static IServiceCollection AddDnsBlazorServices(this IServiceCollection services)
     {
+        services.AddHttpContextAccessor();
+
+        services.AddScoped<CircuitHandler, LoggingCircuitHandler>();
+
         services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
-        // HttpClient base address resolved per-request from NavigationManager
-        // so it always matches the actual origin the browser is using.
-        services.AddScoped(sp => new HttpClient
-        {
-            BaseAddress = new Uri(
-                sp.GetRequiredService<NavigationManager>().BaseUri)
-        });
+        services.TryAddScoped<HttpClient>();
 
         services.AddMudServices(config =>
         {
@@ -70,6 +67,34 @@ public static class BlazorHostingExtensions
 
         endpoints.MapRazorComponents<App>()
                  .AddInteractiveServerRenderMode();
+
         return endpoints;
+    }
+
+    private sealed class LoggingCircuitHandler(ILogger<LoggingCircuitHandler> logger) : CircuitHandler
+    {
+        public override Task OnCircuitClosedAsync(Circuit circuit, CancellationToken cancellationToken)
+        {
+            logger.LogInformation("Blazor circuit closed: {CircuitId}", circuit.Id);
+            return Task.CompletedTask;
+        }
+
+        public override Task OnConnectionDownAsync(Circuit circuit, CancellationToken cancellationToken)
+        {
+            logger.LogWarning("Blazor connection down: {CircuitId}", circuit.Id);
+            return Task.CompletedTask;
+        }
+
+        public override Task OnConnectionUpAsync(Circuit circuit, CancellationToken cancellationToken)
+        {
+            logger.LogInformation("Blazor connection up: {CircuitId}", circuit.Id);
+            return Task.CompletedTask;
+        }
+
+        public override Task OnCircuitOpenedAsync(Circuit circuit, CancellationToken cancellationToken)
+        {
+            logger.LogInformation("Blazor circuit opened: {CircuitId}", circuit.Id);
+            return Task.CompletedTask;
+        }
     }
 }
