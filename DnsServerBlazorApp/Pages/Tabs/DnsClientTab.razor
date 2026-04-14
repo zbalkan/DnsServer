@@ -70,7 +70,7 @@
                         <MudTd>@context.Name</MudTd>
                         <MudTd>@context.Type</MudTd>
                         <MudTd>@context.Ttl</MudTd>
-                        <MudTd Style="word-break:break-all;">@context.RData</MudTd>
+                        <MudTd Style="word-break:break-all;">@FormatRData(context.RData)</MudTd>
                     </RowTemplate>
                 </MudTable>
             }
@@ -87,7 +87,7 @@
                         <MudTd>@context.Name</MudTd>
                         <MudTd>@context.Type</MudTd>
                         <MudTd>@context.Ttl</MudTd>
-                        <MudTd Style="word-break:break-all;">@context.RData</MudTd>
+                        <MudTd Style="word-break:break-all;">@FormatRData(context.RData)</MudTd>
                     </RowTemplate>
                 </MudTable>
             }
@@ -104,7 +104,7 @@
                         <MudTd>@context.Name</MudTd>
                         <MudTd>@context.Type</MudTd>
                         <MudTd>@context.Ttl</MudTd>
-                        <MudTd Style="word-break:break-all;">@context.RData</MudTd>
+                        <MudTd Style="word-break:break-all;">@FormatRData(context.RData)</MudTd>
                     </RowTemplate>
                 </MudTable>
             }
@@ -156,5 +156,22 @@
             _result = res.Data.Result;
         else
             Snackbar.Add(res.DisplayError, Severity.Error);
+    }
+
+    // RDATA is a JSON object whose shape varies by record type.
+    // Extract and join the values so they render as plain text, e.g.
+    //   {"IPAddress":"1.2.3.4"}  →  "1.2.3.4"
+    //   {"Exchange":"mx.example.com","Preference":10}  →  "mx.example.com 10"
+    private static string FormatRData(System.Text.Json.JsonElement? rdata)
+    {
+        if (rdata is null) return string.Empty;
+        return rdata.Value.ValueKind switch
+        {
+            System.Text.Json.JsonValueKind.Object =>
+                string.Join(" ", rdata.Value.EnumerateObject().Select(p => p.Value.ToString())),
+            System.Text.Json.JsonValueKind.String =>
+                rdata.Value.GetString() ?? string.Empty,
+            _ => rdata.Value.ToString()
+        };
     }
 }
