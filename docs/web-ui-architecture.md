@@ -42,7 +42,12 @@ Called from `DnsWebService.StartWebServiceAsync()` on the `IServiceCollection`:
 
 ```csharp
 services.AddRazorComponents().AddInteractiveServerComponents();
-services.AddScoped<HttpClient>(...);   // base address from NavigationManager.BaseUri
+// NavigationManager.BaseUri is always available in Blazor Server circuits;
+// IHttpContextAccessor.HttpContext is null during SignalR execution and cannot be used here.
+services.AddScoped(sp => new HttpClient
+{
+    BaseAddress = new Uri(sp.GetRequiredService<NavigationManager>().BaseUri)
+});
 services.AddMudServices(...);          // snackbar, dialog, theming
 services.AddMudExtensions();
 services.AddScoped<SessionService>();

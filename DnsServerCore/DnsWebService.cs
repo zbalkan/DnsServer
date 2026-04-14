@@ -1535,7 +1535,9 @@ namespace DnsServerCore
 
             StaticWebAssetsLoader.UseStaticWebAssets(builder.Environment, builder.Configuration);
 
-            builder.Configuration["ASPNETCORE_DETAILEDERRORS"] = "true";
+            // Detailed error pages expose stack traces — only enable in Development.
+            if (builder.Environment.IsDevelopment())
+                builder.Configuration["ASPNETCORE_DETAILEDERRORS"] = "true";
 
             // Use a physical wwwroot only when the directory exists; otherwise let ASP.NET Core
             // default to NullFileProvider so Kestrel doesn't throw on a missing folder.
@@ -2474,7 +2476,10 @@ namespace DnsServerCore
             try
             {
                 //init dns server
-                _dnsServer = new DnsServer(_configFolder, Path.Combine(_appFolder, "wwwroot"), _log);
+                // dohwww is the web root for the DNS-over-HTTPS informational page served
+                // by DnsServer.StartDoHAsync().  It is distinct from the Blazor app's wwwroot
+                // (served by MapStaticAssets/MapDnsBlazorApp) and must not be conflated with it.
+                _dnsServer = new DnsServer(_configFolder, Path.Combine(_appFolder, "dohwww"), _log);
 
                 //init dhcp server
                 _dhcpServer = new DhcpServer(Path.Combine(_configFolder, "scopes"), _log);

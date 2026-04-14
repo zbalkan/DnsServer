@@ -12,10 +12,9 @@ namespace DnsServerBlazorApp.Services;
 /// </summary>
 public sealed class ApiService
 {
-    private readonly HttpClient           _http;
-    private readonly SessionService       _session;
-    private readonly IHttpContextAccessor _httpContextAccessor;
-    private readonly ILogger<ApiService>  _logger;
+    private readonly HttpClient          _http;
+    private readonly SessionService      _session;
+    private readonly ILogger<ApiService> _logger;
 
     private static readonly JsonSerializerOptions _json = new()
     {
@@ -23,21 +22,14 @@ public sealed class ApiService
         DefaultIgnoreCondition      = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public ApiService(HttpClient http, SessionService session,
-                      IHttpContextAccessor httpContextAccessor,
-                      ILogger<ApiService> logger)
+    // HttpClient is registered with BaseAddress = NavigationManager.BaseUri in
+    // BlazorHostingExtensions so it is always correctly configured in every
+    // rendering phase (pre-render and SignalR circuit alike).
+    public ApiService(HttpClient http, SessionService session, ILogger<ApiService> logger)
     {
-        _http                = http;
-        _session             = session;
-        _httpContextAccessor = httpContextAccessor;
-        _logger              = logger;
-
-        var ctx = _httpContextAccessor.HttpContext;
-        if (ctx is not null)
-        {
-            var origin = $"{ctx.Request.Scheme}://{ctx.Request.Host.Value}";
-            _http.BaseAddress ??= new Uri(origin, UriKind.Absolute);
-        }
+        _http    = http;
+        _session = session;
+        _logger  = logger;
     }
 
     // ── Public API ────────────────────────────────────────────────────

@@ -1,6 +1,6 @@
 using DnsServerBlazorApp.Services;
+using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Server.Circuits;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using MudBlazor;
 using MudBlazor.Extensions;
 using MudBlazor.Services;
@@ -22,14 +22,18 @@ public static class BlazorHostingExtensions
     /// </summary>
     public static IServiceCollection AddDnsBlazorServices(this IServiceCollection services)
     {
-        services.AddHttpContextAccessor();
-
         services.AddScoped<CircuitHandler, LoggingCircuitHandler>();
 
         services.AddRazorComponents()
                 .AddInteractiveServerComponents();
 
-        services.TryAddScoped<HttpClient>();
+        // NavigationManager.BaseUri is always set in Blazor Server circuits (unlike
+        // IHttpContextAccessor.HttpContext, which is null during SignalR execution).
+        // Using it here ensures API calls work reliably in all rendering phases.
+        services.AddScoped(sp => new HttpClient
+        {
+            BaseAddress = new Uri(sp.GetRequiredService<NavigationManager>().BaseUri)
+        });
 
         services.AddMudServices(config =>
         {
