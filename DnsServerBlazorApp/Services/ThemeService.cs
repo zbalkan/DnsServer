@@ -38,7 +38,6 @@ public sealed class ThemeService
         {
             var stored = await _js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
             IsDarkMode = stored == DarkValue;
-            await ApplyBodyClassAsync();
         }
         catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable loading theme (SSR pre-render or storage error)"); }
     }
@@ -48,7 +47,6 @@ public sealed class ThemeService
     {
         IsDarkMode = !IsDarkMode;
         await PersistAsync();
-        await ApplyBodyClassAsync();
         OnChange?.Invoke();
     }
 
@@ -62,17 +60,5 @@ public sealed class ThemeService
             await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, value);
         }
         catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable persisting theme (SSR pre-render or storage error)"); }
-    }
-
-    private async Task ApplyBodyClassAsync()
-    {
-        // app.js is no longer loaded; call classList directly via JSInterop.
-        // document.body.classList.add/remove are valid JSInterop identifiers.
-        try
-        {
-            var fn = IsDarkMode ? "document.body.classList.add" : "document.body.classList.remove";
-            await _js.InvokeVoidAsync(fn, "dark-mode");
-        }
-        catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable applying body class (SSR pre-render or storage error)"); }
     }
 }

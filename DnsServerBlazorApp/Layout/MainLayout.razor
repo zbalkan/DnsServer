@@ -92,8 +92,8 @@
 
 @* ── Footer ───────────────────────────────────────────────────────── *@
 <MudPaper Elevation="2" Square="true"
-          Style="@($"background:{(ThemeService.IsDarkMode ? "#252525" : "#f3f3f3")};padding:10px 0;text-align:center;")">
-    <MudText Typo="Typo.caption" Style="@($"color:{(ThemeService.IsDarkMode ? "#888" : "#777")};font-size:11px;font-weight:600;font-family:Arial,sans-serif;")">
+          Style="background:var(--mud-palette-background-gray);padding:10px 0;text-align:center;">
+    <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);font-size:11px;font-weight:600;font-family:Arial,sans-serif;">
         <MudLink Href="https://technitium.com/" Target="_blank" Color="Color.Primary">Technitium</MudLink>
         &nbsp;|&nbsp;
         <MudLink Href="https://blog.technitium.com/" Target="_blank" Color="Color.Primary">Blog</MudLink>

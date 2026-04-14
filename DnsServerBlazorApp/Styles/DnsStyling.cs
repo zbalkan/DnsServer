@@ -25,6 +25,7 @@ public static class DnsStyling
             AppbarBackground    = Primary,
             AppbarText          = "#ffffff",
             Background          = "#fafafa",
+            BackgroundGray      = FooterBg,   // → --mud-palette-background-gray: #f3f3f3
             Surface             = "#ffffff",
             DrawerBackground    = "#ffffff",
             TextPrimary         = "rgba(0,0,0,.87)",
