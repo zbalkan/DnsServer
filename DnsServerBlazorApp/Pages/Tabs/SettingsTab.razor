@@ -82,7 +82,7 @@ else if (_s is not null)
                               ValueChanged="@((string v) => _s.Forwarders = LinesToList(v))"
                               Label="Forwarders" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="4" Class="mb-2" HelperText="One per line" />
-                <MudCheckBox @bind-Value="_s.EnableConcurrentForwarding" Label="Concurrent Forwarding" Dense="true" />
+                <MudCheckBox @bind-Value="_s.ConcurrentForwarding" Label="Concurrent Forwarding" Dense="true" />
             </MudPaper>
 
             @* Recursion *@
@@ -324,7 +324,7 @@ else if (_s is not null)
         Bool("enableDnsOverQuic",        s.EnableDnsOverQuic);
         Str("forwarderProtocol",         s.ForwarderProtocol);
         Lines("forwarders",              s.Forwarders);
-        Bool("enableConcurrentForwarding", s.EnableConcurrentForwarding);
+        Bool("concurrentForwarding",       s.ConcurrentForwarding);
         Str("recursion",                 s.Recursion);
         Bool("qnameMinimization",        s.QnameMinimization);
         Bool("randomizeName",            s.RandomizeName);

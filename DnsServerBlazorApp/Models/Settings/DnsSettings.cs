@@ -55,7 +55,7 @@ public sealed class DnsSettingsResponse
     public bool EnableUdpSocketPool { get; set; } = true;
 
     [JsonPropertyName("socketPoolExcludedPorts")]
-    public List<string>? SocketPoolExcludedPorts { get; set; }
+    public List<int>? SocketPoolExcludedPorts { get; set; }
 
     [JsonPropertyName("udpPayloadSize")]
     public int UdpPayloadSize { get; set; } = 1232;
@@ -232,8 +232,8 @@ public sealed class DnsSettingsResponse
     [JsonPropertyName("forwarderProtocol")]
     public string ForwarderProtocol { get; set; } = "Udp";
 
-    [JsonPropertyName("enableConcurrentForwarding")]
-    public bool EnableConcurrentForwarding { get; set; }
+    [JsonPropertyName("concurrentForwarding")]
+    public bool ConcurrentForwarding { get; set; }
 
     [JsonPropertyName("forwarderConcurrency")]
     public int ForwarderConcurrency { get; set; } = 2;
@@ -281,7 +281,7 @@ public sealed class DnsSettingsResponse
     public int ServeStaleAnswerTtl { get; set; } = 30;
 
     [JsonPropertyName("serveStaleResetTtl")]
-    public bool ServeStaleResetTtl { get; set; }
+    public int ServeStaleResetTtl { get; set; } = 30;
 
     [JsonPropertyName("serveStaleMaxWaitTime")]
     public int ServeStaleMaxWaitTime { get; set; } = 10000;
