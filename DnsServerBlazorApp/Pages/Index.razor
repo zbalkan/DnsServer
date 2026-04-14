@@ -255,12 +255,20 @@ else
             UpdatePageTitle();
             StartAutoRefresh();
 
-            // Prompt default password change (mirrors original JS)
-            if (!sd.TotpEnabled && string.Equals(_loginUser, "admin", StringComparison.OrdinalIgnoreCase) && _loginPass == "admin")
-                await ShowChangePasswordAsync();
+            // Capture before clearing so the condition survives the field reset.
+            var promptPasswordChange = !sd.TotpEnabled
+                && string.Equals(_loginUser, "admin", StringComparison.OrdinalIgnoreCase)
+                && _loginPass == "admin";
 
             _loginPass = string.Empty;
             _loginTotp = string.Empty;
+
+            // Force the component to re-render now so the login form is replaced
+            // by the tab panel before the dialog opens (or before this method returns).
+            StateHasChanged();
+
+            if (promptPasswordChange)
+                await ShowChangePasswordAsync();
         }
         else if (result.Is2FARequired)
         {
