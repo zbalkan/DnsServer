@@ -344,7 +344,7 @@ public sealed class DnsSettingsResponse
 public sealed class QpmPrefixLimit
 {
     [JsonPropertyName("prefix")]
-    public string Prefix { get; set; } = string.Empty;
+    public int Prefix { get; set; }
 
     [JsonPropertyName("udpLimit")]
     public int UdpLimit { get; set; }
