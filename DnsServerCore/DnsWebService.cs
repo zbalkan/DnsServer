@@ -1680,6 +1680,13 @@ namespace DnsServerCore
 
             _webService.UseRouting();
 
+            // WebSocket upgrade support must be enabled before SignalR/Blazor endpoints
+            // are reached.  Blazor Interactive Server communicates over a SignalR hub
+            // mounted at /_blazor, which requires the WebSocket protocol.  Without this
+            // call the 101 Switching Protocols handshake is never performed and the
+            // Blazor circuit cannot be established.
+            _webService.UseWebSockets();
+
             // UseAntiforgery() must come after UseRouting() (and after any
             // UseAuthentication/UseAuthorization if present).
             // Blazor's MapRazorComponents adds anti-forgery metadata to the
