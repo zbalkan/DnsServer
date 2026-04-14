@@ -190,18 +190,18 @@
                     <HeaderContent>
                         <MudTh>Node</MudTh>
                         <MudTh>Type</MudTh>
-                        <MudTh>Status</MudTh>
-                        <MudTh>Version</MudTh>
+                        <MudTh>State</MudTh>
+                        <MudTh>IP Address</MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd>@context.Name</MudTd>
-                        <MudTd>@(context.Name == _primaryNodeName ? "Primary" : "Secondary")</MudTd>
+                        <MudTd>@context.Type</MudTd>
                         <MudTd>
                             <MudChip T="string" Size="Size.Small"
-                                     Color="@(context.Status=="Online" ? Color.Success : Color.Error)"
-                                     Variant="Variant.Filled">@context.Status</MudChip>
+                                     Color="@(context.State is "Connected" or "Self" ? Color.Success : Color.Error)"
+                                     Variant="Variant.Filled">@context.State</MudChip>
                         </MudTd>
-                        <MudTd>@context.Version</MudTd>
+                        <MudTd>@context.IpAddress</MudTd>
                     </RowTemplate>
                 </MudTable>
             }
@@ -364,11 +364,8 @@
 
         if (result.IsOk && result.Data is { } data)
         {
-            _primaryNodeName = data.PrimaryNode?.Name;
-            var nodes = new List<ClusterNode>();
-            if (data.PrimaryNode is not null) nodes.Add(data.PrimaryNode);
-            if (data.SecondaryNodes is not null) nodes.AddRange(data.SecondaryNodes);
-            _clusterNodes = nodes;
+            _primaryNodeName = data.Nodes?.FirstOrDefault(n => n.Type == "Primary")?.Name;
+            _clusterNodes    = data.Nodes ?? [];
         }
     }
 }

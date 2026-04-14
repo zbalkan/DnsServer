@@ -47,14 +47,13 @@
         <MudPaper Elevation="1" Class="pa-3">
             <div style="display:flex;align-items:center;margin-bottom:8px;gap:8px;">
                 <MudText Typo="Typo.subtitle2" Style="flex:1">
-                    Response — @_result.Status
-                    @if (_result.RCode is not null) { <span> (@_result.RCode)</span> }
+                    @(_result.RCode ?? "Response")
+                    @if (_result.AuthoritativeAnswer) { <span> · AA</span> }
+                    @if (_result.Metadata?.NameServer is { } ns) { <span style="font-weight:normal;"> via @ns</span> }
                 </MudText>
-                @if (_result.TimeTaken.HasValue)
+                @if (_result.Metadata?.RoundTripTime is { } rtt)
                 {
-                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">
-                        @_result.TimeTaken.Value ms
-                    </MudChip>
+                    <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined">@rtt</MudChip>
                 }
             </div>
 

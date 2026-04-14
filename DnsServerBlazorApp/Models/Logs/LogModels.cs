@@ -55,6 +55,15 @@ public sealed class QueryLogEntry
     [JsonPropertyName("rcode")]
     public string Rcode { get; set; } = string.Empty;
 
+    [JsonPropertyName("rowNumber")]
+    public int RowNumber { get; set; }
+
+    [JsonPropertyName("responseRtt")]
+    public double? ResponseRtt { get; set; }
+
+    [JsonPropertyName("qclass")]
+    public string? QClass { get; set; }
+
     [JsonPropertyName("answer")]
     public string? Answer { get; set; }
 }

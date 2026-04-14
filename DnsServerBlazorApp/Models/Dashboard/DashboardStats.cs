@@ -26,13 +26,13 @@ public sealed class DashboardStats
     [JsonPropertyName("totalRefused")]
     public long TotalRefused { get; set; }
 
-    [JsonPropertyName("totalAuthHit")]
+    [JsonPropertyName("totalAuthoritative")]
     public long TotalAuthHit { get; set; }
 
-    [JsonPropertyName("totalRecursions")]
+    [JsonPropertyName("totalRecursive")]
     public long TotalRecursions { get; set; }
 
-    [JsonPropertyName("totalCacheHit")]
+    [JsonPropertyName("totalCached")]
     public long TotalCacheHit { get; set; }
 
     [JsonPropertyName("totalBlocked")]
@@ -122,13 +122,13 @@ public sealed class ChartDataPoint
     [JsonPropertyName("totalRefused")]
     public long TotalRefused { get; set; }
 
-    [JsonPropertyName("totalAuthHit")]
+    [JsonPropertyName("totalAuthoritative")]
     public long TotalAuthHit { get; set; }
 
-    [JsonPropertyName("totalRecursions")]
+    [JsonPropertyName("totalRecursive")]
     public long TotalRecursions { get; set; }
 
-    [JsonPropertyName("totalCacheHit")]
+    [JsonPropertyName("totalCached")]
     public long TotalCacheHit { get; set; }
 
     [JsonPropertyName("totalBlocked")]

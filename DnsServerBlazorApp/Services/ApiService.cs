@@ -1,4 +1,5 @@
 using DnsServerBlazorApp.Models;
+using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace DnsServerBlazorApp.Services;
@@ -11,9 +12,10 @@ namespace DnsServerBlazorApp.Services;
 /// </summary>
 public sealed class ApiService
 {
-    private readonly HttpClient    _http;
-    private readonly SessionService _session;
+    private readonly HttpClient           _http;
+    private readonly SessionService       _session;
     private readonly IHttpContextAccessor _httpContextAccessor;
+    private readonly ILogger<ApiService>  _logger;
 
     private static readonly JsonSerializerOptions _json = new()
     {
@@ -21,11 +23,14 @@ public sealed class ApiService
         DefaultIgnoreCondition      = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
-    public ApiService(HttpClient http, SessionService session, IHttpContextAccessor httpContextAccessor)
+    public ApiService(HttpClient http, SessionService session,
+                      IHttpContextAccessor httpContextAccessor,
+                      ILogger<ApiService> logger)
     {
-        _http    = http;
-        _session = session;
+        _http                = http;
+        _session             = session;
         _httpContextAccessor = httpContextAccessor;
+        _logger              = logger;
 
         var ctx = _httpContextAccessor.HttpContext;
         if (ctx is not null)
@@ -66,6 +71,13 @@ public sealed class ApiService
         return token is { Length: > 0 } ? $"{path}{sep}token={Uri.EscapeDataString(token)}" : path;
     }
 
+    // Strip the token query parameter before logging so credentials never appear in logs.
+    private static string SanitizeUrl(string url)
+    {
+        var idx = url.IndexOf("token=", StringComparison.OrdinalIgnoreCase);
+        return idx < 0 ? url : url[..idx] + "token=***";
+    }
+
     private async Task<ApiResult<T>> SendAsync<T>(
         HttpMethod method, string url, HttpContent? content, CancellationToken ct)
     {
@@ -83,12 +95,27 @@ public sealed class ApiService
 
             return new ApiResult<T>(envelope);
         }
+        catch (JsonException ex)
+        {
+            // Log with full path/position so model mismatches are immediately obvious
+            // during development without needing browser DevTools.
+            _logger.LogError(ex,
+                "JSON deserialization failed for {Method} {Url} — " +
+                "Path: {Path} | Line: {Line} | Pos: {Pos} | " +
+                "Check that the C# model property type and [JsonPropertyName] match the API response. " +
+                "Response type parameter: {ResponseType}",
+                method, SanitizeUrl(url),
+                ex.Path, ex.LineNumber, ex.BytePositionInLine,
+                typeof(T).Name);
+            return ApiResult<T>.NetworkError($"Response parse error at {ex.Path}: {ex.Message}");
+        }
         catch (OperationCanceledException)
         {
             return ApiResult<T>.NetworkError("Request was cancelled.");
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, "API request failed for {Method} {Url}", method, SanitizeUrl(url));
             return ApiResult<T>.NetworkError(ex.Message);
         }
     }

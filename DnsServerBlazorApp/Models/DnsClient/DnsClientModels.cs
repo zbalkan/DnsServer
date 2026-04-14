@@ -13,8 +13,15 @@ public sealed class DnsClientResponse
 public sealed class DnsClientResult
 {
     // APIDOCS response keys are PascalCase; PropertyNameCaseInsensitive handles matching.
+
+    [JsonPropertyName("Metadata")]
+    public DnsResponseMetadata? Metadata { get; init; }
+
     [JsonPropertyName("RCODE")]
     public string? RCode { get; init; }
+
+    [JsonPropertyName("AuthoritativeAnswer")]
+    public bool AuthoritativeAnswer { get; init; }
 
     [JsonPropertyName("Answer")]
     public List<DnsRecord>? Answer { get; init; }
@@ -26,14 +33,34 @@ public sealed class DnsClientResult
     public List<DnsRecord>? Additional { get; init; }
 }
 
+public sealed class DnsResponseMetadata
+{
+    // e.g. "server1:53 (127.0.0.1:53)"
+    [JsonPropertyName("NameServer")]
+    public string? NameServer { get; init; }
+
+    [JsonPropertyName("Protocol")]
+    public string? Protocol { get; init; }
+
+    // e.g. "45 bytes"
+    [JsonPropertyName("DatagramSize")]
+    public string? DatagramSize { get; init; }
+
+    // e.g. "1.42 ms"
+    [JsonPropertyName("RoundTripTime")]
+    public string? RoundTripTime { get; init; }
+}
+
 public sealed class DnsRecord
 {
-    // APIDOCS: "Name", "Type", "TTL" (string like "86400 (1 day)"), "RDATA" (object)
     [JsonPropertyName("Name")]
     public string Name { get; init; } = string.Empty;
 
     [JsonPropertyName("Type")]
     public string Type { get; init; } = string.Empty;
+
+    [JsonPropertyName("Class")]
+    public string? Class { get; init; }
 
     // TTL is returned as a human-readable string, e.g. "86400 (1 day)".
     [JsonPropertyName("TTL")]
