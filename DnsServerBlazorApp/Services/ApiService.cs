@@ -1,5 +1,4 @@
 using DnsServerBlazorApp.Models;
-using Microsoft.Extensions.Logging;
 using System.Text.Json;
 
 namespace DnsServerBlazorApp.Services;
@@ -12,14 +11,14 @@ namespace DnsServerBlazorApp.Services;
 /// </summary>
 public sealed class ApiService
 {
-    private readonly HttpClient          _http;
-    private readonly SessionService      _session;
+    private readonly HttpClient _http;
+    private readonly SessionService _session;
     private readonly ILogger<ApiService> _logger;
 
     private static readonly JsonSerializerOptions _json = new()
     {
         PropertyNameCaseInsensitive = true,
-        DefaultIgnoreCondition      = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
     };
 
     // HttpClient is registered with BaseAddress = NavigationManager.BaseUri in
@@ -27,9 +26,9 @@ public sealed class ApiService
     // rendering phase (pre-render and SignalR circuit alike).
     public ApiService(HttpClient http, SessionService session, ILogger<ApiService> logger)
     {
-        _http    = http;
+        _http = http;
         _session = session;
-        _logger  = logger;
+        _logger = logger;
     }
 
     // ── Public API ────────────────────────────────────────────────────
@@ -59,7 +58,7 @@ public sealed class ApiService
     private string BuildUrl(string path)
     {
         var token = _session.Token;
-        var sep   = path.Contains('?') ? "&" : "?";
+        var sep = path.Contains('?') ? "&" : "?";
         return token is { Length: > 0 } ? $"{path}{sep}token={Uri.EscapeDataString(token)}" : path;
     }
 
@@ -118,13 +117,13 @@ public sealed class ApiService
 /// <summary>Outcome of an API call.</summary>
 public sealed class ApiResult<T>
 {
-    public bool   IsOk           { get; }
-    public bool   IsInvalidToken { get; }
-    public bool   Is2FARequired  { get; }
-    public bool   IsError        { get; }
-    public bool   IsNetworkError { get; }
+    public bool IsOk { get; }
+    public bool IsInvalidToken { get; }
+    public bool Is2FARequired { get; }
+    public bool IsError { get; }
+    public bool IsNetworkError { get; }
 
-    public T?      Data         { get; }
+    public T? Data { get; }
     public string? ErrorMessage { get; }
 
     // Full envelope (token, displayName, info at top level on login)
@@ -132,26 +131,43 @@ public sealed class ApiResult<T>
 
     internal ApiResult(ApiResponse<T> env)
     {
-        Envelope       = env;
-        Data           = env.Response;
-        ErrorMessage   = env.ErrorMessage;
-        IsOk           = env.IsOk;
+        Envelope = env;
+        Data = env.Response;
+        ErrorMessage = env.ErrorMessage;
+        IsOk = env.IsOk;
         IsInvalidToken = env.IsInvalidToken;
-        Is2FARequired  = env.Is2FARequired;
-        IsError        = env.IsError;
+        Is2FARequired = env.Is2FARequired;
+        IsError = env.IsError;
     }
 
     private ApiResult(string networkError)
     {
         IsNetworkError = true;
-        ErrorMessage   = networkError;
+        ErrorMessage = networkError;
     }
 
     internal static ApiResult<T> NetworkError(string msg) => new(msg);
 
-    public string DisplayError =>
-        ErrorMessage ?? (IsInvalidToken ? "Session expired. Please log in again."
-                       : Is2FARequired  ? "Two-factor authentication required."
-                       : IsNetworkError ? "Unable to connect to the server."
-                       : "Unknown error.");
+    public string DisplayError
+    {
+        get
+        {
+            if (IsInvalidToken)
+            {
+                return ErrorMessage ?? "Session expired. Please log in again.";
+            }
+
+            if (Is2FARequired)
+            {
+                return ErrorMessage ?? "Two-factor authentication required.";
+            }
+
+            if (IsNetworkError)
+            {
+                return ErrorMessage ?? "Unable to connect to the server.";
+            }
+
+            return ErrorMessage ?? "Unknown error.";
+        }
+    }
 }
