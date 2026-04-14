@@ -61,10 +61,13 @@ public sealed class ThemeService
 
     private async Task ApplyBodyClassAsync()
     {
+        // app.js is no longer loaded; call classList directly via JSInterop.
+        // document.body.classList.add/remove are valid JSInterop identifiers.
         try
         {
-            await _js.InvokeVoidAsync("dnsApp.setBodyClass", "dark-mode", IsDarkMode);
+            var fn = IsDarkMode ? "document.body.classList.add" : "document.body.classList.remove";
+            await _js.InvokeVoidAsync(fn, "dark-mode");
         }
-        catch { /* best-effort */ }
+        catch { /* best-effort — silently skip during SSR pre-render */ }
     }
 }
