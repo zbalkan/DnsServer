@@ -62,11 +62,17 @@ public sealed class ApiService
         return token is { Length: > 0 } ? $"{path}{sep}token={Uri.EscapeDataString(token)}" : path;
     }
 
-    // Strip the token query parameter before logging so credentials never appear in logs.
+    // Strip the token value before logging so credentials never appear in logs.
+    // Preserves any query parameters that follow the token.
     private static string SanitizeUrl(string url)
     {
         var idx = url.IndexOf("token=", StringComparison.OrdinalIgnoreCase);
-        return idx < 0 ? url : url[..idx] + "token=***";
+        if (idx < 0) return url;
+        var valueStart = idx + "token=".Length;
+        var valueEnd   = url.IndexOf('&', valueStart);
+        return valueEnd < 0
+            ? url[..valueStart] + "***"
+            : url[..valueStart] + "***" + url[valueEnd..];
     }
 
     private async Task<ApiResult<T>> SendAsync<T>(

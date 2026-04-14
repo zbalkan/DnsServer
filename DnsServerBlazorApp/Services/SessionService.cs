@@ -10,9 +10,14 @@ namespace DnsServerBlazorApp.Services;
 /// </summary>
 public sealed class SessionService
 {
-    private readonly IJSRuntime _js;
+    private readonly IJSRuntime            _js;
+    private readonly ILogger<SessionService> _logger;
 
-    public SessionService(IJSRuntime js) => _js = js;
+    public SessionService(IJSRuntime js, ILogger<SessionService> logger)
+    {
+        _js     = js;
+        _logger = logger;
+    }
 
     // ── State ─────────────────────────────────────────────────────────
 
@@ -45,7 +50,11 @@ public sealed class SessionService
         {
             return await _js.InvokeAsync<string?>("localStorage.getItem", "token");
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "JS interop unavailable loading token (SSR pre-render or storage error)");
+            return null;
+        }
     }
 
     /// <summary>Store a new session after successful login / session-get.</summary>
@@ -93,13 +102,13 @@ public sealed class SessionService
     private async Task PersistTokenAsync(string token)
     {
         try { await _js.InvokeVoidAsync("localStorage.setItem", "token", token); }
-        catch { /* best-effort */ }
+        catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable persisting token (SSR pre-render or storage error)"); }
     }
 
     private async Task RemoveTokenAsync()
     {
         try { await _js.InvokeVoidAsync("localStorage.removeItem", "token"); }
-        catch { /* best-effort */ }
+        catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable removing token (SSR pre-render or storage error)"); }
     }
 
     private void Notify() => OnChange?.Invoke();

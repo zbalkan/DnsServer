@@ -1612,8 +1612,7 @@ namespace DnsServerCore
                 {
                     ctx.Context.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
                     ctx.Context.Response.Headers.CacheControl = "no-cache";
-                },
-                ServeUnknownFileTypes = true
+                }
             });
 
             ConfigureWebServiceRoutes();
@@ -2076,6 +2075,8 @@ namespace DnsServerCore
                 response.Headers.CacheControl = "no-cache, no-store, must-revalidate";
                 response.Headers.Pragma = "no-cache";
                 response.Headers.Expires = "0";
+                response.Headers["X-Content-Type-Options"] = "nosniff";
+                response.Headers["X-Frame-Options"] = "SAMEORIGIN";
 
                 object apiFallback = context.Items["apiFallback"]; //check api fallback mark
                 if (apiFallback is null)

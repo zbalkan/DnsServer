@@ -223,11 +223,15 @@ else if (_stats is not null)
 
     private async Task OnNodeChangedAsync(string v) { _node = v; await RefreshAsync(); }
 
+    private bool _refreshing;
+
     /// <summary>Called by the parent auto-refresh timer without showing spinner.</summary>
     public async Task SilentRefreshAsync()
     {
-        if (_range == "lastHour")
-            await LoadDataAsync(showLoader: false);
+        if (_refreshing || _range != "lastHour") return;
+        _refreshing = true;
+        try   { await LoadDataAsync(showLoader: false); }
+        finally { _refreshing = false; }
     }
 
     // ── Data loading ──────────────────────────────────────────────────

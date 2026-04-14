@@ -8,4 +8,3 @@ public sealed class CacheListResponse
     [JsonPropertyName("zones")]
     public List<string>? Zones { get; init; }
 }
-
