@@ -98,7 +98,8 @@
                     <MudSelectItem Value="@a.Name">@a.Name</MudSelectItem>
                 }
             </MudSelect>
-            <MudSelect T="string" @bind-Value="_queryClassPath" Label="Class Path" Variant="Variant.Outlined"
+            <MudSelect T="string" Value="@_queryClassPath" ValueChanged="OnQueryClassPathChanged"
+                       Label="Class Path" Variant="Variant.Outlined"
                        Margin="Margin.Dense" Style="max-width:260px;"
                        Disabled="@(string.IsNullOrEmpty(_queryAppName))">
                 @foreach (var c in _queryLogClasses)
@@ -239,6 +240,8 @@
                 .Where(a => a.DnsApps.Any(c => c.IsQueryLogs))
                 .ToList();
         }
+        else
+            Snackbar.Add(result.DisplayError, Severity.Error);
     }
 
     private void OnQueryAppChanged(string appName)
@@ -253,6 +256,8 @@
         if (_queryLogClasses.Count == 1)
             _queryClassPath = _queryLogClasses[0].ClassPath;
     }
+
+    private void OnQueryClassPathChanged(string classPath) => _queryClassPath = classPath;
 
     private async Task QueryLogsAsync()
     {

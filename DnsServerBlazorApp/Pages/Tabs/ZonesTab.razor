@@ -138,6 +138,8 @@ else
                          z.Name.Contains(_search, StringComparison.OrdinalIgnoreCase)) &&
                         (string.IsNullOrEmpty(_typeFilter) || z.Type == _typeFilter))
             .ToList();
+
+        _page = Math.Clamp(_page, 1, PageCount);
     }
 
     private void OnTypeFilterChanged(string value) { _typeFilter = value; UpdateFiltered(); }
