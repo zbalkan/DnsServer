@@ -228,6 +228,19 @@ body {
     gap: 8px;
 }
 
+.dns-dashboard-grid {
+    align-items: stretch;
+}
+
+.dns-dashboard-panel {
+    height: 100%;
+    min-height: 280px;
+}
+
+.dns-dashboard-main-chart {
+    min-height: 420px;
+}
+
 .dns-form-section {
     border: 1px solid var(--mud-palette-divider);
     border-radius: 4px;

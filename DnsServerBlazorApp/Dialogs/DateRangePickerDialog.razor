@@ -1,0 +1,101 @@
+<MudDialog>
+    <DialogContent>
+        <MudText Typo="Typo.h6" Class="mb-4">Select Date Range</MudText>
+        <MudStack Spacing="3">
+            <MudText Typo="Typo.subtitle2">Start</MudText>
+            <MudGrid Spacing="1">
+                <MudItem xs="8">
+                    <MudDatePicker @bind-Date="_startDate" Label="Date"
+                                   MaxDate="DateTime.Today"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="4">
+                    <MudTimePicker @bind-Time="_startTime" Label="Time"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+
+            <MudText Typo="Typo.subtitle2" Class="mt-3">End</MudText>
+            <MudGrid Spacing="1">
+                <MudItem xs="8">
+                    <MudDatePicker @bind-Date="_endDate" Label="Date"
+                                   MinDate="_startDate"
+                                   MaxDate="DateTime.Today"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+                <MudItem xs="4">
+                    <MudTimePicker @bind-Time="_endTime" Label="Time"
+                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
+                </MudItem>
+            </MudGrid>
+
+            @if (_error is not null)
+            {
+                <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
+            }
+        </MudStack>
+    </DialogContent>
+    <DialogActions>
+        <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
+        <MudButton OnClick="ApplyAsync" Color="Color.Primary" Variant="Variant.Filled">Apply</MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter] IMudDialogInstance MudDialog { get; set; } = null!;
+    [Parameter] public DateTime? InitialStart { get; set; }
+    [Parameter] public DateTime? InitialEnd { get; set; }
+
+    private DateTime? _startDate;
+    private DateTime? _endDate;
+    private TimeSpan? _startTime;
+    private TimeSpan? _endTime;
+    private string? _error;
+
+    protected override Task OnInitializedAsync()
+    {
+        if (InitialStart.HasValue)
+        {
+            _startDate = InitialStart.Value.Date;
+            _startTime = InitialStart.Value.TimeOfDay;
+        }
+
+        if (InitialEnd.HasValue)
+        {
+            _endDate = InitialEnd.Value.Date;
+            _endTime = InitialEnd.Value.TimeOfDay;
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task ApplyAsync()
+    {
+        _error = null;
+
+        // Validate dates are provided
+        if (!_startDate.HasValue || !_endDate.HasValue)
+        {
+            _error = "Both start and end dates are required.";
+            return Task.CompletedTask;
+        }
+
+        // Get times (default to 00:00 if not set)
+        var startTime = _startTime ?? TimeSpan.Zero;
+        var endTime = _endTime ?? TimeSpan.Zero;
+
+        // Combine date and time
+        var startDateTime = _startDate.Value.Add(startTime);
+        var endDateTime = _endDate.Value.Add(endTime);
+
+        // Validate that start is before end
+        if (startDateTime >= endDateTime)
+        {
+            _error = "Start date/time must be before end date/time.";
+            return Task.CompletedTask;
+        }
+
+        MudDialog.Close(DialogResult.Ok(new { Start = startDateTime, End = endDateTime }));
+        return Task.CompletedTask;
+    }
+}

@@ -6,11 +6,12 @@ namespace DnsServerBlazorApp.Infrastructure.Storage;
 public sealed class ProtectedLocalStorageStore(ProtectedLocalStorage storage)
     : IClientStateStore
 {
-    public async ValueTask SetAsync<T>(string key, T value)
+    public async ValueTask SetAsync<T>(string key, T? value)
     {
         try
         {
-            await storage.SetAsync(key, value);
+            if (value is not null)
+                await storage.SetAsync(key, value);
         }
         catch (InvalidOperationException)
         {

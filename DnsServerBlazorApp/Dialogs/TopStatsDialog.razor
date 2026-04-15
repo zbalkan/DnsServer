@@ -53,7 +53,7 @@
         {
             _items = StatsType switch
             {
-                "TopClients"        => result.Data.TopClients ?? [],
+                "TopClients"        => [.. (result.Data.TopClients ?? []).Cast<TopStatsEntry>()],
                 "TopDomains"        => result.Data.TopDomains ?? [],
                 "TopBlockedDomains" => result.Data.TopBlockedDomains ?? [],
                 _                   => []

@@ -2,259 +2,374 @@
 @inject SessionService  SessionService
 @inject IDialogService  DialogService
 @inject ISnackbar       Snackbar
+@implements IDisposable
 
-@* ── Time-range selector ── *@
-<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+<MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Spacing="1" Class="mb-2">
     <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary">
         @foreach (var r in _ranges)
         {
-            <MudButton Variant="@(_range == r.Key ? Variant.Filled : Variant.Outlined)"
-                       OnClick="@(() => SetRangeAsync(r.Key))">@r.Label</MudButton>
+            @if (r.Key == "custom")
+            {
+                <MudButton Variant="@(_range == r.Key ? Variant.Filled : Variant.Outlined)"
+                           OnClick="OpenCustomRangeDialogAsync">@r.Label</MudButton>
+            }
+            else
+            {
+                <MudButton Variant="@(_range == r.Key ? Variant.Filled : Variant.Outlined)"
+                           OnClick="@(() => SetRangeAsync(r.Key))">@r.Label</MudButton>
+            }
         }
     </MudButtonGroup>
 
-    @if (_range == "custom")
-    {
-        <MudStack Row="true" AlignItems="AlignItems.Center" Spacing="1">
-            <MudDatePicker @bind-Date="_customStart" Label="Start"
-                           Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <MudDatePicker @bind-Date="_customEnd" Label="End"
-                           Variant="Variant.Outlined" Margin="Margin.Dense" />
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       Size="Size.Small" OnClick="RefreshAsync">Show</MudButton>
-        </MudStack>
-    }
-
     <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
-</div>
+</MudStack>
 
-@* ── Loading ── *@
-@if (_loading)
+@if (_loadError is not null)
 {
-    <div style="display:flex;justify-content:center;align-items:center;height:400px;">
-        <MudProgressCircular Indeterminate="true" Size="Size.Large" Color="Color.Primary" />
-    </div>
+    <MudAlert Severity="Severity.Error" Dense="true" Class="mb-2">@_loadError</MudAlert>
 }
-else if (_stats is not null)
+
+@if (_loading && _response is null)
 {
-    @* ── Stats strip ── *@
+    <MudGrid Spacing="2">
+        @for (var i = 0; i < 11; i++)
+        {
+            <MudItem xs="6" sm="4" md="3" lg="2" xl="1">
+                <MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="62px" />
+            </MudItem>
+        }
+
+        <MudItem xs="12" xl="8"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="420px" /></MudItem>
+        <MudItem xs="12" xl="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="420px" /></MudItem>
+        <MudItem xs="12" md="6" xl="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="290px" /></MudItem>
+        <MudItem xs="12" md="6" xl="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="290px" /></MudItem>
+        <MudItem xs="12" md="6" xl="4"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="290px" /></MudItem>
+        <MudItem xs="12" xl="6"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="330px" /></MudItem>
+        <MudItem xs="12" xl="6"><MudSkeleton SkeletonType="SkeletonType.Rectangle" Height="330px" /></MudItem>
+    </MudGrid>
+}
+else if (_response?.Stats is not null)
+{
+    var stats = _response.Stats;
+
     <div class="dns-stats-strip">
-        <StatsCard StatKey="TotalQueries"  Title="Total Queries"  Value="@_stats.TotalQueries"  ShowPercent="false" />
-        <StatsCard StatKey="TotalNoError"  Title="No Error"       Value="@_stats.TotalNoError"  ShowPercent="true" Percent="@_stats.NoErrorPct" />
-        <StatsCard StatKey="ServerFailure" Title="Server Failure" Value="@_stats.TotalServerFailure" ShowPercent="true" Percent="@_stats.ServerFailurePct" />
-        <StatsCard StatKey="NxDomain"      Title="NX Domain"      Value="@_stats.TotalNxDomain" ShowPercent="true" Percent="@_stats.NxDomainPct" />
-        <StatsCard StatKey="Refused"       Title="Refused"        Value="@_stats.TotalRefused"  ShowPercent="true" Percent="@_stats.RefusedPct" />
-        <StatsCard StatKey="AuthHit"        Title="Authoritative"  Value="@_stats.TotalAuthHit"  ShowPercent="true" Percent="@_stats.AuthHitPct" />
-        <StatsCard StatKey="Recursions"    Title="Recursive"      Value="@_stats.TotalRecursions" ShowPercent="true" Percent="@_stats.RecursionsPct" />
-        <StatsCard StatKey="CacheHit"      Title="Cached"         Value="@_stats.TotalCacheHit" ShowPercent="true" Percent="@_stats.CacheHitPct" />
-        <StatsCard StatKey="Blocked"       Title="Blocked"        Value="@_stats.TotalBlocked"  ShowPercent="true" Percent="@_stats.BlockedPct" />
-        <StatsCard StatKey="Dropped"       Title="Dropped"        Value="@_stats.TotalDropped"  ShowPercent="true" Percent="@_stats.DroppedPct" />
-        <StatsCard StatKey="Clients"       Title="Clients"        Value="@_stats.TotalClients"  ShowPercent="false" />
+        <StatsCard StatKey="TotalQueries" Title="Total Queries" Value="@stats.TotalQueries" ShowPercent="false" />
+        <StatsCard StatKey="TotalNoError" Title="No Error" Value="@stats.TotalNoError" ShowPercent="true" Percent="@stats.NoErrorPct" />
+        <StatsCard StatKey="ServerFailure" Title="Server Failure" Value="@stats.TotalServerFailure" ShowPercent="true" Percent="@stats.ServerFailurePct" />
+        <StatsCard StatKey="NxDomain" Title="NX Domain" Value="@stats.TotalNxDomain" ShowPercent="true" Percent="@stats.NxDomainPct" />
+        <StatsCard StatKey="Refused" Title="Refused" Value="@stats.TotalRefused" ShowPercent="true" Percent="@stats.RefusedPct" />
+        <StatsCard StatKey="AuthHit" Title="Authoritative" Value="@stats.TotalAuthHit" ShowPercent="true" Percent="@stats.AuthHitPct" />
+        <StatsCard StatKey="Recursions" Title="Recursive" Value="@stats.TotalRecursions" ShowPercent="true" Percent="@stats.RecursionsPct" />
+        <StatsCard StatKey="CacheHit" Title="Cached" Value="@stats.TotalCacheHit" ShowPercent="true" Percent="@stats.CacheHitPct" />
+        <StatsCard StatKey="Blocked" Title="Blocked" Value="@stats.TotalBlocked" ShowPercent="true" Percent="@stats.BlockedPct" />
+        <StatsCard StatKey="Dropped" Title="Dropped" Value="@stats.TotalDropped" ShowPercent="true" Percent="@stats.DroppedPct" />
+        <StatsCard StatKey="Clients" Title="Clients" Value="@stats.TotalClients" ShowPercent="false" />
     </div>
 
-    @* ── Main line chart ── *@
-    @if (_lineLabels.Length > 0)
-    {
-        <MudChart T="double" ChartType="ChartType.Line"
-                  ChartSeries="@_lineSeries"
-                  xAxisLabels="@_lineLabels"
-                  Height="320px"
-                  Width="100%"
-                  ChartOptions="@_lineOptions" />
-    }
-
-    @* ── Bottom section: pie charts + zone stats + top tables ── *@
-    <div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;">
-
-        @* Left column: 3 pie charts + zone-stats row *@
-        <div style="flex:1;min-width:280px;">
-            @* Zone stats strip *@
+    <MudGrid Spacing="2" Class="dns-dashboard-grid">
+        <MudItem xs="12">
             <div class="dns-zone-stats-strip">
-                <ZoneStatsCard Title="Zones"      Value="@_stats.Zones" />
-                <ZoneStatsCard Title="Cache"       Value="@_stats.CachedEntries" />
-                <ZoneStatsCard Title="Allowed"     Value="@_stats.AllowedZones" />
-                <ZoneStatsCard Title="Blocked"     Value="@_stats.BlockedZones" />
-                <ZoneStatsCard Title="Allow List"  Value="@_stats.AllowListZones" />
-                <ZoneStatsCard Title="Block List"  Value="@_stats.BlockListZones" />
+                <ZoneStatsCard Title="Zones" Value="@stats.Zones" />
+                <ZoneStatsCard Title="Cache" Value="@stats.CachedEntries" />
+                <ZoneStatsCard Title="Allowed" Value="@stats.AllowedZones" />
+                <ZoneStatsCard Title="Blocked" Value="@stats.BlockedZones" />
+                <ZoneStatsCard Title="Allow List" Value="@stats.AllowListZones" />
+                <ZoneStatsCard Title="Block List" Value="@stats.BlockListZones" />
             </div>
+        </MudItem>
 
-            @if (_pie1Labels.Length > 0)
-            {
-                <MudPaper Elevation="1" Class="pa-2 mb-3">
-                    <MudText Typo="Typo.subtitle2" Class="mb-1">Response Types</MudText>
-                    <MudChart T="double" ChartType="ChartType.Donut"
-                              inputData="@_pie1Data" inputLabels="@_pie1Labels"
-                              Height="200px" Width="100%" />
-                </MudPaper>
-            }
-            @if (_pie2Labels.Length > 0)
-            {
-                <MudPaper Elevation="1" Class="pa-2 mb-3">
-                    <MudText Typo="Typo.subtitle2" Class="mb-1">Query Types</MudText>
-                    <MudChart T="double" ChartType="ChartType.Donut"
-                              inputData="@_pie2Data" inputLabels="@_pie2Labels"
-                              Height="200px" Width="100%" />
-                </MudPaper>
-            }
-            @if (_pie3Labels.Length > 0)
-            {
-                <MudPaper Elevation="1" Class="pa-2">
-                    <MudText Typo="Typo.subtitle2" Class="mb-1">Protocols</MudText>
-                    <MudChart T="double" ChartType="ChartType.Donut"
-                              inputData="@_pie3Data" inputLabels="@_pie3Labels"
-                              Height="200px" Width="100%" />
-                </MudPaper>
-            }
-        </div>
+        <MudItem xs="12" xl="8">
+            <MudPaper Elevation="1" Class="pa-2 dns-dashboard-panel dns-dashboard-main-chart">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Query Trends</MudText>
+                @if (_lineLabels.Length > 0 && _lineSeries.Count > 0)
+                {
+                    <MudChart T="double" ChartType="ChartType.Line"
+                              ChartSeries="@_lineSeries"
+                              xAxisLabels="@_lineLabels"
+                              Height="380px"
+                              Width="100%"
+                              ChartOptions="@_lineOptions" />
+                }
+                else
+                {
+                    <MudText Class="pa-6" Align="Align.Center" Typo="Typo.body2">No data for selected range.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
 
-        @* Right column: top clients *@
-        <div style="flex:1;min-width:260px;">
-            <MudPaper Elevation="1" Class="mb-3">
+        <MudItem xs="12" xl="4">
+            <MudPaper Elevation="1" Class="dns-dashboard-panel">
                 <div class="dns-panel-header-row pa-2">
                     <MudText Typo="Typo.subtitle2">Top Clients</MudText>
                     <MudButton Size="Size.Small" Variant="Variant.Outlined"
                                OnClick="@(() => ShowTopStatsAsync("TopClients"))">More</MudButton>
                 </div>
-                <MudTable Items="@_stats.TopClients" Dense="true" Hover="true"
-                          Elevation="0" FixedHeader="true" Height="220px">
+                <MudTable Items="@(_response?.TopClients ?? [])" Dense="true" Hover="true" Elevation="0" FixedHeader="true" Height="380px">
                     <HeaderContent>
-                        <MudTh>Client</MudTh><MudTh>Queries</MudTh><MudTh></MudTh>
+                        <MudTh>Client</MudTh>
+                        <MudTh style="text-align:right;">Queries</MudTh>
+                        <MudTh></MudTh>
                     </HeaderContent>
                     <RowTemplate>
                         <MudTd DataLabel="Client">@context.Name</MudTd>
-                        <MudTd DataLabel="Queries">@context.Hits.ToString("N0")</MudTd>
+                        <MudTd DataLabel="Queries" style="text-align:right;">@context.Hits.ToString("N0")</MudTd>
                         <MudTd>
                             <MudIconButton Icon="@Icons.Material.Filled.Search" Size="Size.Small"
                                            OnClick="@(() => QueryClient(context.Name))"
                                            title="Query this client" />
                         </MudTd>
                     </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Class="pa-4" Typo="Typo.body2">No data for selected range.</MudText>
+                    </NoRecordsContent>
                 </MudTable>
             </MudPaper>
-        </div>
-    </div>
+        </MudItem>
 
-    @* ── Top domains / top blocked ── *@
-    <div style="display:flex;gap:16px;margin-top:16px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:260px;">
-            <MudPaper Elevation="1">
+        <MudItem xs="12" md="6" xl="4">
+            <MudPaper Elevation="1" Class="pa-2 dns-dashboard-panel">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Response Types</MudText>
+                @if (_pie1Labels.Length > 0)
+                {
+                    <MudChart T="double" ChartType="ChartType.Donut"
+                              inputData="@_pie1Data" inputLabels="@_pie1Labels"
+                              Height="250px" Width="100%" />
+                }
+                else
+                {
+                    <MudText Class="pa-6" Align="Align.Center" Typo="Typo.body2">No data for selected range.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6" xl="4">
+            <MudPaper Elevation="1" Class="pa-2 dns-dashboard-panel">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Query Types</MudText>
+                @if (_pie2Labels.Length > 0)
+                {
+                    <MudChart T="double" ChartType="ChartType.Donut"
+                              inputData="@_pie2Data" inputLabels="@_pie2Labels"
+                              Height="250px" Width="100%" />
+                }
+                else
+                {
+                    <MudText Class="pa-6" Align="Align.Center" Typo="Typo.body2">No data for selected range.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" md="6" xl="4">
+            <MudPaper Elevation="1" Class="pa-2 dns-dashboard-panel">
+                <MudText Typo="Typo.subtitle2" Class="mb-1">Protocols</MudText>
+                @if (_pie3Labels.Length > 0)
+                {
+                    <MudChart T="double" ChartType="ChartType.Donut"
+                              inputData="@_pie3Data" inputLabels="@_pie3Labels"
+                              Height="250px" Width="100%" />
+                }
+                else
+                {
+                    <MudText Class="pa-6" Align="Align.Center" Typo="Typo.body2">No data for selected range.</MudText>
+                }
+            </MudPaper>
+        </MudItem>
+
+        <MudItem xs="12" xl="6">
+            <MudPaper Elevation="1" Class="dns-dashboard-panel">
                 <div class="dns-panel-header-row pa-2">
                     <MudText Typo="Typo.subtitle2">Top Domains</MudText>
                     <MudButton Size="Size.Small" Variant="Variant.Outlined"
                                OnClick="@(() => ShowTopStatsAsync("TopDomains"))">More</MudButton>
                 </div>
-                <MudTable Items="@_stats.TopDomains" Dense="true" Hover="true"
-                          Elevation="0" FixedHeader="true" Height="220px">
+                <MudTable Items="@(_response?.TopDomains ?? [])" Dense="true" Hover="true" Elevation="0" FixedHeader="true" Height="300px">
                     <HeaderContent>
-                        <MudTh>Domain</MudTh><MudTh>Hits</MudTh><MudTh></MudTh>
+                        <MudTh>Domain</MudTh>
+                        <MudTh style="text-align:right;">Hits</MudTh>
+                        <MudTh></MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd DataLabel="Domain">@context.Name</MudTd>
-                        <MudTd DataLabel="Hits">@context.Hits.ToString("N0")</MudTd>
+                        <MudTd DataLabel="Domain">@DisplayName(context)</MudTd>
+                        <MudTd DataLabel="Hits" style="text-align:right;">@context.Hits.ToString("N0")</MudTd>
                         <MudTd>
                             <MudIconButton Icon="@Icons.Material.Filled.Search" Size="Size.Small"
                                            OnClick="@(() => QueryDomain(context.Name))"
                                            title="Query this domain" />
                         </MudTd>
                     </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Class="pa-4" Typo="Typo.body2">No data for selected range.</MudText>
+                    </NoRecordsContent>
                 </MudTable>
             </MudPaper>
-        </div>
+        </MudItem>
 
-        <div style="flex:1;min-width:260px;">
-            <MudPaper Elevation="1">
+        <MudItem xs="12" xl="6">
+            <MudPaper Elevation="1" Class="dns-dashboard-panel">
                 <div class="dns-panel-header-row pa-2">
                     <MudText Typo="Typo.subtitle2">Top Blocked Domains</MudText>
                     <MudButton Size="Size.Small" Variant="Variant.Outlined"
                                OnClick="@(() => ShowTopStatsAsync("TopBlockedDomains"))">More</MudButton>
                 </div>
-                <MudTable Items="@_stats.TopBlockedDomains" Dense="true" Hover="true"
-                          Elevation="0" FixedHeader="true" Height="220px">
+                <MudTable Items="@(_response?.TopBlockedDomains ?? [])" Dense="true" Hover="true" Elevation="0" FixedHeader="true" Height="300px">
                     <HeaderContent>
-                        <MudTh>Domain</MudTh><MudTh>Hits</MudTh><MudTh></MudTh>
+                        <MudTh>Domain</MudTh>
+                        <MudTh style="text-align:right;">Hits</MudTh>
+                        <MudTh></MudTh>
                     </HeaderContent>
                     <RowTemplate>
-                        <MudTd DataLabel="Domain">@context.Name</MudTd>
-                        <MudTd DataLabel="Hits">@context.Hits.ToString("N0")</MudTd>
+                        <MudTd DataLabel="Domain">@DisplayName(context)</MudTd>
+                        <MudTd DataLabel="Hits" style="text-align:right;">@context.Hits.ToString("N0")</MudTd>
                         <MudTd>
                             <MudIconButton Icon="@Icons.Material.Filled.Search" Size="Size.Small"
                                            OnClick="@(() => QueryDomain(context.Name))"
                                            title="Query this domain" />
                         </MudTd>
                     </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Class="pa-4" Typo="Typo.body2">No data for selected range.</MudText>
+                    </NoRecordsContent>
                 </MudTable>
             </MudPaper>
-        </div>
-    </div>
+        </MudItem>
+    </MudGrid>
 }
 
 @code {
-    // ── Types / constants ─────────────────────────────────────────────
     private record RangeItem(string Key, string Label);
+
     private static readonly RangeItem[] _ranges =
     [
-        new("lastHour",  "Last Hour"),
-        new("lastDay",   "Last Day"),
-        new("lastWeek",  "Last Week"),
+        new("lastHour", "Last Hour"),
+        new("lastDay", "Last Day"),
+        new("lastWeek", "Last Week"),
         new("lastMonth", "Last Month"),
-        new("lastYear",  "Last Year"),
-        new("custom",    "Custom"),
+        new("lastYear", "Last Year"),
+        new("custom", "Custom"),
     ];
 
-    // ── State ─────────────────────────────────────────────────────────
-    private string              _range  = "lastHour";
-    private string              _node   = "cluster";
-    private DateTime?           _customStart;
-    private DateTime?           _customEnd;
-    private bool                _loading;
-    private DashboardStats?     _stats;
+    private string _range = "lastHour";
+    private string _node = "cluster";
+    private DateTime? _customStart;
+    private DateTime? _customEnd;
 
-    // Chart data
-    private List<ChartSeries<double>>  _lineSeries  = new();
-    private string[]               _lineLabels  = [];
-    private ChartOptions   _lineOptions = new();
-
-    private double[] _pie1Data = []; private string[] _pie1Labels = [];
-    private double[] _pie2Data = []; private string[] _pie2Labels = [];
-    private double[] _pie3Data = []; private string[] _pie3Labels = [];
-
-    // ── Lifecycle ─────────────────────────────────────────────────────
-    protected override async Task OnInitializedAsync() => await RefreshAsync();
-
-    private async Task OnNodeChangedAsync(string v) { _node = v; await RefreshAsync(); }
-
+    private bool _loading = true;
     private bool _refreshing;
+    private string? _loadError;
 
-    /// <summary>Called by the parent auto-refresh timer without showing spinner.</summary>
-    public async Task SilentRefreshAsync()
+    private DashboardStatsResponse? _response;
+    private CancellationTokenSource? _loadCts;
+
+    private List<ChartSeries<double>> _lineSeries = [];
+    private string[] _lineLabels = [];
+    private ChartOptions _lineOptions = new();
+
+    private double[] _pie1Data = [];
+    private string[] _pie1Labels = [];
+    private double[] _pie2Data = [];
+    private string[] _pie2Labels = [];
+    private double[] _pie3Data = [];
+    private string[] _pie3Labels = [];
+
+    protected override async Task OnInitializedAsync()
+        => await RefreshAsync();
+
+    private async Task OnNodeChangedAsync(string value)
     {
-        if (_refreshing || _range != "lastHour") return;
-        _refreshing = true;
-        try   { await LoadDataAsync(showLoader: false); }
-        finally { _refreshing = false; }
+        _node = value;
+        await RefreshAsync();
     }
 
-    // ── Data loading ──────────────────────────────────────────────────
-    private Task SetRangeAsync(string r) { _range = r; return RefreshAsync(); }
+    public async Task SilentRefreshAsync()
+    {
+        if (_refreshing || _range != "lastHour")
+            return;
 
-    private async Task RefreshAsync() => await LoadDataAsync(showLoader: true);
+        _refreshing = true;
+        try
+        {
+            await LoadDataAsync(showLoader: false);
+        }
+        finally
+        {
+            _refreshing = false;
+        }
+    }
+
+    private Task SetRangeAsync(string range)
+    {
+        _range = range;
+        return RefreshAsync();
+    }
+
+    private async Task OpenCustomRangeDialogAsync()
+    {
+        var parameters = new DialogParameters
+        {
+            ["InitialStart"] = _customStart,
+            ["InitialEnd"] = _customEnd,
+        };
+
+        var dialogRef = await DialogService.ShowAsync<Dialogs.DateRangePickerDialog>(
+            "Select Date Range",
+            parameters,
+            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+
+        var result = await dialogRef.Result;
+        if (result.Canceled)
+            return;
+
+        if (result.Data is IDictionary<string, object> data
+            && data.TryGetValue("Start", out var start)
+            && data.TryGetValue("End", out var end)
+            && start is DateTime startDate
+            && end is DateTime endDate)
+        {
+            _customStart = startDate;
+            _customEnd = endDate;
+            _range = "custom";
+            await RefreshAsync();
+        }
+    }
+
+    private Task RefreshAsync() => LoadDataAsync(showLoader: true);
 
     private async Task LoadDataAsync(bool showLoader)
     {
-        if (showLoader) { _loading = true; StateHasChanged(); }
+        var cts = new CancellationTokenSource();
+        var previous = Interlocked.Exchange(ref _loadCts, cts);
+        previous?.Cancel();
+        previous?.Dispose();
 
-        var custom = string.Empty;
-        if (_range == "custom" && _customStart.HasValue && _customEnd.HasValue)
-            custom = $"&start={Uri.EscapeDataString(_customStart.Value.ToUniversalTime().ToString("o"))}" +
-                     $"&end={Uri.EscapeDataString(_customEnd.Value.ToUniversalTime().ToString("o"))}";
+        if (showLoader)
+            _loading = true;
 
-        var url = $"api/dashboard/stats/get?type={_range}&utc=true{custom}&node={Uri.EscapeDataString(_node)}";
-        var result = await Api.GetAsync<DashboardStatsResponse>(url);
+        _loadError = null;
 
-        if (result.IsOk && result.Data?.Stats is { } s)
+        if (_range == "custom" && (!_customStart.HasValue || !_customEnd.HasValue))
         {
-            _stats = s;
-            BuildCharts(s);
+            _loading = false;
+            _loadError = "Select start and end dates for custom range.";
+            return;
+        }
+
+        var customQuery = string.Empty;
+        if (_range == "custom" && _customStart.HasValue && _customEnd.HasValue)
+        {
+            customQuery = $"&start={Uri.EscapeDataString(_customStart.Value.ToUniversalTime().ToString("o"))}" +
+                          $"&end={Uri.EscapeDataString(_customEnd.Value.ToUniversalTime().ToString("o"))}";
+        }
+
+        var url = $"api/dashboard/stats/get?type={_range}&utc=true{customQuery}&node={Uri.EscapeDataString(_node)}";
+        var result = await Api.GetAsync<DashboardStatsResponse>(url, cts.Token);
+
+        if (cts.IsCancellationRequested)
+            return;
+
+        if (result.IsOk && result.Data?.Stats is not null)
+        {
+            _response = result.Data;
+            BuildCharts(result.Data);
+            await LoadTopStatsFallbackAsync(cts.Token);
         }
         else if (result.IsInvalidToken)
         {
@@ -262,48 +377,106 @@ else if (_stats is not null)
         }
         else
         {
+            _loadError = result.DisplayError;
             Snackbar.Add(result.DisplayError, Severity.Error);
         }
 
-        _loading = false;
+        if (ReferenceEquals(_loadCts, cts))
+        {
+            _loading = false;
+            StateHasChanged();
+        }
     }
 
-    private void BuildCharts(DashboardStats s)
+    private async Task LoadTopStatsFallbackAsync(CancellationToken ct)
     {
-        // ── Line chart ────────────────────────────────────────────────
-        _lineLabels = s.MainChartData.Select(d => d.Timestamp.ToLocalTime().ToString("HH:mm")).ToArray();
-        _lineSeries =
-        [
-            new ChartSeries<double> { Name = "Total",      Data = s.MainChartData.Select(d => (double)d.TotalQueries).ToArray() },
-            new ChartSeries<double> { Name = "No Error",   Data = s.MainChartData.Select(d => (double)d.TotalNoError).ToArray() },
-            new ChartSeries<double> { Name = "Cached",     Data = s.MainChartData.Select(d => (double)d.TotalCacheHit).ToArray() },
-            new ChartSeries<double> { Name = "Blocked",    Data = s.MainChartData.Select(d => (double)d.TotalBlocked).ToArray() },
-            new ChartSeries<double> { Name = "Recursive",  Data = s.MainChartData.Select(d => (double)d.TotalRecursions).ToArray() },
-        ];
+        if (_response is null)
+            return;
 
-        // ── Pie charts ────────────────────────────────────────────────
-        static (double[], string[]) ToPie(IEnumerable<PieDataPoint> pts)
+        if (_response.TopClients?.Count == 0)
         {
-            var list = pts.ToList();
-            return (list.Select(p => (double)p.Hits).ToArray(),
-                    list.Select(p => p.Name).ToArray());
+            var topClients = await FetchTopStatsAsync("TopClients", ct);
+            if (topClients?.TopClients is { Count: > 0 })
+                _response.TopClients = topClients.TopClients;
         }
 
-        (_pie1Data, _pie1Labels) = ToPie(s.QueryResponseChartData);
-        (_pie2Data, _pie2Labels) = ToPie(s.QueryTypeChartData);
-        (_pie3Data, _pie3Labels) = ToPie(s.QueryProtocolChartData);
+        if (_response.TopDomains?.Count == 0)
+        {
+            var topDomains = await FetchTopStatsAsync("TopDomains", ct);
+            if (topDomains?.TopDomains is { Count: > 0 })
+                _response.TopDomains = topDomains.TopDomains;
+        }
+
+        if (_response.TopBlockedDomains?.Count == 0)
+        {
+            var topBlockedDomains = await FetchTopStatsAsync("TopBlockedDomains", ct);
+            if (topBlockedDomains?.TopBlockedDomains is { Count: > 0 })
+                _response.TopBlockedDomains = topBlockedDomains.TopBlockedDomains;
+        }
+    }
+
+    private async Task<TopStatsResponse?> FetchTopStatsAsync(string statsType, CancellationToken ct)
+    {
+        var customQuery = string.Empty;
+        if (_range == "custom" && _customStart.HasValue && _customEnd.HasValue)
+        {
+            customQuery = $"&start={Uri.EscapeDataString(_customStart.Value.ToUniversalTime().ToString("o"))}" +
+                          $"&end={Uri.EscapeDataString(_customEnd.Value.ToUniversalTime().ToString("o"))}";
+        }
+
+        var url = $"api/dashboard/stats/getTop?statsType={Uri.EscapeDataString(statsType)}&type={_range}&limit=20&node={Uri.EscapeDataString(_node)}{customQuery}";
+        var result = await Api.GetAsync<TopStatsResponse>(url, ct);
+
+        return result.IsOk ? result.Data : null;
+    }
+
+    private void BuildCharts(DashboardStatsResponse statsResponse)
+    {
+        _lineLabels = statsResponse.MainChartData?.Labels.ToArray() ?? [];
+
+        if (statsResponse.MainChartData?.Datasets is { Count: > 0 })
+        {
+            _lineSeries = statsResponse.MainChartData.Datasets
+                .Where(ds => ds.Data.Count > 0)
+                .Select(ds => new ChartSeries<double>
+                {
+                    Name = string.IsNullOrWhiteSpace(ds.Label) ? "Series" : ds.Label,
+                    Data = ds.Data.Select(v => (double)v).ToArray()
+                })
+                .ToList();
+        }
+        else
+        {
+            _lineSeries = [];
+        }
+
+        static (double[] Data, string[] Labels) ToPie(DashboardChartData? chart)
+        {
+            if (chart?.Datasets.Count == 0 || chart?.Labels.Count == 0)
+                return ([], []);
+
+            var values = chart.Datasets[0].Data;
+            var count = Math.Min(values.Count, chart.Labels.Count);
+            return (values.Take(count).Select(v => (double)v).ToArray(), chart.Labels.Take(count).ToArray());
+        }
+
+        (_pie1Data, _pie1Labels) = ToPie(statsResponse.QueryResponseChartData);
+        (_pie2Data, _pie2Labels) = ToPie(statsResponse.QueryTypeChartData);
+        (_pie3Data, _pie3Labels) = ToPie(statsResponse.ProtocolTypeChartData);
     }
 
     private async Task ShowTopStatsAsync(string statsType)
     {
-        var p = new DialogParameters
+        var parameters = new DialogParameters
         {
             ["StatsType"] = statsType,
-            ["Range"]     = _range,
-            ["Node"]      = _node,
+            ["Range"] = _range,
+            ["Node"] = _node,
         };
+
         await DialogService.ShowAsync<Dialogs.TopStatsDialog>(
-            statsType.Replace("Top", "Top "), p,
+            statsType.Replace("Top", "Top "),
+            parameters,
             new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
     }
 
@@ -312,4 +485,13 @@ else if (_stats is not null)
 
     private void QueryDomain(string domain)
         => Snackbar.Add($"Navigate to DNS Client to query {domain}", Severity.Info);
+
+    private static string DisplayName(TopStatsEntry entry)
+        => string.IsNullOrWhiteSpace(entry.NameIdn) ? entry.Name : entry.NameIdn;
+
+    public void Dispose()
+    {
+        _loadCts?.Cancel();
+        _loadCts?.Dispose();
+    }
 }
