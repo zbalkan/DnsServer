@@ -191,20 +191,25 @@ else
     private System.Threading.Timer? _refreshTimer;
 
     // ── Lifecycle ─────────────────────────────────────────────────────
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
         SessionService.OnChange += OnSessionChanged;
-
-        var storedToken = await SessionService.LoadStoredTokenAsync();
-        if (storedToken is { Length: > 0 })
-            await TryRestoreSessionAsync(storedToken);
     }
 
-    protected override void OnAfterRender(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (firstRender && SessionService.IsAuthenticated)
-            StartAutoRefresh();
+        if (firstRender)
+        {
+            var storedToken = await SessionService.LoadStoredTokenAsync();
+            if (storedToken is { Length: > 0 })
+                await TryRestoreSessionAsync(storedToken);
+
+            if (SessionService.IsAuthenticated)
+                StartAutoRefresh();
+        }
     }
+
+
 
     // ── Session restore ───────────────────────────────────────────────
     private async Task TryRestoreSessionAsync(string token)

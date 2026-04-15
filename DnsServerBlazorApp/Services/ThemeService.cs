@@ -1,5 +1,5 @@
+using DnsServerBlazorApp.Infrastructure.Storage;
 using DnsServerBlazorApp.Styles;
-using Microsoft.JSInterop;
 using MudBlazor;
 
 namespace DnsServerBlazorApp.Services;
@@ -10,16 +10,14 @@ namespace DnsServerBlazorApp.Services;
 /// </summary>
 public sealed class ThemeService
 {
-    private const string StorageKey = "theme";
     private const string DarkValue  = "dark";
+    private const string LightValue = "light";
 
-    private readonly IJSRuntime          _js;
-    private readonly ILogger<ThemeService> _logger;
+    private readonly IClientStateStore _store;
 
-    public ThemeService(IJSRuntime js, ILogger<ThemeService> logger)
+    public ThemeService(IClientStateStore store)
     {
-        _js     = js;
-        _logger = logger;
+        _store = store;
     }
 
     // ── State ─────────────────────────────────────────────────────────
@@ -34,12 +32,8 @@ public sealed class ThemeService
     /// <summary>Restore theme from localStorage on first render.</summary>
     public async Task InitAsync()
     {
-        try
-        {
-            var stored = await _js.InvokeAsync<string?>("localStorage.getItem", StorageKey);
-            IsDarkMode = stored == DarkValue;
-        }
-        catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable loading theme (SSR pre-render or storage error)"); }
+        var stored = await _store.GetAsync<string>(StoreKeys.ThemePreference);
+        IsDarkMode = stored == DarkValue;
     }
 
     /// <summary>Toggle between dark and light mode (mirrors original JS).</summary>
@@ -54,12 +48,8 @@ public sealed class ThemeService
 
     private async Task PersistAsync()
     {
-        try
-        {
-            var value = IsDarkMode ? DarkValue : "light";
-            await _js.InvokeVoidAsync("localStorage.setItem", StorageKey, value);
-        }
-        catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable persisting theme (SSR pre-render or storage error)"); }
+        var value = IsDarkMode ? DarkValue : LightValue;
+        await _store.SetAsync(StoreKeys.ThemePreference, value);
     }
 
 }

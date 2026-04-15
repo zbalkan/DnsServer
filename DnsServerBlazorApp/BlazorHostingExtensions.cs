@@ -1,5 +1,7 @@
+using DnsServerBlazorApp.Infrastructure.Storage;
 using DnsServerBlazorApp.Services;
 using Microsoft.AspNetCore.Components;
+using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using Microsoft.AspNetCore.Components.Server.Circuits;
 using MudBlazor;
 using MudBlazor.Extensions;
@@ -47,6 +49,9 @@ public static class BlazorHostingExtensions
             config.SnackbarConfiguration.SnackbarVariant         = Variant.Filled;
         });
         services.AddMudExtensions();
+
+        services.AddScoped<ProtectedLocalStorage>();
+        services.AddScoped<IClientStateStore, ProtectedLocalStorageStore>();
 
         services.AddScoped<SessionService>();
         services.AddScoped<ApiService>();

@@ -1,5 +1,5 @@
 using DnsServerBlazorApp.Models.Auth;
-using Microsoft.JSInterop;
+using DnsServerBlazorApp.Infrastructure.Storage;
 
 namespace DnsServerBlazorApp.Services;
 
@@ -10,13 +10,11 @@ namespace DnsServerBlazorApp.Services;
 /// </summary>
 public sealed class SessionService
 {
-    private readonly IJSRuntime            _js;
-    private readonly ILogger<SessionService> _logger;
+    private readonly IClientStateStore _store;
 
-    public SessionService(IJSRuntime js, ILogger<SessionService> logger)
+    public SessionService(IClientStateStore store)
     {
-        _js     = js;
-        _logger = logger;
+        _store = store;
     }
 
     // ── State ─────────────────────────────────────────────────────────
@@ -46,15 +44,7 @@ public sealed class SessionService
     /// </summary>
     public async Task<string?> LoadStoredTokenAsync()
     {
-        try
-        {
-            return await _js.InvokeAsync<string?>("localStorage.getItem", "token");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogDebug(ex, "JS interop unavailable loading token (SSR pre-render or storage error)");
-            return null;
-        }
+        return await _store.GetAsync<string>(StoreKeys.AuthToken);
     }
 
     /// <summary>Store a new session after successful login / session-get.</summary>
@@ -101,14 +91,12 @@ public sealed class SessionService
 
     private async Task PersistTokenAsync(string token)
     {
-        try { await _js.InvokeVoidAsync("localStorage.setItem", "token", token); }
-        catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable persisting token (SSR pre-render or storage error)"); }
+        await _store.SetAsync(StoreKeys.AuthToken, token);
     }
 
     private async Task RemoveTokenAsync()
     {
-        try { await _js.InvokeVoidAsync("localStorage.removeItem", "token"); }
-        catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable removing token (SSR pre-render or storage error)"); }
+        await _store.RemoveAsync(StoreKeys.AuthToken);
     }
 
     private void Notify() => OnChange?.Invoke();
