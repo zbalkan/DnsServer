@@ -39,13 +39,34 @@
             <MudTabPanel Text="Relative">
                 <MudStack Spacing="2" Class="pt-2">
                     <MudText Typo="Typo.subtitle2">Quick Select</MudText>
-                    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1">
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(15, RelativeUnit.Minutes))">Last 15 minutes</MudButton>
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(1, RelativeUnit.Hours))">Last 1 hour</MudButton>
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(24, RelativeUnit.Hours))">Last 24 hours</MudButton>
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(7, RelativeUnit.Days))">Last 7 days</MudButton>
-                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(30, RelativeUnit.Days))">Last 30 days</MudButton>
-                    </MudStack>
+                    <MudGrid Spacing="1">
+                        <MudItem xs="12" sm="6">
+                            <MudPaper Outlined="true" Class="pa-2">
+                                <MudText Typo="Typo.caption" Class="mb-1">Calendar ranges</MudText>
+                                <MudStack Spacing="1">
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="SetTodayPreset" FullWidth="true">Today</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="SetThisWeekPreset" FullWidth="true">This week</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="SetThisMonthPreset" FullWidth="true">This month</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="SetThisYearPreset" FullWidth="true">This year</MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                        <MudItem xs="12" sm="6">
+                            <MudPaper Outlined="true" Class="pa-2">
+                                <MudText Typo="Typo.caption" Class="mb-1">Rolling ranges</MudText>
+                                <MudStack Spacing="1">
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(15, RelativeUnit.Minutes))" FullWidth="true">Last 15 minutes</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(1, RelativeUnit.Hours))" FullWidth="true">Last 1 hour</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(1, RelativeUnit.Days))" FullWidth="true">Last 1 day</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(7, RelativeUnit.Days))" FullWidth="true">Last 7 days</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(30, RelativeUnit.Days))" FullWidth="true">Last 30 days</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(3, RelativeUnit.Months))" FullWidth="true">Last 3 months</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(6, RelativeUnit.Months))" FullWidth="true">Last 6 months</MudButton>
+                                    <MudButton Size="Size.Small" Variant="Variant.Text" OnClick="@(() => SetRelative(1, RelativeUnit.Years))" FullWidth="true">Last 1 year</MudButton>
+                                </MudStack>
+                            </MudPaper>
+                        </MudItem>
+                    </MudGrid>
 
                     <MudDivider />
 
@@ -63,6 +84,7 @@
                                 <MudSelectItem Value="RelativeUnit.Days">Days</MudSelectItem>
                                 <MudSelectItem Value="RelativeUnit.Weeks">Weeks</MudSelectItem>
                                 <MudSelectItem Value="RelativeUnit.Months">Months</MudSelectItem>
+                                <MudSelectItem Value="RelativeUnit.Years">Years</MudSelectItem>
                             </MudSelect>
                         </MudItem>
                     </MudGrid>
@@ -101,6 +123,8 @@
     private int _activeTabIndex;
     private int _relativeAmount = 15;
     private RelativeUnit _relativeUnit = RelativeUnit.Minutes;
+    private DateTime? _relativeStartOverride;
+    private DateTime? _relativeEndOverride;
     private string? _error;
 
     private string _previewText = string.Empty;
@@ -111,7 +135,8 @@
         Hours,
         Days,
         Weeks,
-        Months
+        Months,
+        Years
     }
 
     protected override Task OnInitializedAsync()
@@ -176,6 +201,9 @@
     {
         if (_activeTabIndex == 1)
         {
+            if (_relativeStartOverride.HasValue && _relativeEndOverride.HasValue)
+                return (_relativeStartOverride.Value, _relativeEndOverride.Value);
+
             var end = DateTime.Now;
             var start = end - ToTimeSpan(_relativeAmount, _relativeUnit);
             return (start, end);
@@ -203,6 +231,7 @@
         RelativeUnit.Days => TimeSpan.FromDays(value),
         RelativeUnit.Weeks => TimeSpan.FromDays(value * 7),
         RelativeUnit.Months => TimeSpan.FromDays(value * 30),
+        RelativeUnit.Years => TimeSpan.FromDays(value * 365),
         _ => TimeSpan.FromMinutes(value)
     };
 
@@ -211,6 +240,44 @@
         _activeTabIndex = 1;
         _relativeAmount = amount;
         _relativeUnit = unit;
+        _relativeStartOverride = null;
+        _relativeEndOverride = null;
+        UpdatePreview();
+    }
+
+    private void SetTodayPreset()
+    {
+        var now = DateTime.Now;
+        SetRelativeAbsolutePreset(now.Date, now);
+    }
+
+    private void SetThisWeekPreset()
+    {
+        var now = DateTime.Now;
+        var diff = ((int)now.DayOfWeek + 6) % 7; // Monday = 0, Sunday = 6
+        var start = now.Date.AddDays(-diff);
+        SetRelativeAbsolutePreset(start, now);
+    }
+
+    private void SetThisMonthPreset()
+    {
+        var now = DateTime.Now;
+        var start = new DateTime(now.Year, now.Month, 1);
+        SetRelativeAbsolutePreset(start, now);
+    }
+
+    private void SetThisYearPreset()
+    {
+        var now = DateTime.Now;
+        var start = new DateTime(now.Year, 1, 1);
+        SetRelativeAbsolutePreset(start, now);
+    }
+
+    private void SetRelativeAbsolutePreset(DateTime start, DateTime end)
+    {
+        _activeTabIndex = 1;
+        _relativeStartOverride = start;
+        _relativeEndOverride = end;
         UpdatePreview();
     }
 
@@ -258,6 +325,9 @@
 
     private void OnRelativeValueChanged()
     {
+        _relativeStartOverride = null;
+        _relativeEndOverride = null;
+
         if (_activeTabIndex == 1)
             UpdatePreview();
     }
