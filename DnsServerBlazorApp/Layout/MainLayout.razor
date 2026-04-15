@@ -88,27 +88,27 @@
         <div class="dns-content-shell">
             @Body
         </div>
+
+        @* ── Footer ───────────────────────────────────────────────────────── *@
+        <MudPaper Class="dns-layout-footer" Elevation="2" Square="true"
+                  Style="background:var(--mud-palette-background-gray);padding:10px 0;text-align:center;">
+            <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);font-size:11px;font-weight:600;font-family:Arial,sans-serif;">
+                <MudLink Href="https://technitium.com/" Target="_blank" Color="Color.Primary">Technitium</MudLink>
+                &nbsp;|&nbsp;
+                <MudLink Href="https://blog.technitium.com/" Target="_blank" Color="Color.Primary">Blog</MudLink>
+                &nbsp;|&nbsp;
+                <MudLink Href="https://go.technitium.com/?id=35" Target="_blank" Color="Color.Primary">Donate</MudLink>
+                &nbsp;|&nbsp;
+                <MudLink Href="https://dnsclient.net/" Target="_blank" Color="Color.Primary">DNS Client</MudLink>
+                &nbsp;|&nbsp;
+                <MudLink Href="https://github.com/TechnitiumSoftware/DnsServer" Target="_blank" Color="Color.Primary">
+                    GitHub
+                </MudLink>
+            </MudText>
+        </MudPaper>
     </MudMainContent>
 
 </MudLayout>
-
-@* ── Footer ───────────────────────────────────────────────────────── *@
-<MudPaper Elevation="2" Square="true"
-          Style="background:var(--mud-palette-background-gray);padding:10px 0;text-align:center;">
-    <MudText Typo="Typo.caption" Style="color:var(--mud-palette-text-secondary);font-size:11px;font-weight:600;font-family:Arial,sans-serif;">
-        <MudLink Href="https://technitium.com/" Target="_blank" Color="Color.Primary">Technitium</MudLink>
-        &nbsp;|&nbsp;
-        <MudLink Href="https://blog.technitium.com/" Target="_blank" Color="Color.Primary">Blog</MudLink>
-        &nbsp;|&nbsp;
-        <MudLink Href="https://go.technitium.com/?id=35" Target="_blank" Color="Color.Primary">Donate</MudLink>
-        &nbsp;|&nbsp;
-        <MudLink Href="https://dnsclient.net/" Target="_blank" Color="Color.Primary">DNS Client</MudLink>
-        &nbsp;|&nbsp;
-        <MudLink Href="https://github.com/TechnitiumSoftware/DnsServer" Target="_blank" Color="Color.Primary">
-            GitHub
-        </MudLink>
-    </MudText>
-</MudPaper>
 
 @code {
     // ── Alert state ───────────────────────────────────────────────────

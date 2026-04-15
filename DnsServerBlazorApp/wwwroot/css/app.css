@@ -213,6 +213,16 @@ body {
     margin-inline: auto;
 }
 
+.dns-main-content {
+    display: flex;
+    flex-direction: column;
+    min-height: calc(100vh - var(--mud-appbar-height));
+}
+
+.dns-layout-footer {
+    margin-top: auto;
+}
+
 /* ── Misc helpers ── */
 .dns-code-block {
     font-family: monospace;
@@ -234,7 +244,7 @@ body {
 
 .dns-dashboard-panel {
     height: 100%;
-    min-height: 280px;
+    min-height: 240px;
 }
 
 .dns-dashboard-main-chart {
@@ -263,7 +273,7 @@ body {
     .dns-stat-card    { min-width: 72px; }
     .dns-split-container { flex-direction: column; }
     .dns-split-left   { width: 100%; min-width: unset; }
-}
+ }
 
 /* ── Blazor boot spinner ── */
 .dns-splash {

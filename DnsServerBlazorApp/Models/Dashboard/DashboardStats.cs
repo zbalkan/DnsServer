@@ -101,6 +101,9 @@ public sealed class DashboardStats
 
 public sealed class DashboardChartData
 {
+    [JsonPropertyName("labelFormat")]
+    public string? LabelFormat { get; set; }
+
     [JsonPropertyName("labels")]
     public List<string> Labels { get; set; } = [];
 
