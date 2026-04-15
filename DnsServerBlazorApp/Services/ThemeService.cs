@@ -61,4 +61,5 @@ public sealed class ThemeService
         }
         catch (Exception ex) { _logger.LogDebug(ex, "JS interop unavailable persisting theme (SSR pre-render or storage error)"); }
     }
+
 }

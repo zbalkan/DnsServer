@@ -2,6 +2,7 @@
 @inject SessionService SessionService
 @inject IDialogService DialogService
 @inject ISnackbar      Snackbar
+@inject HttpClient     Http
 
 @if (_loading)
 {
@@ -11,83 +12,270 @@
 }
 else if (_s is not null)
 {
-    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start;">
+    <MudTabs Rounded="false">
 
-        @* ── Left column ── *@
-        <div style="flex:1;min-width:320px;max-width:560px;">
-
-            @* General *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudTabPanel Text="General">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">General</MudText>
+
                 <MudTextField @bind-Value="_s.DnsServerDomain" Label="Server Domain"
                               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+
                 <MudTextField Value="@ListToLines(_s.DnsServerLocalEndPoints)"
                               ValueChanged="@((string v) => _s.DnsServerLocalEndPoints = LinesToList(v))"
                               Label="Listen Endpoints" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              Lines="2" Class="mb-2"
-                              HelperText="One per line. e.g. 0.0.0.0:53" />
+                              Lines="2" Class="mb-2" HelperText="One per line. e.g. 0.0.0.0:53" />
+
+                <div style="display:flex;gap:8px;">
+                    <MudTextField Value="@ListToLines(_s.DnsServerIPv4SourceAddresses)"
+                                  ValueChanged="@((string v) => _s.DnsServerIPv4SourceAddresses = LinesToList(v))"
+                                  Label="IPv4 Source Addresses" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Lines="2" Class="mb-2" Style="flex:1;" />
+                    <MudTextField Value="@ListToLines(_s.DnsServerIPv6SourceAddresses)"
+                                  ValueChanged="@((string v) => _s.DnsServerIPv6SourceAddresses = LinesToList(v))"
+                                  Label="IPv6 Source Addresses" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Lines="2" Class="mb-2" Style="flex:1;" />
+                </div>
+
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.DefaultRecordTtl" Label="Default Record TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.DefaultNsRecordTtl" Label="Default NS TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.DefaultSoaRecordTtl" Label="Default SOA TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                </div>
+
+                <MudTextField @bind-Value="_s.DefaultResponsiblePerson" Label="Default Responsible Person"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.MinSoaRefresh" Label="Min SOA Refresh (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.MinSoaRetry" Label="Min SOA Retry (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                </div>
+
+                <MudTextField Value="@ListToLines(_s.ZoneTransferAllowedNetworks)"
+                              ValueChanged="@((string v) => _s.ZoneTransferAllowedNetworks = LinesToList(v))"
+                              Label="Zone Transfer Allowed Networks" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="2" Class="mb-2" />
+
+                <MudTextField Value="@ListToLines(_s.NotifyAllowedNetworks)"
+                              ValueChanged="@((string v) => _s.NotifyAllowedNetworks = LinesToList(v))"
+                              Label="Notify Allowed Networks" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="2" Class="mb-2" />
+
+                <MudDivider Class="my-1" />
+
                 <MudCheckBox @bind-Value="_s.PreferIPv6" Label="Prefer IPv6" Dense="true" Class="mb-1" />
                 <MudCheckBox @bind-Value="_s.DnssecValidation" Label="DNSSEC Validation" Dense="true" Class="mb-1" />
-                <MudCheckBox @bind-Value="_s.LogQueries" Label="Log Queries" Dense="true" />
-            </MudPaper>
+                <MudCheckBox @bind-Value="_s.UseSoaSerialDateScheme" Label="Use SOA Serial Date Scheme" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.DnsAppsEnableAutomaticUpdate" Label="DNS Apps Automatic Update" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.EnableUdpSocketPool" Label="Enable UDP Socket Pool" Dense="true" Class="mb-1" />
 
-            @* Web Service *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudTextField Value="@ListToLinesInt(_s.SocketPoolExcludedPorts)"
+                              ValueChanged="@((string v) => _s.SocketPoolExcludedPorts = LinesToIntList(v))"
+                              Label="Socket Pool Excluded Ports" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="2" Class="mb-2" HelperText="One port per line" />
+
+                <MudTextField @bind-Value="_s.UdpPayloadSize" Label="UDP Payload Size"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Class="mb-2" />
+
+                <MudCheckBox @bind-Value="_s.EDnsClientSubnet" Label="Enable EDNS Client Subnet" Dense="true" Class="mb-1" />
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.EDnsClientSubnetIPv4PrefixLength" Label="EDNS IPv4 Prefix"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.EDnsClientSubnetIPv6PrefixLength" Label="EDNS IPv6 Prefix"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                </div>
+                <MudTextField @bind-Value="_s.EDnsClientSubnetIpv4Override" Label="EDNS IPv4 Override"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                <MudTextField @bind-Value="_s.EDnsClientSubnetIpv6Override" Label="EDNS IPv6 Override"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+
+                <MudDivider Class="my-1" />
+
+                <MudText Typo="Typo.caption" Class="mt-2 mb-1">Advanced Timeouts</MudText>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <MudTextField @bind-Value="_s.ClientTimeout" Label="Client Timeout (ms)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.TcpSendTimeout" Label="TCP Send Timeout (ms)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.TcpReceiveTimeout" Label="TCP Receive Timeout (ms)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.QuicIdleTimeout" Label="QUIC Idle Timeout (ms)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.QuicMaxInboundStreams" Label="QUIC Max Inbound Streams" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.ListenBacklog" Label="Listen Backlog" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.MaxConcurrentResolutionsPerCore" Label="Max Concurrent Resolutions/Core" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:260px;" />
+                </div>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Web Service">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Web Service</MudText>
+
                 <MudTextField Value="@ListToLines(_s.WebServiceLocalAddresses)"
                               ValueChanged="@((string v) => _s.WebServiceLocalAddresses = LinesToList(v))"
                               Label="Listen Addresses" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="2" Class="mb-2" />
+
                 <div style="display:flex;gap:8px;">
                     <MudTextField @bind-Value="_s.WebServiceHttpPort" Label="HTTP Port"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
-                                  InputType="InputType.Number" Style="flex:1;" />
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
                     <MudTextField @bind-Value="_s.WebServiceTlsPort" Label="HTTPS Port"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
-                                  InputType="InputType.Number" Style="flex:1;" />
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
                 </div>
+
                 <MudCheckBox @bind-Value="_s.WebServiceEnableTls" Label="Enable HTTPS (TLS)" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.WebServiceEnableHttp3" Label="Enable HTTP/3" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.WebServiceHttpToTlsRedirect" Label="HTTP to HTTPS Redirect" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.WebServiceUseSelfSignedTlsCertificate" Label="Use Self-Signed TLS Certificate" Dense="true" Class="mb-2" />
+
+                <MudTextField @bind-Value="_s.WebServiceRealIpHeader" Label="Real IP Header"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+
                 @if (_s.WebServiceEnableTls)
                 {
                     <MudTextField @bind-Value="_s.WebServiceTlsCertificatePath" Label="TLS Certificate Path"
                                   Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
                     <MudTextField @bind-Value="_s.WebServiceTlsCertificatePassword" Label="TLS Certificate Password"
                                   Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  InputType="InputType.Password" />
+                                  InputType="InputType.Password" Class="mb-2" />
                 }
             </MudPaper>
+        </MudTabPanel>
 
-            @* Optional Protocols *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudTabPanel Text="Optional Protocols">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Optional Protocols</MudText>
-                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp"  Label="DNS-over-HTTP (DoH)"    Dense="true" />
-                <MudCheckBox @bind-Value="_s.EnableDnsOverTls"   Label="DNS-over-TLS (DoT)"    Dense="true" />
-                <MudCheckBox @bind-Value="_s.EnableDnsOverHttps" Label="DNS-over-HTTPS (DoH)"  Dense="true" />
-                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp3" Label="DNS-over-HTTPS/3 (DoH3)" Dense="true" />
-                <MudCheckBox @bind-Value="_s.EnableDnsOverQuic"  Label="DNS-over-QUIC (DoQ)"   Dense="true" />
-            </MudPaper>
 
-            @* Forwarders *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudCheckBox @bind-Value="_s.EnableDnsOverUdpProxy" Label="Enable DNS-over-UDP" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverTcpProxy" Label="Enable DNS-over-TCP" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp" Label="Enable DNS-over-HTTP" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverTls" Label="Enable DNS-over-TLS" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttps" Label="Enable DNS-over-HTTPS" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverHttp3" Label="Enable DNS-over-HTTPS/3" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.EnableDnsOverQuic" Label="Enable DNS-over-QUIC" Dense="true" Class="mb-2" />
+
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <MudTextField @bind-Value="_s.DnsOverUdpProxyPort" Label="UDP Port" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:180px;" />
+                    <MudTextField @bind-Value="_s.DnsOverTcpProxyPort" Label="TCP Port" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:180px;" />
+                    <MudTextField @bind-Value="_s.DnsOverHttpPort" Label="DoH HTTP Port" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:180px;" />
+                    <MudTextField @bind-Value="_s.DnsOverTlsPort" Label="DoT Port" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:180px;" />
+                    <MudTextField @bind-Value="_s.DnsOverHttpsPort" Label="DoH HTTPS Port" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:180px;" />
+                    <MudTextField @bind-Value="_s.DnsOverQuicPort" Label="DoQ Port" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:180px;" />
+                </div>
+
+                <MudTextField @bind-Value="_s.DnsTlsCertificatePath" Label="DNS TLS Certificate Path"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+                <MudTextField @bind-Value="_s.DnsTlsCertificatePassword" Label="DNS TLS Certificate Password"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Class="mb-2" />
+
+                <MudTextField Value="@ListToLines(_s.ReverseProxyNetworkACL)"
+                              ValueChanged="@((string v) => _s.ReverseProxyNetworkACL = LinesToList(v))"
+                              Label="Reverse Proxy Network ACL" Variant="Variant.Outlined" Margin="Margin.Dense"
+                              Lines="2" Class="mb-2" />
+
+                <MudTextField @bind-Value="_s.DnsOverHttpRealIpHeader" Label="DoH Real IP Header"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Forwarders">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Forwarders</MudText>
-                <MudSelect T="string" @bind-Value="_s.ForwarderProtocol" Label="Protocol"
-                           Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
-                    <MudSelectItem Value="@("Udp")">UDP</MudSelectItem>
-                    <MudSelectItem Value="@("Tcp")">TCP</MudSelectItem>
-                    <MudSelectItem Value="@("Tls")">TLS</MudSelectItem>
-                    <MudSelectItem Value="@("Https")">HTTPS</MudSelectItem>
-                    <MudSelectItem Value="@("Quic")">QUIC</MudSelectItem>
-                </MudSelect>
-                <MudTextField Value="@ListToLines(_s.Forwarders)"
-                              ValueChanged="@((string v) => _s.Forwarders = LinesToList(v))"
-                              Label="Forwarders" Variant="Variant.Outlined" Margin="Margin.Dense"
-                              Lines="4" Class="mb-2" HelperText="One per line" />
-                <MudCheckBox @bind-Value="_s.ConcurrentForwarding" Label="Concurrent Forwarding" Dense="true" />
-            </MudPaper>
 
-            @* Recursion *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;">
+                    <MudSelect T="string" Value="@_s.ForwarderProtocol" ValueChanged="OnActiveForwarderProtocolChanged" Label="Active Protocol"
+                               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" Style="min-width:220px;">
+                        <MudSelectItem Value="@("Udp")">UDP</MudSelectItem>
+                        <MudSelectItem Value="@("Tcp")">TCP</MudSelectItem>
+                        <MudSelectItem Value="@("Tls")">TLS</MudSelectItem>
+                        <MudSelectItem Value="@("Https")">HTTPS</MudSelectItem>
+                        <MudSelectItem Value="@("Quic")">QUIC</MudSelectItem>
+                    </MudSelect>
+                </div>
+
+                <MudText Typo="Typo.caption" Class="mb-1">Only enabled entries from <b>@_s.ForwarderProtocol</b> are saved.</MudText>
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
+                    <MudText Typo="Typo.subtitle2">Forwarder Endpoints (@_s.ForwarderProtocol)</MudText>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="OpenAddForwarderDialog">
+                        Add Forwarder
+                    </MudButton>
+                </div>
+
+                <MudTable T="ForwarderRow" Items="FilteredForwarderRows" Dense="true" Hover="true" Elevation="0" Class="mb-2" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh>Enabled</MudTh>
+                        <MudTh>
+                            <div>Name</div>
+                            <MudTextField @bind-Value="_forwarderNameFilter" Placeholder="Filter name" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        </MudTh>
+                        <MudTh>
+                            <div>Address</div>
+                            <MudTextField @bind-Value="_forwarderAddressFilter" Placeholder="Filter address" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        </MudTh>
+                        <MudTh style="width:120px;">Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudSwitch Value="context.Enabled" ValueChanged="@((bool v) => OnForwarderEnabledChanged(context, v))" Color="Color.Primary" />
+                        </MudTd>
+                        <MudTd>@context.Name</MudTd>
+                        <MudTd>@context.Address</MudTd>
+                        <MudTd>
+                            @if (context.Enabled)
+                            {
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowUp" Size="Size.Small" Disabled="@(!CanMoveForwarderUp(context))" OnClick="@(() => MoveForwarderUp(context))" />
+                                <MudIconButton Icon="@Icons.Material.Filled.KeyboardArrowDown" Size="Size.Small" Disabled="@(!CanMoveForwarderDown(context))" OnClick="@(() => MoveForwarderDown(context))" />
+                            }
+                            @if (context.IsCustom)
+                            {
+                                <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveForwarder(context))">
+                                    Remove
+                                </MudButton>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2" Class="pa-2">No forwarders for current protocol.</MudText>
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager />
+                    </PagerContent>
+                </MudTable>
+
+                <MudDivider Class="my-1" />
+
+                <MudCheckBox @bind-Value="_s.ConcurrentForwarding" Label="Concurrent Forwarding" Dense="true" Class="mb-1" />
+
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.ForwarderConcurrency" Label="Forwarder Concurrency"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.ForwarderRetries" Label="Forwarder Retries"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.ForwarderTimeout" Label="Forwarder Timeout (ms)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                </div>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Recursion">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Recursion</MudText>
+
                 <MudSelect T="string" @bind-Value="_s.Recursion" Label="Recursion"
                            Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
                     <MudSelectItem Value="@("Allow")">Allow All</MudSelectItem>
@@ -95,80 +283,180 @@ else if (_s is not null)
                     <MudSelectItem Value="@("AllowOnlyForPrivateNetworks")">Private Networks Only</MudSelectItem>
                     <MudSelectItem Value="@("UseSpecifiedNetworkACL")">Specified Networks</MudSelectItem>
                 </MudSelect>
+
+                @if (_s.Recursion == "UseSpecifiedNetworkACL")
+                {
+                    <MudTextField Value="@ListToLines(_s.RecursionNetworkACL)"
+                                  ValueChanged="@((string v) => _s.RecursionNetworkACL = LinesToList(v))"
+                                  Label="Recursion Network ACL" Variant="Variant.Outlined" Margin="Margin.Dense"
+                                  Lines="3" Class="mb-2" />
+                }
+
                 <MudCheckBox @bind-Value="_s.QnameMinimization" Label="QNAME Minimization" Dense="true" Class="mb-1" />
-                <MudCheckBox @bind-Value="_s.RandomizeName"     Label="Randomize Name"      Dense="true" />
+                <MudCheckBox @bind-Value="_s.RandomizeName" Label="Randomize Name" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.NsRevalidation" Label="NS Revalidation" Dense="true" Class="mb-2" />
+
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.ResolverRetries" Label="Resolver Retries"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.ResolverTimeout" Label="Resolver Timeout (ms)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.ResolverMaxStackCount" Label="Resolver Max Stack"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number"
+                                  Class="mb-2" Style="flex:1;" />
+                </div>
             </MudPaper>
-        </div>
+        </MudTabPanel>
 
-        @* ── Right column ── *@
-        <div style="flex:1;min-width:320px;max-width:560px;">
+        <MudTabPanel Text="Cache">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
+                <MudText Typo="Typo.subtitle2" Class="mb-2">Cache</MudText>
 
-            @* Blocking *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+                <MudTextField @bind-Value="_s.CacheMaximumEntries" Label="Maximum Entries"
+                              Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Class="mb-2" />
+
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.CacheMinimumRecordTtl" Label="Min TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.CacheMaximumRecordTtl" Label="Max TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Class="mb-2" Style="flex:1;" />
+                </div>
+
+                <div style="display:flex;gap:8px;">
+                    <MudTextField @bind-Value="_s.CacheNegativeRecordTtl" Label="Negative TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Class="mb-2" Style="flex:1;" />
+                    <MudTextField @bind-Value="_s.CacheFailureRecordTtl" Label="Failure TTL (sec)"
+                                  Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Class="mb-2" Style="flex:1;" />
+                </div>
+
+                <MudDivider Class="my-1" />
+
+                <MudCheckBox @bind-Value="_s.ServeStale" Label="Serve Stale" Dense="true" Class="mb-1" />
+
+                @if (_s.ServeStale)
+                {
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                        <MudTextField @bind-Value="_s.ServeStaleTtl" Label="Serve Stale TTL (sec)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                        <MudTextField @bind-Value="_s.ServeStaleAnswerTtl" Label="Serve Stale Answer TTL (sec)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                        <MudTextField @bind-Value="_s.ServeStaleResetTtl" Label="Serve Stale Reset TTL (sec)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                        <MudTextField @bind-Value="_s.ServeStaleMaxWaitTime" Label="Serve Stale Max Wait (ms)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    </div>
+                }
+
+                <MudText Typo="Typo.caption" Class="mt-2 mb-1">Cache Prefetch</MudText>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <MudTextField @bind-Value="_s.CachePrefetchEligibility" Label="Prefetch Eligibility" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.CachePrefetchTrigger" Label="Prefetch Trigger" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.CachePrefetchSampleIntervalInMinutes" Label="Sample Interval (min)" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                    <MudTextField @bind-Value="_s.CachePrefetchSampleEligibilityHitsPerHour" Label="Eligibility Hits/Hour" Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Style="width:220px;" />
+                </div>
+            </MudPaper>
+        </MudTabPanel>
+
+        <MudTabPanel Text="Blocking">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Blocking</MudText>
-                <MudCheckBox @bind-Value="_s.EnableBlocking" Label="Enable Blocking" Dense="true" Class="mb-2" />
+
+                <MudCheckBox @bind-Value="_s.EnableBlocking" Label="Enable Blocking" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.AllowTxtBlockingReport" Label="Allow TXT Blocking Report" Dense="true" Class="mb-2" />
+
                 <MudSelect T="string" @bind-Value="_s.BlockingType" Label="Blocking Type"
                            Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
                     <MudSelectItem Value="@("NxDomain")">NXDOMAIN</MudSelectItem>
                     <MudSelectItem Value="@("Refused")">REFUSED</MudSelectItem>
                     <MudSelectItem Value="@("Address")">Address</MudSelectItem>
                 </MudSelect>
+
                 <MudTextField Value="@ListToLines(_s.CustomBlockingAddresses)"
                               ValueChanged="@((string v) => _s.CustomBlockingAddresses = LinesToList(v))"
                               Label="Custom Blocking Addresses"
                               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
                               HelperText="One per line (for Address type)" />
-                <MudTextField Value="@ListToLines(_s.BlockListUrls)"
-                              ValueChanged="@((string v) => _s.BlockListUrls = LinesToList(v))"
-                              Label="Block List URLs"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" Lines="4" Class="mb-2"
-                              HelperText="One URL per line" />
+
+                <MudDivider Class="my-1" />
+
+                <div style="display:flex;justify-content:space-between;align-items:center;margin:8px 0;">
+                    <MudText Typo="Typo.subtitle2">Block List Feeds</MudText>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="OpenAddFeedDialog">
+                        Add Feed
+                    </MudButton>
+                </div>
+
+                <MudTable T="FeedRow" Items="FilteredBlockListFeeds" Dense="true" Hover="true" Elevation="0" Class="mb-2" RowsPerPage="10">
+                    <HeaderContent>
+                        <MudTh>Enabled</MudTh>
+                        <MudTh>
+                            <div>Title</div>
+                            <MudTextField @bind-Value="_feedTitleFilter" Placeholder="Filter title" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        </MudTh>
+                        <MudTh>
+                            <div>URL</div>
+                            <MudTextField @bind-Value="_feedUrlFilter" Placeholder="Filter URL" Variant="Variant.Outlined" Margin="Margin.Dense" Immediate="true" />
+                        </MudTh>
+                        <MudTh style="width:120px;">Actions</MudTh>
+                    </HeaderContent>
+                    <RowTemplate>
+                        <MudTd>
+                            <MudSwitch @bind-Value="context.Enabled" Color="Color.Primary" />
+                        </MudTd>
+                        <MudTd>@context.Title</MudTd>
+                        <MudTd>@context.Url</MudTd>
+                        <MudTd>
+                            @if (context.IsCustom)
+                            {
+                                <MudButton Variant="Variant.Text" Color="Color.Error" Size="Size.Small" OnClick="@(() => RemoveFeed(context))">
+                                    Remove
+                                </MudButton>
+                            }
+                        </MudTd>
+                    </RowTemplate>
+                    <NoRecordsContent>
+                        <MudText Typo="Typo.body2" Class="pa-2">No feeds configured.</MudText>
+                    </NoRecordsContent>
+                    <PagerContent>
+                        <MudTablePager />
+                    </PagerContent>
+                </MudTable>
+
                 <div style="display:flex;align-items:center;gap:8px;">
                     <MudTextField @bind-Value="_s.BlockListUpdateIntervalHours"
                                   Label="Update Interval (hrs)"
                                   Variant="Variant.Outlined" Margin="Margin.Dense"
                                   InputType="InputType.Number" Style="max-width:180px;" />
-                    <MudButton Variant="Variant.Outlined" Size="Size.Small"
-                               OnClick="UpdateBlockListAsync">Update Now</MudButton>
+                    <MudButton Variant="Variant.Outlined" Size="Size.Small" OnClick="UpdateBlockListAsync">Update Now</MudButton>
                 </div>
             </MudPaper>
+        </MudTabPanel>
 
-            @* Cache *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
-                <MudText Typo="Typo.subtitle2" Class="mb-2">Cache</MudText>
-                <MudTextField @bind-Value="_s.CacheMaximumEntries" Label="Maximum Entries"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
-                              InputType="InputType.Number" />
-                <div style="display:flex;gap:8px;">
-                    <MudTextField @bind-Value="_s.CacheMinimumRecordTtl" Label="Min TTL (sec)"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  InputType="InputType.Number" Style="flex:1;" Class="mb-2" />
-                    <MudTextField @bind-Value="_s.CacheMaximumRecordTtl" Label="Max TTL (sec)"
-                                  Variant="Variant.Outlined" Margin="Margin.Dense"
-                                  InputType="InputType.Number" Style="flex:1;" Class="mb-2" />
-                </div>
-                <MudCheckBox @bind-Value="_s.ServeStale" Label="Serve Stale" Dense="true" />
-            </MudPaper>
-
-            @* Logging *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudTabPanel Text="Logging">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Logging</MudText>
+
                 <MudSelect T="string" @bind-Value="_s.LoggingType" Label="Logging Type"
                            Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2">
                     <MudSelectItem Value="@("File")">File</MudSelectItem>
                     <MudSelectItem Value="@("Console")">Console</MudSelectItem>
                 </MudSelect>
+
                 <MudTextField @bind-Value="_s.LogFolder" Label="Log Folder"
                               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
                 <MudTextField @bind-Value="_s.MaxLogFileDays" Label="Max Log Days (0=unlimited)"
-                              Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
-                              InputType="InputType.Number" />
+                              Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Number" Class="mb-2" />
+
+                <MudDivider Class="my-1" />
+
+                <MudCheckBox @bind-Value="_s.LogQueries" Label="Log Queries" Dense="true" Class="mb-1" />
+                <MudCheckBox @bind-Value="_s.IgnoreResolverLogs" Label="Ignore Resolver Logs" Dense="true" Class="mb-1" />
                 <MudCheckBox @bind-Value="_s.UseLocalTime" Label="Use Local Time" Dense="true" />
             </MudPaper>
+        </MudTabPanel>
 
-            @* Proxy *@
-            <MudPaper Elevation="1" Class="pa-3 mb-3">
+        <MudTabPanel Text="Proxy">
+            <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Proxy</MudText>
+
                 <MudSelect T="string" Value="@(_s.Proxy?.Type ?? "None")"
                            ValueChanged="@((string v) => SetProxyType(v))"
                            Label="Proxy Type" Variant="Variant.Outlined"
@@ -177,6 +465,7 @@ else if (_s is not null)
                     <MudSelectItem Value="@("Http")">HTTP</MudSelectItem>
                     <MudSelectItem Value="@("Socks5")">SOCKS5</MudSelectItem>
                 </MudSelect>
+
                 @if (_s.Proxy is not null && _s.Proxy.Type != "None")
                 {
                     <MudTextField @bind-Value="_s.Proxy.Address" Label="Proxy Address"
@@ -196,31 +485,71 @@ else if (_s is not null)
                                   HelperText="One host/CIDR per line to bypass proxy" />
                 }
             </MudPaper>
+        </MudTabPanel>
+    </MudTabs>
 
-            @* Backup / Restore *@
-            @if (SessionService.CanModify("Settings"))
-            {
-                <MudPaper Elevation="1" Class="pa-3 mb-3">
-                    <MudText Typo="Typo.subtitle2" Class="mb-2">Backup &amp; Restore</MudText>
-                    <div style="display:flex;gap:8px;">
-                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download"
-                                   OnClick="BackupAsync">Backup</MudButton>
-                        <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload"
-                                   OnClick="RestoreAsync">Restore</MudButton>
-                    </div>
-                </MudPaper>
-            }
+    @if (_addFeedDialogOpen)
+    {
+        <MudOverlay Visible="true" DarkBackground="true" AutoClose="false" />
+        <div style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1400;width:min(560px,95vw);">
+            <MudPaper Elevation="12" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Add Feed</MudText>
+                <MudTextField @bind-Value="_newFeedTitle" Label="Title" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" Required="true" />
+                <MudTextField @bind-Value="_newFeedUrl" Label="URL" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" Required="true" />
+                <div style="display:flex;justify-content:flex-end;gap:8px;">
+                    <MudButton Variant="Variant.Text" OnClick="CancelAddFeed">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmAddFeed">Add</MudButton>
+                </div>
+            </MudPaper>
         </div>
-    </div>
+    }
+
+    @if (_addForwarderDialogOpen)
+    {
+        <MudOverlay Visible="true" DarkBackground="true" AutoClose="false" />
+        <div style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1400;width:min(560px,95vw);">
+            <MudPaper Elevation="12" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Add Forwarder (@_s.ForwarderProtocol)</MudText>
+                <MudTextField @bind-Value="_newForwarderName" Label="Name" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" Required="true" />
+                <MudTextField @bind-Value="_newForwarderAddress" Label="Address" Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-3" Required="true" />
+                <div style="display:flex;justify-content:flex-end;gap:8px;">
+                    <MudButton Variant="Variant.Text" OnClick="CancelAddForwarder">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" OnClick="ConfirmAddForwarder">Add</MudButton>
+                </div>
+            </MudPaper>
+        </div>
+    }
+
+    @if (_saveConfirmOpen)
+    {
+        <MudOverlay Visible="true" DarkBackground="true" AutoClose="false" />
+        <div style="position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:1400;width:min(1100px,96vw);">
+            <MudPaper Elevation="12" Class="pa-4">
+                <MudText Typo="Typo.h6" Class="mb-2">Review Changes Before Save</MudText>
+                <div style="display:flex;gap:12px;flex-wrap:wrap;">
+                    <MudTextField Value="@_saveBeforeText" Label="Before" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="16" ReadOnly="true" Style="flex:1;min-width:420px;" />
+                    <MudTextField Value="@_saveAfterText" Label="After" Variant="Variant.Outlined" Margin="Margin.Dense" Lines="16" ReadOnly="true" Style="flex:1;min-width:420px;" />
+                </div>
+                <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:8px;">
+                    <MudButton Variant="Variant.Text" OnClick="CancelSaveConfirmation">Cancel</MudButton>
+                    <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving" OnClick="ConfirmSaveAsync">Confirm Save</MudButton>
+                </div>
+            </MudPaper>
+        </div>
+    }
 
     @if (SessionService.CanModify("Settings"))
     {
-        <div style="margin-top:8px;padding-bottom:16px;">
-            <MudButton Variant="Variant.Filled" Color="Color.Primary"
-                       Disabled="@_saving" OnClick="SaveAsync">
-                @if (_saving) { <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" /> }
+        <div class="dns-toolbar" style="display:flex;gap:8px;align-items:center;margin-top:8px;padding-bottom:16px;">
+            <MudButton Variant="Variant.Filled" Color="Color.Primary" Disabled="@_saving" OnClick="OpenSaveConfirmation">
+                @if (_saving)
+                {
+                    <MudProgressCircular Size="Size.Small" Indeterminate="true" Class="mr-2" />
+                }
                 Save Settings
             </MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Download" OnClick="BackupAsync">Backup</MudButton>
+            <MudButton Variant="Variant.Outlined" StartIcon="@Icons.Material.Filled.Upload" OnClick="RestoreAsync">Restore</MudButton>
         </div>
     }
 }
@@ -230,18 +559,85 @@ else if (_s is not null)
     private bool                 _saving;
     private DnsSettingsResponse? _s;
 
+    private readonly List<FeedRow> _blockListFeeds = [];
+    private readonly List<BuiltinFeedPreset> _builtinFeedPresets = [];
+    private readonly List<BuiltinForwarderPreset> _builtinForwarderPresets = [];
+    private bool _addFeedDialogOpen;
+    private bool _addForwarderDialogOpen;
+    private bool _saveConfirmOpen;
+    private string _newFeedTitle = string.Empty;
+    private string _newFeedUrl = string.Empty;
+    private string _newForwarderName = string.Empty;
+    private string _newForwarderAddress = string.Empty;
+    private string _saveBeforeText = string.Empty;
+    private string _saveAfterText = string.Empty;
+    private string _feedTitleFilter = string.Empty;
+    private string _feedUrlFilter = string.Empty;
+    private string _forwarderNameFilter = string.Empty;
+    private string _forwarderAddressFilter = string.Empty;
+    private Dictionary<string, string> _originalForm = new(StringComparer.Ordinal);
+
+    private IEnumerable<FeedRow> FilteredBlockListFeeds => _blockListFeeds.Where(MatchesFeedFilter);
+    private IEnumerable<ForwarderRow> FilteredForwarderRows => _forwarderRows
+        .Where(MatchesForwarderFilter)
+        .OrderByDescending(x => x.Enabled)
+        .ThenBy(x => x.Enabled ? x.Order : int.MaxValue)
+        .ThenBy(x => x.Name);
+    private readonly List<ForwarderRow> _forwarderRows = [];
+
     protected override async Task OnInitializedAsync() => await LoadAsync();
 
     private async Task LoadAsync()
     {
         _loading = true;
+        await LoadBuiltinFeedPresetsAsync();
+        await LoadBuiltinForwarderPresetsAsync();
         var result = await Api.GetAsync<DnsSettingsResponse>("api/settings/get");
         _loading = false;
 
         if (result.IsOk && result.Data is not null)
+        {
             _s = result.Data;
+            InitializeForwarders();
+            InitializeBlockListFeeds();
+            _originalForm = BuildForm(_s);
+        }
         else
+        {
             Snackbar.Add(result.DisplayError, Severity.Error);
+        }
+    }
+
+    private async Task LoadBuiltinForwarderPresetsAsync()
+    {
+        _builtinForwarderPresets.Clear();
+
+        try
+        {
+            var presets = await Http.GetFromJsonAsync<List<BuiltinForwarderPreset>>("json/quick-forwarders-list-builtin.json");
+            if (presets is not null)
+                _builtinForwarderPresets.AddRange(presets);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not load built-in forwarder presets: {ex.Message}", Severity.Warning);
+        }
+    }
+
+    private async Task LoadBuiltinFeedPresetsAsync()
+    {
+        _builtinFeedPresets.Clear();
+
+        try
+        {
+            var presets = await Http.GetFromJsonAsync<List<BuiltinFeedPreset>>("json/quick-block-lists-builtin.json");
+            if (presets is not null)
+                _builtinFeedPresets.AddRange(presets);
+        }
+        catch (Exception ex)
+        {
+            Snackbar.Add($"Could not load built-in block list feeds: {ex.Message}", Severity.Warning);
+        }
     }
 
     private void SetProxyType(string type)
@@ -251,19 +647,188 @@ else if (_s is not null)
         _s.Proxy.Type = type;
     }
 
-    private async Task SaveAsync()
+    private Task OnActiveForwarderProtocolChanged(string protocol)
+    {
+        if (_s is null)
+            return Task.CompletedTask;
+
+        _s.ForwarderProtocol = protocol;
+
+        foreach (var row in _forwarderRows)
+        {
+            if (row.Protocol != protocol && row.Enabled)
+            {
+                row.Enabled = false;
+                row.Order = int.MaxValue;
+            }
+        }
+
+        CompactForwarderOrder(protocol);
+        return Task.CompletedTask;
+    }
+
+    private static string NormalizeForwarderProtocol(string? protocol) => protocol?.ToUpperInvariant() switch
+    {
+        "UDP" => "Udp",
+        "TCP" => "Tcp",
+        "TLS" => "Tls",
+        "HTTPS" => "Https",
+        "QUIC" => "Quic",
+        _ => "Udp"
+    };
+
+    private void OpenSaveConfirmation()
+    {
+        if (_s is null)
+            return;
+
+        SyncForwardersFromRows();
+        SyncBlockListUrlsFromFeeds();
+
+        var current = BuildForm(_s);
+        var keys = _originalForm.Keys
+            .Concat(current.Keys)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(k => k, StringComparer.Ordinal)
+            .ToList();
+
+        List<string> before = [];
+        List<string> after = [];
+
+        foreach (var key in keys)
+        {
+            var hadOld = _originalForm.TryGetValue(key, out var oldValue);
+            var hasNew = current.TryGetValue(key, out var newValue);
+            oldValue ??= string.Empty;
+            newValue ??= string.Empty;
+
+            if ((!hadOld && !hasNew) || string.Equals(oldValue, newValue, StringComparison.Ordinal))
+                continue;
+
+            before.Add($"{key}: {oldValue}");
+            after.Add($"{key}: {newValue}");
+        }
+
+        if (before.Count == 0)
+        {
+            Snackbar.Add("No changes to save.", Severity.Info);
+            return;
+        }
+
+        _saveBeforeText = string.Join("\n", before);
+        _saveAfterText = string.Join("\n", after);
+        _saveConfirmOpen = true;
+    }
+
+    private void CancelSaveConfirmation() => _saveConfirmOpen = false;
+
+    private async Task ConfirmSaveAsync()
     {
         if (_s is null) return;
+        _saveConfirmOpen = false;
         _saving = true;
+
+        SyncForwardersFromRows();
+        SyncBlockListUrlsFromFeeds();
 
         var form = BuildForm(_s);
         var result = await Api.PostAsync<object>("api/settings/set", form);
         _saving = false;
 
         if (result.IsOk)
+        {
+            _originalForm = BuildForm(_s);
             Snackbar.Add("Settings saved.", Severity.Success);
+        }
         else
             Snackbar.Add(result.DisplayError, Severity.Error);
+    }
+
+    private void InitializeForwarders()
+    {
+        _forwarderRows.Clear();
+        if (_s is null)
+            return;
+
+        List<string> selectedOrdered = [];
+        HashSet<string> selectedSet = new(StringComparer.OrdinalIgnoreCase);
+        if (_s.Forwarders is not null)
+        {
+            foreach (var raw in _s.Forwarders)
+            {
+                var normalized = raw?.Trim();
+                if (string.IsNullOrWhiteSpace(normalized) || !selectedSet.Add(normalized))
+                    continue;
+
+                selectedOrdered.Add(normalized);
+            }
+        }
+
+        Dictionary<string, int> selectedOrder = new(StringComparer.OrdinalIgnoreCase);
+        for (var i = 0; i < selectedOrdered.Count; i++)
+            selectedOrder[selectedOrdered[i]] = i;
+
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var preset in _builtinForwarderPresets)
+        {
+            var protocol = NormalizeForwarderProtocol(preset.Protocol);
+            if (preset.Addresses is null)
+                continue;
+
+            foreach (var raw in preset.Addresses)
+            {
+                var normalized = raw?.Trim();
+                if (string.IsNullOrWhiteSpace(normalized) || !seen.Add($"{protocol}|{normalized}"))
+                    continue;
+
+                _forwarderRows.Add(new ForwarderRow
+                {
+                    Enabled = protocol == _s.ForwarderProtocol && selectedSet.Contains(normalized),
+                    Name = string.IsNullOrWhiteSpace(preset.Name) ? normalized : preset.Name,
+                    Address = normalized,
+                    Protocol = protocol,
+                    Order = selectedOrder.TryGetValue(normalized, out var idx) ? idx : int.MaxValue,
+                    IsCustom = false
+                });
+            }
+        }
+
+        foreach (var address in selectedOrdered)
+        {
+            if (!seen.Add($"{_s.ForwarderProtocol}|{address}"))
+                continue;
+
+            _forwarderRows.Add(new ForwarderRow
+            {
+                Enabled = true,
+                Name = address,
+                Address = address,
+                Protocol = _s.ForwarderProtocol,
+                Order = selectedOrder[address],
+                IsCustom = true
+            });
+        }
+
+        CompactForwarderOrder(_s.ForwarderProtocol);
+    }
+
+    private void SyncForwardersFromRows()
+    {
+        if (_s is null)
+            return;
+
+        List<string> addresses = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in _forwarderRows.Where(r => r.Protocol == _s.ForwarderProtocol && r.Enabled).OrderBy(r => r.Order))
+        {
+            var normalized = row.Address?.Trim();
+            if (string.IsNullOrWhiteSpace(normalized) || !seen.Add(normalized))
+                continue;
+
+            addresses.Add(normalized);
+        }
+
+        _s.Forwarders = addresses.Count == 0 ? null : addresses;
     }
 
     private async Task UpdateBlockListAsync()
@@ -271,7 +836,7 @@ else if (_s is not null)
         var res = await Api.PostAsync<object>("api/settings/forceUpdateBlockLists",
             new Dictionary<string, string>());
         if (res.IsOk) Snackbar.Add("Block list update triggered.", Severity.Success);
-        else          Snackbar.Add(res.DisplayError, Severity.Error);
+        else Snackbar.Add(res.DisplayError, Severity.Error);
     }
 
     private async Task BackupAsync()
@@ -288,6 +853,339 @@ else if (_s is not null)
         if (r is { Canceled: false }) await LoadAsync();
     }
 
+    private void InitializeBlockListFeeds()
+    {
+        _blockListFeeds.Clear();
+
+        HashSet<string> selectedUrls = new(StringComparer.OrdinalIgnoreCase);
+        if (_s?.BlockListUrls is not null)
+        {
+            foreach (var raw in _s.BlockListUrls)
+            {
+                var normalized = raw?.Trim();
+                if (!string.IsNullOrWhiteSpace(normalized))
+                    selectedUrls.Add(normalized);
+            }
+        }
+
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var preset in _builtinFeedPresets)
+        {
+            if (preset.Urls is null) continue;
+
+            foreach (var rawUrl in preset.Urls)
+            {
+                var normalized = rawUrl?.Trim();
+                if (string.IsNullOrWhiteSpace(normalized) || !seen.Add(normalized))
+                    continue;
+
+                _blockListFeeds.Add(new FeedRow
+                {
+                    Enabled = selectedUrls.Contains(normalized),
+                    Title = string.IsNullOrWhiteSpace(preset.Name) ? GuessFeedTitle(normalized) : preset.Name,
+                    Url = normalized,
+                    IsCustom = false
+                });
+            }
+        }
+
+        foreach (var url in selectedUrls)
+        {
+            var normalized = url?.Trim();
+            if (string.IsNullOrWhiteSpace(normalized) || !seen.Add(normalized))
+                continue;
+
+            _blockListFeeds.Add(new FeedRow
+            {
+                Enabled = true,
+                Title = GuessFeedTitle(normalized),
+                Url = normalized,
+                IsCustom = true
+            });
+        }
+    }
+
+    private static string GuessFeedTitle(string url)
+    {
+        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
+            return uri.Host;
+        return url;
+    }
+
+    private void SyncBlockListUrlsFromFeeds()
+    {
+        if (_s is null) return;
+
+        List<string> urls = [];
+        HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
+        foreach (var feed in _blockListFeeds)
+        {
+            var url = feed.Url?.Trim();
+            if (!feed.Enabled || string.IsNullOrWhiteSpace(url) || !seen.Add(url))
+                continue;
+
+            urls.Add(url);
+        }
+
+        _s.BlockListUrls = urls.Count == 0 ? null : urls;
+    }
+
+    private void OpenAddFeedDialog()
+    {
+        _newFeedTitle = string.Empty;
+        _newFeedUrl = string.Empty;
+        _addFeedDialogOpen = true;
+    }
+
+    private void CancelAddFeed()
+    {
+        _addFeedDialogOpen = false;
+    }
+
+    private void ConfirmAddFeed()
+    {
+        var title = (_newFeedTitle ?? string.Empty).Trim();
+        var url = (_newFeedUrl ?? string.Empty).Trim();
+
+        if (title.Length == 0)
+        {
+            Snackbar.Add("Feed title is required.", Severity.Warning);
+            return;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out _))
+        {
+            Snackbar.Add("A valid absolute feed URL is required.", Severity.Warning);
+            return;
+        }
+
+        foreach (var feed in _blockListFeeds)
+        {
+            if (string.Equals(feed.Url, url, StringComparison.OrdinalIgnoreCase))
+            {
+                feed.Enabled = true;
+                if (feed.IsCustom)
+                    feed.Title = title;
+                _addFeedDialogOpen = false;
+                return;
+            }
+        }
+
+        _blockListFeeds.Add(new FeedRow
+        {
+            Enabled = true,
+            Title = title,
+            Url = url,
+            IsCustom = true
+        });
+
+        _addFeedDialogOpen = false;
+    }
+
+    private void RemoveFeed(FeedRow row)
+    {
+        _blockListFeeds.Remove(row);
+    }
+
+    private void OpenAddForwarderDialog()
+    {
+        _newForwarderName = string.Empty;
+        _newForwarderAddress = string.Empty;
+        _addForwarderDialogOpen = true;
+    }
+
+    private void CancelAddForwarder()
+    {
+        _addForwarderDialogOpen = false;
+    }
+
+    private void ConfirmAddForwarder()
+    {
+        if (_s is null)
+            return;
+
+        var name = (_newForwarderName ?? string.Empty).Trim();
+        var address = (_newForwarderAddress ?? string.Empty).Trim();
+
+        if (name.Length == 0)
+        {
+            Snackbar.Add("Forwarder name is required.", Severity.Warning);
+            return;
+        }
+
+        if (address.Length == 0)
+        {
+            Snackbar.Add("Forwarder address is required.", Severity.Warning);
+            return;
+        }
+
+        foreach (var row in _forwarderRows)
+        {
+            if (row.Protocol == _s.ForwarderProtocol && string.Equals(row.Address, address, StringComparison.OrdinalIgnoreCase))
+            {
+                OnForwarderEnabledChanged(row, true);
+                if (row.IsCustom)
+                    row.Name = name;
+                _addForwarderDialogOpen = false;
+                return;
+            }
+        }
+
+        _forwarderRows.Add(new ForwarderRow
+        {
+            Enabled = true,
+            Name = name,
+            Address = address,
+            Protocol = _s.ForwarderProtocol,
+            Order = NextForwarderOrder(_s.ForwarderProtocol),
+            IsCustom = true
+        });
+
+        _addForwarderDialogOpen = false;
+    }
+
+    private void RemoveForwarder(ForwarderRow row)
+    {
+        _forwarderRows.Remove(row);
+        if (_s is not null)
+            CompactForwarderOrder(_s.ForwarderProtocol);
+    }
+
+    private void OnForwarderEnabledChanged(ForwarderRow row, bool enabled)
+    {
+        row.Enabled = enabled;
+
+        if (enabled)
+            row.Order = NextForwarderOrder(row.Protocol);
+        else
+            row.Order = int.MaxValue;
+
+        CompactForwarderOrder(row.Protocol);
+    }
+
+    private int NextForwarderOrder(string protocol) => _forwarderRows
+        .Where(r => r.Protocol == protocol && r.Enabled)
+        .Select(r => r.Order)
+        .DefaultIfEmpty(-1)
+        .Max() + 1;
+
+    private void CompactForwarderOrder(string protocol)
+    {
+        var ordered = _forwarderRows
+            .Where(r => r.Protocol == protocol && r.Enabled)
+            .OrderBy(r => r.Order)
+            .ThenBy(r => r.Name)
+            .ToList();
+
+        for (var i = 0; i < ordered.Count; i++)
+            ordered[i].Order = i;
+    }
+
+    private bool CanMoveForwarderUp(ForwarderRow row)
+    {
+        if (!row.Enabled) return false;
+        var minOrder = _forwarderRows.Where(r => r.Protocol == row.Protocol && r.Enabled).Select(r => r.Order).DefaultIfEmpty(0).Min();
+        return row.Order > minOrder;
+    }
+
+    private bool CanMoveForwarderDown(ForwarderRow row)
+    {
+        if (!row.Enabled) return false;
+        var maxOrder = _forwarderRows.Where(r => r.Protocol == row.Protocol && r.Enabled).Select(r => r.Order).DefaultIfEmpty(0).Max();
+        return row.Order < maxOrder;
+    }
+
+    private void MoveForwarderUp(ForwarderRow row)
+    {
+        if (!CanMoveForwarderUp(row)) return;
+
+        var prev = _forwarderRows
+            .Where(r => r.Protocol == row.Protocol && r.Enabled && r.Order < row.Order)
+            .OrderByDescending(r => r.Order)
+            .FirstOrDefault();
+
+        if (prev is null) return;
+
+        (row.Order, prev.Order) = (prev.Order, row.Order);
+        CompactForwarderOrder(row.Protocol);
+    }
+
+    private void MoveForwarderDown(ForwarderRow row)
+    {
+        if (!CanMoveForwarderDown(row)) return;
+
+        var next = _forwarderRows
+            .Where(r => r.Protocol == row.Protocol && r.Enabled && r.Order > row.Order)
+            .OrderBy(r => r.Order)
+            .FirstOrDefault();
+
+        if (next is null) return;
+
+        (row.Order, next.Order) = (next.Order, row.Order);
+        CompactForwarderOrder(row.Protocol);
+    }
+
+    private bool MatchesFeedFilter(FeedRow row)
+    {
+        if (!string.IsNullOrWhiteSpace(_feedTitleFilter) &&
+            (row.Title?.Contains(_feedTitleFilter, StringComparison.OrdinalIgnoreCase) != true))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(_feedUrlFilter) &&
+            (row.Url?.Contains(_feedUrlFilter, StringComparison.OrdinalIgnoreCase) != true))
+            return false;
+
+        return true;
+    }
+
+    private bool MatchesForwarderFilter(ForwarderRow row)
+    {
+        if (_s is null || row.Protocol != _s.ForwarderProtocol)
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(_forwarderNameFilter) &&
+            (row.Name?.Contains(_forwarderNameFilter, StringComparison.OrdinalIgnoreCase) != true))
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(_forwarderAddressFilter) &&
+            (row.Address?.Contains(_forwarderAddressFilter, StringComparison.OrdinalIgnoreCase) != true))
+            return false;
+
+        return true;
+    }
+
+    private sealed class FeedRow
+    {
+        public bool Enabled { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string Url { get; set; } = string.Empty;
+        public bool IsCustom { get; set; }
+    }
+
+    private sealed class BuiltinFeedPreset
+    {
+        public string Name { get; set; } = string.Empty;
+        public List<string>? Urls { get; set; }
+    }
+
+    private sealed class BuiltinForwarderPreset
+    {
+        public string Name { get; set; } = string.Empty;
+        public string Protocol { get; set; } = "UDP";
+        public List<string>? Addresses { get; set; }
+    }
+
+    private sealed class ForwarderRow
+    {
+        public bool Enabled { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Address { get; set; } = string.Empty;
+        public string Protocol { get; set; } = "Udp";
+        public int Order { get; set; } = int.MaxValue;
+        public bool IsCustom { get; set; }
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────
     private static string ListToLines(List<string>? list) =>
         list is null ? "" : string.Join("\n", list);
@@ -298,58 +1196,147 @@ else if (_s is not null)
         return lines.Length == 0 ? null : [.. lines];
     }
 
+    private static string ListToLinesInt(List<int>? list) =>
+        list is null ? "" : string.Join("\n", list);
+
+    private static List<int>? LinesToIntList(string text)
+    {
+        List<int> values = [];
+        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var line in lines)
+        {
+            if (int.TryParse(line, out var value))
+                values.Add(value);
+        }
+        return values.Count == 0 ? null : values;
+    }
+
     private static Dictionary<string, string> BuildForm(DnsSettingsResponse s)
     {
         var f = new Dictionary<string, string>();
-        void Str(string k, string? v)       { if (v is not null) f[k] = v; }
-        void Int(string k, int v)           { f[k] = v.ToString(); }
-        void Bool(string k, bool v)         { f[k] = v ? "true" : "false"; }
+        void Str(string k, string? v) { if (v is not null) f[k] = v; }
+        void Int(string k, int v) { f[k] = v.ToString(); }
+        void Bool(string k, bool v) { f[k] = v ? "true" : "false"; }
         void Lines(string k, List<string>? v) { f[k] = v?.Count > 0 ? string.Join(",", v) : string.Empty; }
+        void LinesInt(string k, List<int>? v) { f[k] = v?.Count > 0 ? string.Join(",", v) : string.Empty; }
 
-        Str("dnsServerDomain",           s.DnsServerDomain);
+        Str("dnsServerDomain", s.DnsServerDomain);
         Lines("dnsServerLocalEndPoints", s.DnsServerLocalEndPoints);
-        Bool("preferIPv6",               s.PreferIPv6);
-        Bool("dnssecValidation",         s.DnssecValidation);
-        Bool("logQueries",               s.LogQueries);
-        Lines("webServiceLocalAddresses",s.WebServiceLocalAddresses);
-        Int("webServiceHttpPort",        s.WebServiceHttpPort);
-        Int("webServiceTlsPort",         s.WebServiceTlsPort);
-        Bool("webServiceEnableTls",      s.WebServiceEnableTls);
-        Str("webServiceTlsCertificatePath",     s.WebServiceTlsCertificatePath);
+        Lines("dnsServerIPv4SourceAddresses", s.DnsServerIPv4SourceAddresses);
+        Lines("dnsServerIPv6SourceAddresses", s.DnsServerIPv6SourceAddresses);
+        Int("defaultRecordTtl", s.DefaultRecordTtl);
+        Int("defaultNsRecordTtl", s.DefaultNsRecordTtl);
+        Int("defaultSoaRecordTtl", s.DefaultSoaRecordTtl);
+        Str("defaultResponsiblePerson", s.DefaultResponsiblePerson);
+        Bool("useSoaSerialDateScheme", s.UseSoaSerialDateScheme);
+        Int("minSoaRefresh", s.MinSoaRefresh);
+        Int("minSoaRetry", s.MinSoaRetry);
+        Lines("zoneTransferAllowedNetworks", s.ZoneTransferAllowedNetworks);
+        Lines("notifyAllowedNetworks", s.NotifyAllowedNetworks);
+        Bool("dnsAppsEnableAutomaticUpdate", s.DnsAppsEnableAutomaticUpdate);
+
+        Bool("preferIPv6", s.PreferIPv6);
+        Bool("enableUdpSocketPool", s.EnableUdpSocketPool);
+        LinesInt("socketPoolExcludedPorts", s.SocketPoolExcludedPorts);
+        Int("udpPayloadSize", s.UdpPayloadSize);
+        Bool("dnssecValidation", s.DnssecValidation);
+
+        Bool("eDnsClientSubnet", s.EDnsClientSubnet);
+        Int("eDnsClientSubnetIPv4PrefixLength", s.EDnsClientSubnetIPv4PrefixLength);
+        Int("eDnsClientSubnetIPv6PrefixLength", s.EDnsClientSubnetIPv6PrefixLength);
+        Str("eDnsClientSubnetIpv4Override", s.EDnsClientSubnetIpv4Override);
+        Str("eDnsClientSubnetIpv6Override", s.EDnsClientSubnetIpv6Override);
+
+        Int("clientTimeout", s.ClientTimeout);
+        Int("tcpSendTimeout", s.TcpSendTimeout);
+        Int("tcpReceiveTimeout", s.TcpReceiveTimeout);
+        Int("quicIdleTimeout", s.QuicIdleTimeout);
+        Int("quicMaxInboundStreams", s.QuicMaxInboundStreams);
+        Int("listenBacklog", s.ListenBacklog);
+        Int("maxConcurrentResolutionsPerCore", s.MaxConcurrentResolutionsPerCore);
+
+        Lines("webServiceLocalAddresses", s.WebServiceLocalAddresses);
+        Int("webServiceHttpPort", s.WebServiceHttpPort);
+        Bool("webServiceEnableTls", s.WebServiceEnableTls);
+        Bool("webServiceEnableHttp3", s.WebServiceEnableHttp3);
+        Bool("webServiceHttpToTlsRedirect", s.WebServiceHttpToTlsRedirect);
+        Bool("webServiceUseSelfSignedTlsCertificate", s.WebServiceUseSelfSignedTlsCertificate);
+        Int("webServiceTlsPort", s.WebServiceTlsPort);
+        Str("webServiceTlsCertificatePath", s.WebServiceTlsCertificatePath);
         Str("webServiceTlsCertificatePassword", s.WebServiceTlsCertificatePassword);
-        Bool("enableDnsOverHttp",        s.EnableDnsOverHttp);
-        Bool("enableDnsOverTls",         s.EnableDnsOverTls);
-        Bool("enableDnsOverHttps",       s.EnableDnsOverHttps);
-        Bool("enableDnsOverHttp3",       s.EnableDnsOverHttp3);
-        Bool("enableDnsOverQuic",        s.EnableDnsOverQuic);
-        Str("forwarderProtocol",         s.ForwarderProtocol);
-        Lines("forwarders",              s.Forwarders);
-        Bool("concurrentForwarding",       s.ConcurrentForwarding);
-        Str("recursion",                 s.Recursion);
-        Bool("qnameMinimization",        s.QnameMinimization);
-        Bool("randomizeName",            s.RandomizeName);
-        Bool("enableBlocking",           s.EnableBlocking);
-        Str("blockingType",              s.BlockingType);
+        Str("webServiceRealIpHeader", s.WebServiceRealIpHeader);
+
+        Bool("enableDnsOverUdpProxy", s.EnableDnsOverUdpProxy);
+        Int("dnsOverUdpProxyPort", s.DnsOverUdpProxyPort);
+        Bool("enableDnsOverTcpProxy", s.EnableDnsOverTcpProxy);
+        Int("dnsOverTcpProxyPort", s.DnsOverTcpProxyPort);
+        Bool("enableDnsOverHttp", s.EnableDnsOverHttp);
+        Int("dnsOverHttpPort", s.DnsOverHttpPort);
+        Bool("enableDnsOverTls", s.EnableDnsOverTls);
+        Int("dnsOverTlsPort", s.DnsOverTlsPort);
+        Bool("enableDnsOverHttps", s.EnableDnsOverHttps);
+        Bool("enableDnsOverHttp3", s.EnableDnsOverHttp3);
+        Int("dnsOverHttpsPort", s.DnsOverHttpsPort);
+        Bool("enableDnsOverQuic", s.EnableDnsOverQuic);
+        Int("dnsOverQuicPort", s.DnsOverQuicPort);
+        Str("dnsTlsCertificatePath", s.DnsTlsCertificatePath);
+        Str("dnsTlsCertificatePassword", s.DnsTlsCertificatePassword);
+        Lines("reverseProxyNetworkACL", s.ReverseProxyNetworkACL);
+        Str("dnsOverHttpRealIpHeader", s.DnsOverHttpRealIpHeader);
+
+        Str("forwarderProtocol", s.ForwarderProtocol);
+        Lines("forwarders", s.Forwarders);
+        Bool("concurrentForwarding", s.ConcurrentForwarding);
+        Int("forwarderConcurrency", s.ForwarderConcurrency);
+        Int("forwarderRetries", s.ForwarderRetries);
+        Int("forwarderTimeout", s.ForwarderTimeout);
+
+        Str("recursion", s.Recursion);
+        Lines("recursionNetworkACL", s.RecursionNetworkACL);
+        Bool("qnameMinimization", s.QnameMinimization);
+        Bool("randomizeName", s.RandomizeName);
+        Bool("nsRevalidation", s.NsRevalidation);
+        Int("resolverRetries", s.ResolverRetries);
+        Int("resolverTimeout", s.ResolverTimeout);
+        Int("resolverMaxStackCount", s.ResolverMaxStackCount);
+
+        Bool("enableBlocking", s.EnableBlocking);
+        Bool("allowTxtBlockingReport", s.AllowTxtBlockingReport);
+        Str("blockingType", s.BlockingType);
         Lines("customBlockingAddresses", s.CustomBlockingAddresses);
-        Lines("blockListUrls",           s.BlockListUrls);
+        Lines("blockListUrls", s.BlockListUrls);
         Int("blockListUpdateIntervalHours", s.BlockListUpdateIntervalHours);
-        Int("cacheMaximumEntries",       s.CacheMaximumEntries);
-        Int("cacheMinimumRecordTtl",     s.CacheMinimumRecordTtl);
-        Int("cacheMaximumRecordTtl",     s.CacheMaximumRecordTtl);
-        Bool("serveStale",               s.ServeStale);
-        Str("loggingType",               s.LoggingType);
-        Str("logFolder",                 s.LogFolder);
-        Int("maxLogFileDays",            s.MaxLogFileDays);
-        Bool("useLocalTime",             s.UseLocalTime);
+
+        Bool("serveStale", s.ServeStale);
+        Int("serveStaleTtl", s.ServeStaleTtl);
+        Int("serveStaleAnswerTtl", s.ServeStaleAnswerTtl);
+        Int("serveStaleResetTtl", s.ServeStaleResetTtl);
+        Int("serveStaleMaxWaitTime", s.ServeStaleMaxWaitTime);
+        Int("cacheMaximumEntries", s.CacheMaximumEntries);
+        Int("cacheMinimumRecordTtl", s.CacheMinimumRecordTtl);
+        Int("cacheMaximumRecordTtl", s.CacheMaximumRecordTtl);
+        Int("cacheNegativeRecordTtl", s.CacheNegativeRecordTtl);
+        Int("cacheFailureRecordTtl", s.CacheFailureRecordTtl);
+        Int("cachePrefetchEligibility", s.CachePrefetchEligibility);
+        Int("cachePrefetchTrigger", s.CachePrefetchTrigger);
+        Int("cachePrefetchSampleIntervalInMinutes", s.CachePrefetchSampleIntervalInMinutes);
+        Int("cachePrefetchSampleEligibilityHitsPerHour", s.CachePrefetchSampleEligibilityHitsPerHour);
+
+        Str("loggingType", s.LoggingType);
+        Str("logFolder", s.LogFolder);
+        Int("maxLogFileDays", s.MaxLogFileDays);
+        Bool("logQueries", s.LogQueries);
+        Bool("ignoreResolverLogs", s.IgnoreResolverLogs);
+        Bool("useLocalTime", s.UseLocalTime);
 
         if (s.Proxy is { } p && p.Type != "None")
         {
-            f["proxyType"]    = p.Type;
+            f["proxyType"] = p.Type;
             f["proxyAddress"] = p.Address;
-            f["proxyPort"]    = p.Port.ToString();
+            f["proxyPort"] = p.Port.ToString();
             if (p.Username is not null) f["proxyUsername"] = p.Username;
             if (p.Password is not null) f["proxyPassword"] = p.Password;
-            if (p.Bypass?.Count > 0)   f["proxyBypass"]   = string.Join(",", p.Bypass);
+            if (p.Bypass?.Count > 0) f["proxyBypass"] = string.Join(",", p.Bypass);
         }
         else
         {
