@@ -1,39 +1,87 @@
-<MudDialog>
+<MudDialog Class="dns-date-range-dialog">
     <DialogContent>
-        <MudText Typo="Typo.h6" Class="mb-4">Select Date Range</MudText>
-        <MudStack Spacing="3">
-            <MudText Typo="Typo.subtitle2">Start</MudText>
-            <MudGrid Spacing="1">
-                <MudItem xs="8">
-                    <MudDatePicker @bind-Date="_startDate" Label="Date"
-                                   MaxDate="DateTime.Today"
-                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
-                </MudItem>
-                <MudItem xs="4">
-                    <MudTimePicker @bind-Time="_startTime" Label="Time"
-                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
-                </MudItem>
-            </MudGrid>
+        <MudPaper Outlined="true" Class="dns-date-range-preview pa-2 mb-2">
+            <MudText Typo="Typo.body2">@_previewText</MudText>
+        </MudPaper>
 
-            <MudText Typo="Typo.subtitle2" Class="mt-3">End</MudText>
-            <MudGrid Spacing="1">
-                <MudItem xs="8">
-                    <MudDatePicker @bind-Date="_endDate" Label="Date"
-                                   MinDate="_startDate"
-                                   MaxDate="DateTime.Today"
-                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
-                </MudItem>
-                <MudItem xs="4">
-                    <MudTimePicker @bind-Time="_endTime" Label="Time"
-                                   Variant="Variant.Outlined" Margin="Margin.Dense" />
-                </MudItem>
-            </MudGrid>
+        <MudTabs Rounded="false" Elevation="0" @bind-ActivePanelIndex="_activeTabIndex" @bind-ActivePanelIndex:after="OnTabChanged">
+            <MudTabPanel Text="Absolute">
+                <MudStack Spacing="2" Class="pt-2">
+                    <MudText Typo="Typo.subtitle2">Start</MudText>
+                    <MudGrid Spacing="1">
+                        <MudItem xs="8">
+                            <MudDatePicker @bind-Date="_startDate" @bind-Date:after="OnAbsoluteValueChanged" Label="Date"
+                                           MaxDate="DateTime.Today"
+                                           Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="4">
+                            <MudTimePicker @bind-Time="_startTime" @bind-Time:after="OnAbsoluteValueChanged" Label="Time"
+                                           Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
 
-            @if (_error is not null)
-            {
-                <MudAlert Severity="Severity.Error" Class="mt-3">@_error</MudAlert>
-            }
-        </MudStack>
+                    <MudText Typo="Typo.subtitle2">End</MudText>
+                    <MudGrid Spacing="1">
+                        <MudItem xs="8">
+                            <MudDatePicker @bind-Date="_endDate" @bind-Date:after="OnAbsoluteValueChanged" Label="Date"
+                                           MinDate="_startDate"
+                                           MaxDate="DateTime.Today"
+                                           Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="4">
+                            <MudTimePicker @bind-Time="_endTime" @bind-Time:after="OnAbsoluteValueChanged" Label="Time"
+                                           Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Relative">
+                <MudStack Spacing="2" Class="pt-2">
+                    <MudText Typo="Typo.subtitle2">Quick Select</MudText>
+                    <MudStack Row="true" Wrap="Wrap.Wrap" Spacing="1">
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(15, RelativeUnit.Minutes))">Last 15 minutes</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(1, RelativeUnit.Hours))">Last 1 hour</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(24, RelativeUnit.Hours))">Last 24 hours</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(7, RelativeUnit.Days))">Last 7 days</MudButton>
+                        <MudButton Size="Size.Small" Variant="Variant.Outlined" OnClick="@(() => SetRelative(30, RelativeUnit.Days))">Last 30 days</MudButton>
+                    </MudStack>
+
+                    <MudDivider />
+
+                    <MudText Typo="Typo.subtitle2">Last</MudText>
+                    <MudGrid Spacing="1">
+                        <MudItem xs="5">
+                            <MudNumericField T="int" @bind-Value="_relativeAmount" @bind-Value:after="OnRelativeValueChanged" Min="1"
+                                             Variant="Variant.Outlined" Margin="Margin.Dense" />
+                        </MudItem>
+                        <MudItem xs="7">
+                            <MudSelect T="RelativeUnit" @bind-Value="_relativeUnit" @bind-Value:after="OnRelativeValueChanged"
+                                       Variant="Variant.Outlined" Margin="Margin.Dense">
+                                <MudSelectItem Value="RelativeUnit.Minutes">Minutes</MudSelectItem>
+                                <MudSelectItem Value="RelativeUnit.Hours">Hours</MudSelectItem>
+                                <MudSelectItem Value="RelativeUnit.Days">Days</MudSelectItem>
+                                <MudSelectItem Value="RelativeUnit.Weeks">Weeks</MudSelectItem>
+                                <MudSelectItem Value="RelativeUnit.Months">Months</MudSelectItem>
+                            </MudSelect>
+                        </MudItem>
+                    </MudGrid>
+                </MudStack>
+            </MudTabPanel>
+
+            <MudTabPanel Text="Now">
+                <MudStack Spacing="1" Class="pt-2">
+                    <MudButton Variant="Variant.Text" OnClick="SetNowRange">Now (last 1 minute)</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="SetTodayRange">Today</MudButton>
+                    <MudButton Variant="Variant.Text" OnClick="SetYesterdayRange">Yesterday</MudButton>
+                </MudStack>
+            </MudTabPanel>
+        </MudTabs>
+
+        @if (_error is not null)
+        {
+            <MudAlert Severity="Severity.Error" Dense="true" Class="mt-2">@_error</MudAlert>
+        }
     </DialogContent>
     <DialogActions>
         <MudButton OnClick="MudDialog.Cancel">Cancel</MudButton>
@@ -50,14 +98,35 @@
     private DateTime? _endDate;
     private TimeSpan? _startTime;
     private TimeSpan? _endTime;
+    private int _activeTabIndex;
+    private int _relativeAmount = 15;
+    private RelativeUnit _relativeUnit = RelativeUnit.Minutes;
     private string? _error;
+
+    private string _previewText = string.Empty;
+
+    private enum RelativeUnit
+    {
+        Minutes,
+        Hours,
+        Days,
+        Weeks,
+        Months
+    }
 
     protected override Task OnInitializedAsync()
     {
+        var now = DateTime.Now;
+
         if (InitialStart.HasValue)
         {
             _startDate = InitialStart.Value.Date;
             _startTime = InitialStart.Value.TimeOfDay;
+        }
+        else
+        {
+            _startDate = now.AddMinutes(-15).Date;
+            _startTime = now.AddMinutes(-15).TimeOfDay;
         }
 
         if (InitialEnd.HasValue)
@@ -65,6 +134,13 @@
             _endDate = InitialEnd.Value.Date;
             _endTime = InitialEnd.Value.TimeOfDay;
         }
+        else
+        {
+            _endDate = now.Date;
+            _endTime = now.TimeOfDay;
+        }
+
+        UpdatePreview();
 
         return Task.CompletedTask;
     }
@@ -73,29 +149,121 @@
     {
         _error = null;
 
-        // Validate dates are provided
-        if (!_startDate.HasValue || !_endDate.HasValue)
+        var (startDateTime, endDateTime) = ResolveSelection();
+
+        if (!startDateTime.HasValue || !endDateTime.HasValue)
         {
             _error = "Both start and end dates are required.";
             return Task.CompletedTask;
         }
 
-        // Get times (default to 00:00 if not set)
-        var startTime = _startTime ?? TimeSpan.Zero;
-        var endTime = _endTime ?? TimeSpan.Zero;
-
-        // Combine date and time
-        var startDateTime = _startDate.Value.Add(startTime);
-        var endDateTime = _endDate.Value.Add(endTime);
-
-        // Validate that start is before end
         if (startDateTime >= endDateTime)
         {
             _error = "Start date/time must be before end date/time.";
             return Task.CompletedTask;
         }
 
-        MudDialog.Close(DialogResult.Ok(new { Start = startDateTime, End = endDateTime }));
+        MudDialog.Close(DialogResult.Ok(new Dictionary<string, object>
+        {
+            ["Start"] = startDateTime.Value,
+            ["End"] = endDateTime.Value
+        }));
+
         return Task.CompletedTask;
+    }
+
+    private (DateTime? Start, DateTime? End) ResolveSelection()
+    {
+        if (_activeTabIndex == 1)
+        {
+            var end = DateTime.Now;
+            var start = end - ToTimeSpan(_relativeAmount, _relativeUnit);
+            return (start, end);
+        }
+
+        if (_activeTabIndex == 2)
+        {
+            var end = DateTime.Now;
+            var start = end.AddMinutes(-1);
+            return (start, end);
+        }
+
+        if (!_startDate.HasValue || !_endDate.HasValue)
+            return (null, null);
+
+        var startTime = _startTime ?? TimeSpan.Zero;
+        var endTime = _endTime ?? TimeSpan.Zero;
+        return (_startDate.Value.Add(startTime), _endDate.Value.Add(endTime));
+    }
+
+    private static TimeSpan ToTimeSpan(int value, RelativeUnit unit) => unit switch
+    {
+        RelativeUnit.Minutes => TimeSpan.FromMinutes(value),
+        RelativeUnit.Hours => TimeSpan.FromHours(value),
+        RelativeUnit.Days => TimeSpan.FromDays(value),
+        RelativeUnit.Weeks => TimeSpan.FromDays(value * 7),
+        RelativeUnit.Months => TimeSpan.FromDays(value * 30),
+        _ => TimeSpan.FromMinutes(value)
+    };
+
+    private void SetRelative(int amount, RelativeUnit unit)
+    {
+        _activeTabIndex = 1;
+        _relativeAmount = amount;
+        _relativeUnit = unit;
+        UpdatePreview();
+    }
+
+    private void SetNowRange()
+    {
+        _activeTabIndex = 2;
+        UpdatePreview();
+    }
+
+    private void SetTodayRange()
+    {
+        _activeTabIndex = 0;
+        var now = DateTime.Now;
+        _startDate = now.Date;
+        _startTime = TimeSpan.Zero;
+        _endDate = now.Date;
+        _endTime = now.TimeOfDay;
+        UpdatePreview();
+    }
+
+    private void SetYesterdayRange()
+    {
+        _activeTabIndex = 0;
+        var yesterday = DateTime.Today.AddDays(-1);
+        _startDate = yesterday.Date;
+        _startTime = TimeSpan.Zero;
+        _endDate = yesterday.Date;
+        _endTime = new TimeSpan(23, 59, 59);
+        UpdatePreview();
+    }
+
+    private void UpdatePreview()
+    {
+        var (start, end) = ResolveSelection();
+        _previewText = start.HasValue && end.HasValue
+            ? $"{start:MMM d, yyyy HH:mm:ss} → {end:MMM d, yyyy HH:mm:ss}"
+            : "Select start and end dates";
+    }
+
+    private void OnAbsoluteValueChanged()
+    {
+        if (_activeTabIndex == 0)
+            UpdatePreview();
+    }
+
+    private void OnRelativeValueChanged()
+    {
+        if (_activeTabIndex == 1)
+            UpdatePreview();
+    }
+
+    private void OnTabChanged()
+    {
+        UpdatePreview();
     }
 }

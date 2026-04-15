@@ -5,23 +5,20 @@
 @implements IDisposable
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Spacing="1" Class="mb-2">
-    <MudButtonGroup Variant="Variant.Outlined" Size="Size.Small" Color="Color.Primary">
-        @foreach (var r in _ranges)
-        {
-            @if (r.Key == "custom")
-            {
-                <MudButton Variant="@(_range == r.Key ? Variant.Filled : Variant.Outlined)"
-                           OnClick="OpenCustomRangeDialogAsync">@r.Label</MudButton>
-            }
-            else
-            {
-                <MudButton Variant="@(_range == r.Key ? Variant.Filled : Variant.Outlined)"
-                           OnClick="@(() => SetRangeAsync(r.Key))">@r.Label</MudButton>
-            }
-        }
-    </MudButtonGroup>
+    <MudButton Variant="Variant.Outlined" Color="Color.Primary" StartIcon="@Icons.Material.Outlined.DateRange"
+               OnClick="OpenCustomRangeDialogAsync">
+        @GetSelectedRangeLabel()
+    </MudButton>
 
-    <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
+    <MudStack Row="true" Spacing="1" AlignItems="AlignItems.Center">
+        @if (_range != "lastHour")
+        {
+            <MudButton Size="Size.Small" Variant="Variant.Text" Color="Color.Primary" OnClick="UseLastHourAsync">
+                Use Last Hour
+            </MudButton>
+        }
+        <ClusterNodeSelect Value="@_node" ValueChanged="OnNodeChangedAsync" />
+    </MudStack>
 </MudStack>
 
 @if (_loadError is not null)
@@ -235,18 +232,6 @@ else if (_response?.Stats is not null)
 }
 
 @code {
-    private record RangeItem(string Key, string Label);
-
-    private static readonly RangeItem[] _ranges =
-    [
-        new("lastHour", "Last Hour"),
-        new("lastDay", "Last Day"),
-        new("lastWeek", "Last Week"),
-        new("lastMonth", "Last Month"),
-        new("lastYear", "Last Year"),
-        new("custom", "Custom"),
-    ];
-
     private string _range = "lastHour";
     private string _node = "cluster";
     private DateTime? _customStart;
@@ -295,10 +280,12 @@ else if (_response?.Stats is not null)
         }
     }
 
-    private Task SetRangeAsync(string range)
+    private async Task UseLastHourAsync()
     {
-        _range = range;
-        return RefreshAsync();
+        _range = "lastHour";
+        _customStart = null;
+        _customEnd = null;
+        await RefreshAsync();
     }
 
     private async Task OpenCustomRangeDialogAsync()
@@ -312,9 +299,11 @@ else if (_response?.Stats is not null)
         var dialogRef = await DialogService.ShowAsync<Dialogs.DateRangePickerDialog>(
             "Select Date Range",
             parameters,
-            new DialogOptions { MaxWidth = MaxWidth.ExtraSmall, FullWidth = true });
+            new DialogOptions { MaxWidth = MaxWidth.Large, FullWidth = true });
 
         var result = await dialogRef.Result;
+        if (result == null)
+            return;
         if (result.Canceled)
             return;
 
@@ -452,7 +441,7 @@ else if (_response?.Stats is not null)
 
         static (double[] Data, string[] Labels) ToPie(DashboardChartData? chart)
         {
-            if (chart?.Datasets.Count == 0 || chart?.Labels.Count == 0)
+            if (chart == null || chart?.Datasets.Count == 0 || chart?.Labels.Count == 0)
                 return ([], []);
 
             var values = chart.Datasets[0].Data;
@@ -485,6 +474,14 @@ else if (_response?.Stats is not null)
 
     private void QueryDomain(string domain)
         => Snackbar.Add($"Navigate to DNS Client to query {domain}", Severity.Info);
+
+    private string GetSelectedRangeLabel()
+    {
+        if (_range == "custom" && _customStart.HasValue && _customEnd.HasValue)
+            return $"{_customStart:MMM d, yyyy HH:mm} → {_customEnd:MMM d, yyyy HH:mm}";
+
+        return "Last Hour";
+    }
 
     private static string DisplayName(TopStatsEntry entry)
         => string.IsNullOrWhiteSpace(entry.NameIdn) ? entry.Name : entry.NameIdn;
