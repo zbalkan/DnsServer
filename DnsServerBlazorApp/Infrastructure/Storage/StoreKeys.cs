@@ -4,6 +4,7 @@ public static class StoreKeys
 {
     public const string AuthToken = "auth-token";
     public const string ThemePreference = "theme";
+    public const string DashboardDateFilter = "dashboard-date-filter";
 
     public const string UserPreferences = "user-prefs";
     public const string SessionContext = "session-ctx";

@@ -2,6 +2,7 @@
 @inject SessionService  SessionService
 @inject IDialogService  DialogService
 @inject ISnackbar       Snackbar
+@inject DnsServerBlazorApp.Infrastructure.Storage.IClientStateStore Store
 @implements IDisposable
 
 <MudStack Row="true" AlignItems="AlignItems.Center" Justify="Justify.SpaceBetween" Wrap="Wrap.Wrap" Spacing="1" Class="mb-2">
@@ -232,6 +233,13 @@ else if (_response?.Stats is not null)
 }
 
 @code {
+    private sealed class DashboardFilterState
+    {
+        public string Range { get; set; } = "lastHour";
+        public DateTime? Start { get; set; }
+        public DateTime? End { get; set; }
+    }
+
     private string _range = "lastHour";
     private string _node = "cluster";
     private DateTime? _customStart;
@@ -256,7 +264,10 @@ else if (_response?.Stats is not null)
     private string[] _pie3Labels = [];
 
     protected override async Task OnInitializedAsync()
-        => await RefreshAsync();
+    {
+        await LoadSavedFilterAsync();
+        await RefreshAsync();
+    }
 
     private async Task OnNodeChangedAsync(string value)
     {
@@ -285,6 +296,7 @@ else if (_response?.Stats is not null)
         _range = "lastHour";
         _customStart = null;
         _customEnd = null;
+        await SaveFilterAsync();
         await RefreshAsync();
     }
 
@@ -316,8 +328,40 @@ else if (_response?.Stats is not null)
             _customStart = startDate;
             _customEnd = endDate;
             _range = "custom";
+            await SaveFilterAsync();
             await RefreshAsync();
         }
+    }
+
+    private async Task LoadSavedFilterAsync()
+    {
+        var saved = await Store.GetAsync<DashboardFilterState>(DnsServerBlazorApp.Infrastructure.Storage.StoreKeys.DashboardDateFilter);
+        if (saved is null)
+            return;
+
+        if (saved.Range == "custom" && saved.Start.HasValue && saved.End.HasValue && saved.Start < saved.End)
+        {
+            _range = "custom";
+            _customStart = saved.Start;
+            _customEnd = saved.End;
+            return;
+        }
+
+        _range = "lastHour";
+        _customStart = null;
+        _customEnd = null;
+    }
+
+    private ValueTask SaveFilterAsync()
+    {
+        var state = new DashboardFilterState
+        {
+            Range = _range,
+            Start = _customStart,
+            End = _customEnd
+        };
+
+        return Store.SetAsync(DnsServerBlazorApp.Infrastructure.Storage.StoreKeys.DashboardDateFilter, state);
     }
 
     private Task RefreshAsync() => LoadDataAsync(showLoader: true);
