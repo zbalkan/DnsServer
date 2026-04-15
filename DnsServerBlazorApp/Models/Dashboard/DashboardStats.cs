@@ -104,7 +104,7 @@ public sealed class DashboardChartData
     [JsonPropertyName("labels")]
     public List<string> Labels { get; set; } = [];
 
-    [JsonPropertyName("dataSets")]
+    [JsonPropertyName("datasets")]
     public List<DashboardChartDataSet> Datasets { get; set; } = [];
 }
 

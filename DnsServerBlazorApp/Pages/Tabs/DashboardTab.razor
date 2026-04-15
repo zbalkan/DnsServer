@@ -126,15 +126,15 @@ else if (_response?.Stats is not null)
         <MudItem xs="12" md="6" xl="4">
             <MudPaper Elevation="1" Class="pa-2 dns-dashboard-panel">
                 <MudText Typo="Typo.subtitle2" Class="mb-1">Response Types</MudText>
-                @if (_pie1Labels.Length > 0)
+                @if (HasPieData(_pie1Data, _pie1Labels))
                 {
-                    <MudChart T="double" ChartType="ChartType.Donut"
-                              inputData="@_pie1Data" inputLabels="@_pie1Labels"
+                    <MudChart ChartType="ChartType.Pie"
+                              ChartSeries="@_pie1Data.AsChartDataSet()" ChartLabels="@_pie1Labels"
                               Height="250px" Width="100%" />
                 }
                 else
                 {
-                    <MudText Class="pa-6" Align="Align.Center" Typo="Typo.body2">No data for selected range.</MudText>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="ma-2">No data for selected range.</MudAlert>
                 }
             </MudPaper>
         </MudItem>
@@ -142,15 +142,15 @@ else if (_response?.Stats is not null)
         <MudItem xs="12" md="6" xl="4">
             <MudPaper Elevation="1" Class="pa-2 dns-dashboard-panel">
                 <MudText Typo="Typo.subtitle2" Class="mb-1">Query Types</MudText>
-                @if (_pie2Labels.Length > 0)
+                @if (HasPieData(_pie2Data, _pie2Labels))
                 {
-                    <MudChart T="double" ChartType="ChartType.Donut"
-                              inputData="@_pie2Data" inputLabels="@_pie2Labels"
+                    <MudChart ChartType="ChartType.Pie"
+                              ChartSeries="@_pie2Data.AsChartDataSet()" ChartLabels="@_pie2Labels"
                               Height="250px" Width="100%" />
                 }
                 else
                 {
-                    <MudText Class="pa-6" Align="Align.Center" Typo="Typo.body2">No data for selected range.</MudText>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="ma-2">No data for selected range.</MudAlert>
                 }
             </MudPaper>
         </MudItem>
@@ -158,15 +158,15 @@ else if (_response?.Stats is not null)
         <MudItem xs="12" md="6" xl="4">
             <MudPaper Elevation="1" Class="pa-2 dns-dashboard-panel">
                 <MudText Typo="Typo.subtitle2" Class="mb-1">Protocols</MudText>
-                @if (_pie3Labels.Length > 0)
+                @if (HasPieData(_pie3Data, _pie3Labels))
                 {
-                    <MudChart T="double" ChartType="ChartType.Donut"
-                              inputData="@_pie3Data" inputLabels="@_pie3Labels"
+                    <MudChart ChartType="ChartType.Pie"
+                              ChartSeries="@_pie3Data.AsChartDataSet()" ChartLabels="@_pie3Labels"
                               Height="250px" Width="100%" />
                 }
                 else
                 {
-                    <MudText Class="pa-6" Align="Align.Center" Typo="Typo.body2">No data for selected range.</MudText>
+                    <MudAlert Severity="Severity.Info" Dense="true" Class="ma-2">No data for selected range.</MudAlert>
                 }
             </MudPaper>
         </MudItem>
@@ -485,6 +485,9 @@ else if (_response?.Stats is not null)
 
     private static string DisplayName(TopStatsEntry entry)
         => string.IsNullOrWhiteSpace(entry.NameIdn) ? entry.Name : entry.NameIdn;
+
+    private static bool HasPieData(double[] data, string[] labels)
+        => labels.Length > 0 && data.Length > 0 && data.Any(v => v > 0d);
 
     public void Dispose()
     {
