@@ -55,6 +55,7 @@ public static class BlazorHostingExtensions
 
         services.AddScoped<SessionService>();
         services.AddScoped<ApiService>();
+        services.AddScoped<SimpleZoneListService>();
         services.AddScoped<ThemeService>();
 
         return services;

@@ -21,18 +21,18 @@ else if (_s is not null)
                 <MudTextField @bind-Value="_s.DnsServerDomain" Label="Server Domain"
                               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2" />
 
-                <MudTextField Value="@ListToLines(_s.DnsServerLocalEndPoints)"
-                              ValueChanged="@((string v) => _s.DnsServerLocalEndPoints = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.DnsServerLocalEndPoints)"
+                              ValueChanged="@((string v) => _s.DnsServerLocalEndPoints = SettingsTabHelper.LinesToList(v))"
                               Label="Listen Endpoints" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="2" Class="mb-2" HelperText="One per line. e.g. 0.0.0.0:53" />
 
                 <div style="display:flex;gap:8px;">
-                    <MudTextField Value="@ListToLines(_s.DnsServerIPv4SourceAddresses)"
-                                  ValueChanged="@((string v) => _s.DnsServerIPv4SourceAddresses = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.DnsServerIPv4SourceAddresses)"
+                              ValueChanged="@((string v) => _s.DnsServerIPv4SourceAddresses = SettingsTabHelper.LinesToList(v))"
                                   Label="IPv4 Source Addresses" Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Lines="2" Class="mb-2" Style="flex:1;" />
-                    <MudTextField Value="@ListToLines(_s.DnsServerIPv6SourceAddresses)"
-                                  ValueChanged="@((string v) => _s.DnsServerIPv6SourceAddresses = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.DnsServerIPv6SourceAddresses)"
+                              ValueChanged="@((string v) => _s.DnsServerIPv6SourceAddresses = SettingsTabHelper.LinesToList(v))"
                                   Label="IPv6 Source Addresses" Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Lines="2" Class="mb-2" Style="flex:1;" />
                 </div>
@@ -61,13 +61,13 @@ else if (_s is not null)
                                   Class="mb-2" Style="flex:1;" />
                 </div>
 
-                <MudTextField Value="@ListToLines(_s.ZoneTransferAllowedNetworks)"
-                              ValueChanged="@((string v) => _s.ZoneTransferAllowedNetworks = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.ZoneTransferAllowedNetworks)"
+                              ValueChanged="@((string v) => _s.ZoneTransferAllowedNetworks = SettingsTabHelper.LinesToList(v))"
                               Label="Zone Transfer Allowed Networks" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="2" Class="mb-2" />
 
-                <MudTextField Value="@ListToLines(_s.NotifyAllowedNetworks)"
-                              ValueChanged="@((string v) => _s.NotifyAllowedNetworks = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.NotifyAllowedNetworks)"
+                              ValueChanged="@((string v) => _s.NotifyAllowedNetworks = SettingsTabHelper.LinesToList(v))"
                               Label="Notify Allowed Networks" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="2" Class="mb-2" />
 
@@ -79,8 +79,8 @@ else if (_s is not null)
                 <MudCheckBox @bind-Value="_s.DnsAppsEnableAutomaticUpdate" Label="DNS Apps Automatic Update" Dense="true" Class="mb-1" />
                 <MudCheckBox @bind-Value="_s.EnableUdpSocketPool" Label="Enable UDP Socket Pool" Dense="true" Class="mb-1" />
 
-                <MudTextField Value="@ListToLinesInt(_s.SocketPoolExcludedPorts)"
-                              ValueChanged="@((string v) => _s.SocketPoolExcludedPorts = LinesToIntList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLinesInt(_s.SocketPoolExcludedPorts)"
+                              ValueChanged="@((string v) => _s.SocketPoolExcludedPorts = SettingsTabHelper.LinesToIntList(v))"
                               Label="Socket Pool Excluded Ports" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="2" Class="mb-2" HelperText="One port per line" />
 
@@ -120,8 +120,8 @@ else if (_s is not null)
             <MudPaper Elevation="1" Class="pa-4 mb-3" Style="display:flex;flex-direction:column;gap:10px;">
                 <MudText Typo="Typo.subtitle2" Class="mb-2">Web Service</MudText>
 
-                <MudTextField Value="@ListToLines(_s.WebServiceLocalAddresses)"
-                              ValueChanged="@((string v) => _s.WebServiceLocalAddresses = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.WebServiceLocalAddresses)"
+                              ValueChanged="@((string v) => _s.WebServiceLocalAddresses = SettingsTabHelper.LinesToList(v))"
                               Label="Listen Addresses" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="2" Class="mb-2" />
 
@@ -179,8 +179,8 @@ else if (_s is not null)
                 <MudTextField @bind-Value="_s.DnsTlsCertificatePassword" Label="DNS TLS Certificate Password"
                               Variant="Variant.Outlined" Margin="Margin.Dense" InputType="InputType.Password" Class="mb-2" />
 
-                <MudTextField Value="@ListToLines(_s.ReverseProxyNetworkACL)"
-                              ValueChanged="@((string v) => _s.ReverseProxyNetworkACL = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.ReverseProxyNetworkACL)"
+                              ValueChanged="@((string v) => _s.ReverseProxyNetworkACL = SettingsTabHelper.LinesToList(v))"
                               Label="Reverse Proxy Network ACL" Variant="Variant.Outlined" Margin="Margin.Dense"
                               Lines="2" Class="mb-2" />
 
@@ -286,8 +286,8 @@ else if (_s is not null)
 
                 @if (_s.Recursion == "UseSpecifiedNetworkACL")
                 {
-                    <MudTextField Value="@ListToLines(_s.RecursionNetworkACL)"
-                                  ValueChanged="@((string v) => _s.RecursionNetworkACL = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.RecursionNetworkACL)"
+                              ValueChanged="@((string v) => _s.RecursionNetworkACL = SettingsTabHelper.LinesToList(v))"
                                   Label="Recursion Network ACL" Variant="Variant.Outlined" Margin="Margin.Dense"
                                   Lines="3" Class="mb-2" />
                 }
@@ -369,8 +369,8 @@ else if (_s is not null)
                     <MudSelectItem Value="@("Address")">Address</MudSelectItem>
                 </MudSelect>
 
-                <MudTextField Value="@ListToLines(_s.CustomBlockingAddresses)"
-                              ValueChanged="@((string v) => _s.CustomBlockingAddresses = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.CustomBlockingAddresses)"
+                              ValueChanged="@((string v) => _s.CustomBlockingAddresses = SettingsTabHelper.LinesToList(v))"
                               Label="Custom Blocking Addresses"
                               Variant="Variant.Outlined" Margin="Margin.Dense" Class="mb-2"
                               HelperText="One per line (for Address type)" />
@@ -478,8 +478,8 @@ else if (_s is not null)
                     <MudTextField @bind-Value="_s.Proxy.Password" Label="Password (optional)"
                                   Variant="Variant.Outlined" Margin="Margin.Dense"
                                   InputType="InputType.Password" Class="mb-2" />
-                    <MudTextField Value="@ListToLines(_s.Proxy.Bypass)"
-                                  ValueChanged="@((string v) => _s.Proxy.Bypass = LinesToList(v))"
+                <MudTextField Value="@SettingsTabHelper.ListToLines(_s.Proxy.Bypass)"
+                              ValueChanged="@((string v) => _s.Proxy.Bypass = SettingsTabHelper.LinesToList(v))"
                                   Label="Bypass (optional)" Variant="Variant.Outlined"
                                   Margin="Margin.Dense" Lines="2"
                                   HelperText="One host/CIDR per line to bypass proxy" />
@@ -600,7 +600,7 @@ else if (_s is not null)
             _s = result.Data;
             InitializeForwarders();
             InitializeBlockListFeeds();
-            _originalForm = BuildForm(_s);
+            _originalForm = SettingsTabHelper.BuildForm(_s);
         }
         else
         {
@@ -667,16 +667,6 @@ else if (_s is not null)
         return Task.CompletedTask;
     }
 
-    private static string NormalizeForwarderProtocol(string? protocol) => protocol?.ToUpperInvariant() switch
-    {
-        "UDP" => "Udp",
-        "TCP" => "Tcp",
-        "TLS" => "Tls",
-        "HTTPS" => "Https",
-        "QUIC" => "Quic",
-        _ => "Udp"
-    };
-
     private void OpenSaveConfirmation()
     {
         if (_s is null)
@@ -685,7 +675,7 @@ else if (_s is not null)
         SyncForwardersFromRows();
         SyncBlockListUrlsFromFeeds();
 
-        var current = BuildForm(_s);
+        var current = SettingsTabHelper.BuildForm(_s);
         var keys = _originalForm.Keys
             .Concat(current.Keys)
             .Distinct(StringComparer.Ordinal)
@@ -731,13 +721,13 @@ else if (_s is not null)
         SyncForwardersFromRows();
         SyncBlockListUrlsFromFeeds();
 
-        var form = BuildForm(_s);
+        var form = SettingsTabHelper.BuildForm(_s);
         var result = await Api.PostAsync<object>("api/settings/set", form);
         _saving = false;
 
         if (result.IsOk)
         {
-            _originalForm = BuildForm(_s);
+            _originalForm = SettingsTabHelper.BuildForm(_s);
             Snackbar.Add("Settings saved.", Severity.Success);
         }
         else
@@ -771,7 +761,7 @@ else if (_s is not null)
         HashSet<string> seen = new(StringComparer.OrdinalIgnoreCase);
         foreach (var preset in _builtinForwarderPresets)
         {
-            var protocol = NormalizeForwarderProtocol(preset.Protocol);
+            var protocol = SettingsTabHelper.NormalizeForwarderProtocol(preset.Protocol);
             if (preset.Addresses is null)
                 continue;
 
@@ -883,7 +873,7 @@ else if (_s is not null)
                 _blockListFeeds.Add(new FeedRow
                 {
                     Enabled = selectedUrls.Contains(normalized),
-                    Title = string.IsNullOrWhiteSpace(preset.Name) ? GuessFeedTitle(normalized) : preset.Name,
+                    Title = string.IsNullOrWhiteSpace(preset.Name) ? SettingsTabHelper.GuessFeedTitle(normalized) : preset.Name,
                     Url = normalized,
                     IsCustom = false
                 });
@@ -899,18 +889,11 @@ else if (_s is not null)
             _blockListFeeds.Add(new FeedRow
             {
                 Enabled = true,
-                Title = GuessFeedTitle(normalized),
+                Title = SettingsTabHelper.GuessFeedTitle(normalized),
                 Url = normalized,
                 IsCustom = true
             });
         }
-    }
-
-    private static string GuessFeedTitle(string url)
-    {
-        if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            return uri.Host;
-        return url;
     }
 
     private void SyncBlockListUrlsFromFeeds()
@@ -1155,194 +1138,4 @@ else if (_s is not null)
         return true;
     }
 
-    private sealed class FeedRow
-    {
-        public bool Enabled { get; set; }
-        public string Title { get; set; } = string.Empty;
-        public string Url { get; set; } = string.Empty;
-        public bool IsCustom { get; set; }
-    }
-
-    private sealed class BuiltinFeedPreset
-    {
-        public string Name { get; set; } = string.Empty;
-        public List<string>? Urls { get; set; }
-    }
-
-    private sealed class BuiltinForwarderPreset
-    {
-        public string Name { get; set; } = string.Empty;
-        public string Protocol { get; set; } = "UDP";
-        public List<string>? Addresses { get; set; }
-    }
-
-    private sealed class ForwarderRow
-    {
-        public bool Enabled { get; set; }
-        public string Name { get; set; } = string.Empty;
-        public string Address { get; set; } = string.Empty;
-        public string Protocol { get; set; } = "Udp";
-        public int Order { get; set; } = int.MaxValue;
-        public bool IsCustom { get; set; }
-    }
-
-    // ── Helpers ────────────────────────────────────────────────────────
-    private static string ListToLines(List<string>? list) =>
-        list is null ? "" : string.Join("\n", list);
-
-    private static List<string>? LinesToList(string text)
-    {
-        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        return lines.Length == 0 ? null : [.. lines];
-    }
-
-    private static string ListToLinesInt(List<int>? list) =>
-        list is null ? "" : string.Join("\n", list);
-
-    private static List<int>? LinesToIntList(string text)
-    {
-        List<int> values = [];
-        var lines = text.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var line in lines)
-        {
-            if (int.TryParse(line, out var value))
-                values.Add(value);
-        }
-        return values.Count == 0 ? null : values;
-    }
-
-    private static Dictionary<string, string> BuildForm(DnsSettingsResponse s)
-    {
-        var f = new Dictionary<string, string>();
-        void Str(string k, string? v) { if (v is not null) f[k] = v; }
-        void Int(string k, int v) { f[k] = v.ToString(); }
-        void Bool(string k, bool v) { f[k] = v ? "true" : "false"; }
-        void Lines(string k, List<string>? v) { f[k] = v?.Count > 0 ? string.Join(",", v) : string.Empty; }
-        void LinesInt(string k, List<int>? v) { f[k] = v?.Count > 0 ? string.Join(",", v) : string.Empty; }
-
-        Str("dnsServerDomain", s.DnsServerDomain);
-        Lines("dnsServerLocalEndPoints", s.DnsServerLocalEndPoints);
-        Lines("dnsServerIPv4SourceAddresses", s.DnsServerIPv4SourceAddresses);
-        Lines("dnsServerIPv6SourceAddresses", s.DnsServerIPv6SourceAddresses);
-        Int("defaultRecordTtl", s.DefaultRecordTtl);
-        Int("defaultNsRecordTtl", s.DefaultNsRecordTtl);
-        Int("defaultSoaRecordTtl", s.DefaultSoaRecordTtl);
-        Str("defaultResponsiblePerson", s.DefaultResponsiblePerson);
-        Bool("useSoaSerialDateScheme", s.UseSoaSerialDateScheme);
-        Int("minSoaRefresh", s.MinSoaRefresh);
-        Int("minSoaRetry", s.MinSoaRetry);
-        Lines("zoneTransferAllowedNetworks", s.ZoneTransferAllowedNetworks);
-        Lines("notifyAllowedNetworks", s.NotifyAllowedNetworks);
-        Bool("dnsAppsEnableAutomaticUpdate", s.DnsAppsEnableAutomaticUpdate);
-
-        Bool("preferIPv6", s.PreferIPv6);
-        Bool("enableUdpSocketPool", s.EnableUdpSocketPool);
-        LinesInt("socketPoolExcludedPorts", s.SocketPoolExcludedPorts);
-        Int("udpPayloadSize", s.UdpPayloadSize);
-        Bool("dnssecValidation", s.DnssecValidation);
-
-        Bool("eDnsClientSubnet", s.EDnsClientSubnet);
-        Int("eDnsClientSubnetIPv4PrefixLength", s.EDnsClientSubnetIPv4PrefixLength);
-        Int("eDnsClientSubnetIPv6PrefixLength", s.EDnsClientSubnetIPv6PrefixLength);
-        Str("eDnsClientSubnetIpv4Override", s.EDnsClientSubnetIpv4Override);
-        Str("eDnsClientSubnetIpv6Override", s.EDnsClientSubnetIpv6Override);
-
-        Int("clientTimeout", s.ClientTimeout);
-        Int("tcpSendTimeout", s.TcpSendTimeout);
-        Int("tcpReceiveTimeout", s.TcpReceiveTimeout);
-        Int("quicIdleTimeout", s.QuicIdleTimeout);
-        Int("quicMaxInboundStreams", s.QuicMaxInboundStreams);
-        Int("listenBacklog", s.ListenBacklog);
-        Int("maxConcurrentResolutionsPerCore", s.MaxConcurrentResolutionsPerCore);
-
-        Lines("webServiceLocalAddresses", s.WebServiceLocalAddresses);
-        Int("webServiceHttpPort", s.WebServiceHttpPort);
-        Bool("webServiceEnableTls", s.WebServiceEnableTls);
-        Bool("webServiceEnableHttp3", s.WebServiceEnableHttp3);
-        Bool("webServiceHttpToTlsRedirect", s.WebServiceHttpToTlsRedirect);
-        Bool("webServiceUseSelfSignedTlsCertificate", s.WebServiceUseSelfSignedTlsCertificate);
-        Int("webServiceTlsPort", s.WebServiceTlsPort);
-        Str("webServiceTlsCertificatePath", s.WebServiceTlsCertificatePath);
-        Str("webServiceTlsCertificatePassword", s.WebServiceTlsCertificatePassword);
-        Str("webServiceRealIpHeader", s.WebServiceRealIpHeader);
-
-        Bool("enableDnsOverUdpProxy", s.EnableDnsOverUdpProxy);
-        Int("dnsOverUdpProxyPort", s.DnsOverUdpProxyPort);
-        Bool("enableDnsOverTcpProxy", s.EnableDnsOverTcpProxy);
-        Int("dnsOverTcpProxyPort", s.DnsOverTcpProxyPort);
-        Bool("enableDnsOverHttp", s.EnableDnsOverHttp);
-        Int("dnsOverHttpPort", s.DnsOverHttpPort);
-        Bool("enableDnsOverTls", s.EnableDnsOverTls);
-        Int("dnsOverTlsPort", s.DnsOverTlsPort);
-        Bool("enableDnsOverHttps", s.EnableDnsOverHttps);
-        Bool("enableDnsOverHttp3", s.EnableDnsOverHttp3);
-        Int("dnsOverHttpsPort", s.DnsOverHttpsPort);
-        Bool("enableDnsOverQuic", s.EnableDnsOverQuic);
-        Int("dnsOverQuicPort", s.DnsOverQuicPort);
-        Str("dnsTlsCertificatePath", s.DnsTlsCertificatePath);
-        Str("dnsTlsCertificatePassword", s.DnsTlsCertificatePassword);
-        Lines("reverseProxyNetworkACL", s.ReverseProxyNetworkACL);
-        Str("dnsOverHttpRealIpHeader", s.DnsOverHttpRealIpHeader);
-
-        Str("forwarderProtocol", s.ForwarderProtocol);
-        Lines("forwarders", s.Forwarders);
-        Bool("concurrentForwarding", s.ConcurrentForwarding);
-        Int("forwarderConcurrency", s.ForwarderConcurrency);
-        Int("forwarderRetries", s.ForwarderRetries);
-        Int("forwarderTimeout", s.ForwarderTimeout);
-
-        Str("recursion", s.Recursion);
-        Lines("recursionNetworkACL", s.RecursionNetworkACL);
-        Bool("qnameMinimization", s.QnameMinimization);
-        Bool("randomizeName", s.RandomizeName);
-        Bool("nsRevalidation", s.NsRevalidation);
-        Int("resolverRetries", s.ResolverRetries);
-        Int("resolverTimeout", s.ResolverTimeout);
-        Int("resolverMaxStackCount", s.ResolverMaxStackCount);
-
-        Bool("enableBlocking", s.EnableBlocking);
-        Bool("allowTxtBlockingReport", s.AllowTxtBlockingReport);
-        Str("blockingType", s.BlockingType);
-        Lines("customBlockingAddresses", s.CustomBlockingAddresses);
-        Lines("blockListUrls", s.BlockListUrls);
-        Int("blockListUpdateIntervalHours", s.BlockListUpdateIntervalHours);
-
-        Bool("serveStale", s.ServeStale);
-        Int("serveStaleTtl", s.ServeStaleTtl);
-        Int("serveStaleAnswerTtl", s.ServeStaleAnswerTtl);
-        Int("serveStaleResetTtl", s.ServeStaleResetTtl);
-        Int("serveStaleMaxWaitTime", s.ServeStaleMaxWaitTime);
-        Int("cacheMaximumEntries", s.CacheMaximumEntries);
-        Int("cacheMinimumRecordTtl", s.CacheMinimumRecordTtl);
-        Int("cacheMaximumRecordTtl", s.CacheMaximumRecordTtl);
-        Int("cacheNegativeRecordTtl", s.CacheNegativeRecordTtl);
-        Int("cacheFailureRecordTtl", s.CacheFailureRecordTtl);
-        Int("cachePrefetchEligibility", s.CachePrefetchEligibility);
-        Int("cachePrefetchTrigger", s.CachePrefetchTrigger);
-        Int("cachePrefetchSampleIntervalInMinutes", s.CachePrefetchSampleIntervalInMinutes);
-        Int("cachePrefetchSampleEligibilityHitsPerHour", s.CachePrefetchSampleEligibilityHitsPerHour);
-
-        Str("loggingType", s.LoggingType);
-        Str("logFolder", s.LogFolder);
-        Int("maxLogFileDays", s.MaxLogFileDays);
-        Bool("logQueries", s.LogQueries);
-        Bool("ignoreResolverLogs", s.IgnoreResolverLogs);
-        Bool("useLocalTime", s.UseLocalTime);
-
-        if (s.Proxy is { } p && p.Type != "None")
-        {
-            f["proxyType"] = p.Type;
-            f["proxyAddress"] = p.Address;
-            f["proxyPort"] = p.Port.ToString();
-            if (p.Username is not null) f["proxyUsername"] = p.Username;
-            if (p.Password is not null) f["proxyPassword"] = p.Password;
-            if (p.Bypass?.Count > 0) f["proxyBypass"] = string.Join(",", p.Bypass);
-        }
-        else
-        {
-            f["proxyType"] = "None";
-        }
-
-        return f;
-    }
 }

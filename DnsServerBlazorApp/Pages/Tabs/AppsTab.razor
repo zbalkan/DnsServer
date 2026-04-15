@@ -63,9 +63,9 @@ else
                 <div style="display:flex;flex-wrap:wrap;gap:3px;">
                     @foreach (var cls in context.DnsApps)
                     {
-                        <MudTooltip Text="@BuildClassTooltip(cls)">
+                        <MudTooltip Text="@DisplayFormatHelper.BuildAppClassTooltip(cls)">
                             <MudChip T="string" Size="Size.Small" Variant="Variant.Outlined"
-                                     Color="Color.Default">@ShortClassName(cls.ClassPath)</MudChip>
+                                     Color="Color.Default">@cls.ClassPath.ToShortClassName()</MudChip>
                         </MudTooltip>
                     }
                 </div>
@@ -182,21 +182,4 @@ else
         if (r is { Canceled: false }) await LoadAsync();
     }
 
-    private static string ShortClassName(string? classPath)
-    {
-        if (string.IsNullOrEmpty(classPath)) return "?";
-        var dot = classPath.LastIndexOf('.');
-        return dot >= 0 ? classPath[(dot + 1)..] : classPath;
-    }
-
-    private static string BuildClassTooltip(DnsAppClass cls)
-    {
-        var feats = new List<string>();
-        if (cls.IsRequestController)         feats.Add("Request Controller");
-        if (cls.IsRequestBlockingHandler)    feats.Add("Blocking Handler");
-        if (cls.IsAuthoritativeRequestHandler) feats.Add("Authoritative");
-        if (cls.IsQueryLogger)               feats.Add("Query Logger");
-        if (cls.IsPostProcessor)             feats.Add("Post Processor");
-        return feats.Count > 0 ? string.Join(", ", feats) : ShortClassName(cls.ClassPath);
-    }
 }

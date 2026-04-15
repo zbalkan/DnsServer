@@ -98,7 +98,7 @@
 
     private async Task NavigateUpAsync()
     {
-        var parent = GetParentDomain(_domain);
+        var parent = _domain.GetParentDomain();
         await LoadListAsync(parent);
     }
 
@@ -114,7 +114,7 @@
         if (res.IsOk)
         {
             Snackbar.Add($"Cached zone '{_domain}' deleted.", Severity.Success);
-            await LoadListAsync(GetParentDomain(_domain));
+            await LoadListAsync(_domain.GetParentDomain());
         }
         else
             Snackbar.Add(res.DisplayError, Severity.Error);
@@ -134,10 +134,4 @@
             Snackbar.Add(res.DisplayError, Severity.Error);
     }
 
-    private static string GetParentDomain(string domain)
-    {
-        if (string.IsNullOrEmpty(domain)) return string.Empty;
-        var i = domain.IndexOf('.');
-        return i < 0 ? string.Empty : domain[(i + 1)..];
-    }
 }

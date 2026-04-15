@@ -13,7 +13,7 @@
                 <tr><td><strong>Domain</strong></td><td>@info.DnsServerDomain</td></tr>
                 <tr>
                     <td><strong>Uptime</strong></td>
-                    <td>@FormatUptime(info.Uptimestamp)</td>
+                    <td>@DisplayFormatHelper.FormatUptime(info.Uptimestamp)</td>
                 </tr>
             </tbody>
         </MudSimpleTable>
@@ -39,15 +39,3 @@
     </MudText>
 </MudPaper>
 
-@code {
-    private static string FormatUptime(DateTime? uptimestamp)
-    {
-        if (uptimestamp is null) return "—";
-        var ts = DateTime.UtcNow - uptimestamp.Value;
-        if (ts.TotalDays >= 1)
-            return $"{(int)ts.TotalDays}d {ts.Hours}h {ts.Minutes}m";
-        if (ts.TotalHours >= 1)
-            return $"{ts.Hours}h {ts.Minutes}m {ts.Seconds}s";
-        return $"{ts.Minutes}m {ts.Seconds}s";
-    }
-}
