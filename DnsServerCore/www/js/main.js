@@ -22,7 +22,7 @@ var reverseProxyDetected = false;
 var quickBlockLists = null;
 var quickForwardersList = null;
 
-function showPageLogin() {
+function showPageLogin(autoLogin) {
     hideAlert();
 
     localStorage.removeItem("token");
@@ -46,12 +46,15 @@ function showPageLogin() {
     }
 
     HTTPRequest({
-        url: "api/sso/status",
+        url: "api/status",
         success: function (responseJSON) {
             if (responseJSON.ssoEnabled)
                 $("#divLoginSso").show();
             else
                 $("#divLoginSso").hide();
+
+            if (autoLogin && responseJSON.hasDefaultCredentials)
+                login("admin", "admin");
         }
     });
 }
@@ -89,6 +92,9 @@ function showPageMain() {
     $("#logsTabListLogViewer").addClass("active");
     $("#logsTabPaneLogViewer").addClass("active");
 
+    $("#txtZonesFilterName").val("");
+    $("#optZonesFilterType").val("");
+    $("#tableZonesBody").html("");
     $("#divViewZones").show();
     $("#divEditZone").hide();
 
@@ -260,6 +266,7 @@ function showPageMain() {
 
 $(function () {
     initTheme();
+    initCheckForUpdateMenu();
 
     var headerHtml = $("#header").html();
 
@@ -422,6 +429,7 @@ $(function () {
         var enableLogging = rdLoggingType.toLowerCase() != "none";
 
         $("#chkIgnoreResolverLogs").prop("disabled", !enableLogging);
+        $("#chkNoStackTrace").prop("disabled", !enableLogging);
         $("#chkLogQueries").prop("disabled", !enableLogging);
         $("#chkUseLocalTime").prop("disabled", !enableLogging);
         $("#txtLogFolderPath").prop("disabled", !enableLogging);
@@ -644,7 +652,42 @@ function showAbout() {
     }
 }
 
+function initCheckForUpdateMenu() {
+    var disableCheckForUpdate = localStorage.getItem("disableCheckForUpdate");
+    if (disableCheckForUpdate === "true") {
+        $("#mnuDisableCheckForUpdate").hide();
+        $("#mnuEnableCheckForUpdate").show();
+    }
+    else {
+        $("#mnuEnableCheckForUpdate").hide();
+        $("#mnuDisableCheckForUpdate").show();
+    }
+}
+
+function disableCheckForUpdate() {
+    if (!confirm("Disabling check for update will prevent the Web Console from showing new update notification. You will have to manually find out if a new update is available.\r\n\r\nAre you sure you want to disable checking for update?"))
+        return;
+
+    localStorage.setItem("disableCheckForUpdate", true);
+    $("#mnuDisableCheckForUpdate").hide();
+    $("#mnuEnableCheckForUpdate").show();
+
+    showAlert("success", "Update Check Disabled!", "Check for update was disabled successfully.");
+}
+
+function enableCheckForUpdate() {
+    localStorage.setItem("disableCheckForUpdate", false);
+    $("#mnuEnableCheckForUpdate").hide();
+    $("#mnuDisableCheckForUpdate").show();
+
+    showAlert("success", "Update Check Enabled!", "Check for update was enabled successfully.");
+}
+
 function checkForUpdate() {
+    var disableCheckForUpdate = localStorage.getItem("disableCheckForUpdate");
+    if (disableCheckForUpdate === "true")
+        return;
+
     HTTPRequest({
         url: "api/user/checkForUpdate",
         token: sessionData.token,
@@ -807,6 +850,27 @@ function refreshDnsSettings() {
 
             loadDnsSettings(responseJSON);
             checkForReverseProxy(responseJSON);
+
+            if (sessionData.info.permissions.Settings.canModify) {
+                $("#btnSaveSettings").show();
+            } else {
+                $("#btnSaveSettings").hide();
+            }
+
+            if (sessionData.info.permissions.Cache.canDelete) {
+                $("#btnSettingsFlushCache").show();
+            } else {
+                $("#btnSettingsFlushCache").hide();
+            }
+
+            if (sessionData.info.permissions.Settings.canDelete) {
+                $("#btnShowBackupSettingsModal").show();
+                $("#btnShowRestoreSettingsModal").show();
+            }
+            else {
+                $("#btnShowBackupSettingsModal").hide();
+                $("#btnShowRestoreSettingsModal").hide();
+            }
 
             if (node == "cluster") {
                 //cluster view
@@ -1258,6 +1322,7 @@ function loadDnsSettings(responseJSON) {
 
     $("#chkRandomizeName").prop("checked", responseJSON.response.randomizeName);
     $("#chkQnameMinimization").prop("checked", responseJSON.response.qnameMinimization);
+    $("#chkLocallyServedDnsZones").prop("checked", responseJSON.response.locallyServedDnsZones);
 
     $("#txtResolverRetries").val(responseJSON.response.resolverRetries);
     $("#txtResolverTimeout").val(responseJSON.response.resolverTimeout);
@@ -1471,11 +1536,13 @@ function loadDnsSettings(responseJSON) {
     }
 
     $("#chkIgnoreResolverLogs").prop("disabled", !enableLogging);
+    $("#chkNoStackTrace").prop("disabled", !enableLogging);
     $("#chkLogQueries").prop("disabled", !enableLogging);
     $("#chkUseLocalTime").prop("disabled", !enableLogging);
     $("#txtLogFolderPath").prop("disabled", !enableLogging);
 
     $("#chkIgnoreResolverLogs").prop("checked", responseJSON.response.ignoreResolverLogs);
+    $("#chkNoStackTrace").prop("checked", responseJSON.response.noStackTrace);
     $("#chkLogQueries").prop("checked", responseJSON.response.logQueries);
     $("#chkUseLocalTime").prop("checked", responseJSON.response.useLocalTime);
     $("#txtLogFolderPath").val(responseJSON.response.logFolder);
@@ -1814,6 +1881,7 @@ function saveDnsSettings(objBtn) {
 
         var randomizeName = $("#chkRandomizeName").prop("checked");
         var qnameMinimization = $("#chkQnameMinimization").prop("checked");
+        var locallyServedDnsZones = $("#chkLocallyServedDnsZones").prop("checked");
 
         var resolverRetries = $("#txtResolverRetries").val();
         if ((resolverRetries == null) || (resolverRetries === "")) {
@@ -1843,7 +1911,7 @@ function saveDnsSettings(objBtn) {
             return;
         }
 
-        formData += "&recursion=" + recursion + "&recursionNetworkACL=" + encodeURIComponent(recursionNetworkACL) + "&randomizeName=" + randomizeName + "&qnameMinimization=" + qnameMinimization + "&resolverRetries=" + resolverRetries + "&resolverTimeout=" + resolverTimeout + "&resolverConcurrency=" + resolverConcurrency + "&resolverMaxStackCount=" + resolverMaxStackCount;
+        formData += "&recursion=" + recursion + "&recursionNetworkACL=" + encodeURIComponent(recursionNetworkACL) + "&randomizeName=" + randomizeName + "&qnameMinimization=" + qnameMinimization + "&locallyServedDnsZones=" + locallyServedDnsZones + "&resolverRetries=" + resolverRetries + "&resolverTimeout=" + resolverTimeout + "&resolverConcurrency=" + resolverConcurrency + "&resolverMaxStackCount=" + resolverMaxStackCount;
     }
 
     //cache
@@ -2029,6 +2097,7 @@ function saveDnsSettings(objBtn) {
     if (includeNodeParameters) {
         var loggingType = $("input[name=rdLoggingType]:checked").val();
         var ignoreResolverLogs = $("#chkIgnoreResolverLogs").prop("checked");
+        var noStackTrace = $("#chkNoStackTrace").prop("checked");
         var logQueries = $("#chkLogQueries").prop("checked");
         var useLocalTime = $("#chkUseLocalTime").prop("checked");
         var logFolder = $("#txtLogFolderPath").val();
@@ -2037,7 +2106,7 @@ function saveDnsSettings(objBtn) {
         var enableInMemoryStats = $("#chkEnableInMemoryStats").prop("checked");
         var maxStatFileDays = $("#txtMaxStatFileDays").val();
 
-        formData += "&loggingType=" + loggingType + "&ignoreResolverLogs=" + ignoreResolverLogs + "&logQueries=" + logQueries + "&useLocalTime=" + useLocalTime + "&logFolder=" + encodeURIComponent(logFolder) + "&maxLogFileDays=" + maxLogFileDays + "&enableInMemoryStats=" + enableInMemoryStats + "&maxStatFileDays=" + maxStatFileDays;
+        formData += "&loggingType=" + loggingType + "&ignoreResolverLogs=" + ignoreResolverLogs + "&noStackTrace=" + noStackTrace + "&logQueries=" + logQueries + "&useLocalTime=" + useLocalTime + "&logFolder=" + encodeURIComponent(logFolder) + "&maxLogFileDays=" + maxLogFileDays + "&enableInMemoryStats=" + enableInMemoryStats + "&maxStatFileDays=" + maxStatFileDays;
     }
 
     //send request
