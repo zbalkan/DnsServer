@@ -61,7 +61,7 @@ namespace DnsServerCore
             }
             catch (Exception ex)
             {
-                _log.Write("DNS Server encountered an error while trying to load old DNS config file: " + configFile + "\r\n" + ex.ToString());
+                _log.Write("DNS Server encountered an error while trying to load old DNS config file: " + configFile, ex);
             }
 
             return false;
@@ -78,7 +78,7 @@ namespace DnsServerCore
                 ReadOldConfigFrom(bR, version);
 
                 s.Dispose();
-                _dnsServer.SaveConfigFileInternal();
+                _dnsServer.SaveConfigFile(true);
 
                 return true;
             }
@@ -205,7 +205,7 @@ namespace DnsServerCore
                     }
                     catch (Exception ex)
                     {
-                        _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificatePath + "\r\n" + ex.ToString());
+                        _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificatePath, ex);
                     }
 
                     StartTlsCertificateUpdateTimer();
@@ -831,7 +831,7 @@ namespace DnsServerCore
                     }
                     catch (Exception ex)
                     {
-                        _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificatePath + "\r\n" + ex.ToString());
+                        _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificatePath, ex);
                     }
 
                     StartTlsCertificateUpdateTimer();
