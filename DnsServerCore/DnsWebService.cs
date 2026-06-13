@@ -310,7 +310,7 @@ namespace DnsServerCore
                         }
                         catch (Exception ex)
                         {
-                            _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificateAbsolutePath + "\r\n" + ex.ToString());
+                            _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificateAbsolutePath, ex);
                         }
 
                         StartTlsCertificateUpdateTimer();
@@ -335,13 +335,20 @@ namespace DnsServerCore
                     string webServiceHttpToTlsRedirect = Environment.GetEnvironmentVariable("DNS_SERVER_WEB_SERVICE_HTTP_TO_TLS_REDIRECT");
                     if (!string.IsNullOrEmpty(webServiceHttpToTlsRedirect))
                         _webServiceHttpToTlsRedirect = bool.Parse(webServiceHttpToTlsRedirect);
+
+                    string webServiceReverseProxyAddresses = Environment.GetEnvironmentVariable("DNS_SERVER_WEB_SERVICE_REVERSE_PROXY_ADDRESSES");
+                    if (!string.IsNullOrEmpty(webServiceReverseProxyAddresses))
+                        _webServiceReverseProxyAddresses = webServiceReverseProxyAddresses.Split(NetworkAccessControl.Parse, ',');
                 }
 
-                SaveConfigFileInternal();
+                lock (_saveLock)
+                {
+                    SaveConfigFileInternal();
+                }
             }
             catch (Exception ex)
             {
-                _log.Write("DNS Server encountered an error while loading Web Service config file: " + webServiceConfigFile + "\r\n" + ex.ToString());
+                _log.Write("DNS Server encountered an error while loading Web Service config file: " + webServiceConfigFile, ex);
                 _log.Write("Note: You may try deleting the Web Service config file to fix this issue. However, you will lose Web Service settings but, other data wont be affected.");
                 throw;
             }
@@ -445,16 +452,8 @@ namespace DnsServerCore
 
             foreach (AuthZoneInfo zone in zones)
             {
-                if (zone.Internal)
-                {
-                    _authManager.SetPermission(PermissionSection.Zones, zone.Name, admins, PermissionFlag.View);
-                    _authManager.SetPermission(PermissionSection.Zones, zone.Name, dnsAdmins, PermissionFlag.View);
-                }
-                else
-                {
-                    _authManager.SetPermission(PermissionSection.Zones, zone.Name, admins, PermissionFlag.ViewModifyDelete);
-                    _authManager.SetPermission(PermissionSection.Zones, zone.Name, dnsAdmins, PermissionFlag.ViewModifyDelete);
-                }
+                _authManager.SetPermission(PermissionSection.Zones, zone.Name, admins, PermissionFlag.ViewModifyDelete);
+                _authManager.SetPermission(PermissionSection.Zones, zone.Name, dnsAdmins, PermissionFlag.ViewModifyDelete);
             }
 
             _authManager.SaveConfigFile();
@@ -539,7 +538,7 @@ namespace DnsServerCore
                 }
                 catch (Exception ex)
                 {
-                    _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificateAbsolutePath + "\r\n" + ex.ToString());
+                    _log.Write("DNS Server encountered an error while loading Web Service TLS certificate: " + webServiceTlsCertificateAbsolutePath, ex);
                 }
 
                 StartTlsCertificateUpdateTimer();
@@ -1025,8 +1024,11 @@ namespace DnsServerCore
 
                                     _log.Write("Old DNS config file was restored successfully.");
 
-                                    //explicitly save webservice.config
-                                    SaveConfigFileInternal();
+                                    lock (_saveLock)
+                                    {
+                                        //explicitly save webservice.config
+                                        SaveConfigFileInternal();
+                                    }
                                 }
                             }
                         }
@@ -1541,7 +1543,7 @@ namespace DnsServerCore
                         }
                         catch (Exception ex)
                         {
-                            _log.Write("Failed to restart web service.\r\n" + ex.ToString());
+                            _log.Write("Failed to restart web service.", ex);
                         }
 
                         //update cluster node URL to reflect latest TLS port
@@ -1567,7 +1569,7 @@ namespace DnsServerCore
                     }
                     catch (Exception ex)
                     {
-                        _log.Write("Failed to restart DNS service.\r\n" + ex.ToString());
+                        _log.Write("Failed to restart DNS service.", ex);
                     }
                 }
             });
@@ -1610,7 +1612,7 @@ namespace DnsServerCore
             }
             catch (Exception ex)
             {
-                _log.Write("Web Service failed to start: " + ex.ToString());
+                _log.Write("Web Service failed to start.", ex);
             }
 
             _log.Write("Attempting to revert Web Service end point changes ...");
@@ -1623,12 +1625,16 @@ namespace DnsServerCore
 
                 await StartWebServiceAsync(false);
 
-                SaveConfigFileInternal(); //save reverted changes
+                lock (_saveLock)
+                {
+                    SaveConfigFileInternal(); //save reverted changes
+                }
+
                 return;
             }
             catch (Exception ex2)
             {
-                _log.Write("Web Service failed to start: " + ex2.ToString());
+                _log.Write("Web Service failed to start.", ex2);
             }
 
             _log.Write("Attempting to start Web Service on ANY (0.0.0.0) fallback address...");
@@ -1642,7 +1648,7 @@ namespace DnsServerCore
             }
             catch (Exception ex3)
             {
-                _log.Write("Web Service failed to start: " + ex3.ToString());
+                _log.Write("Web Service failed to start.", ex3);
             }
 
             _log.Write("Attempting to start Web Service on loopback (127.0.0.1) fallback address...");
@@ -1693,6 +1699,17 @@ namespace DnsServerCore
 
                     foreach (string scope in _authManager.SsoScopes)
                         options.Scope.Add(scope);
+
+                    //setup user info endpoint json key map for supported claim types
+                    options.ClaimActions.MapUniqueJsonKey("sub", "sub");
+                    options.ClaimActions.MapUniqueJsonKey("email", "email");
+                    options.ClaimActions.MapUniqueJsonKey("preferred_username", "preferred_username");
+                    options.ClaimActions.MapUniqueJsonKey("upn", "upn");
+                    options.ClaimActions.MapUniqueJsonKey("nickname", "nickname");
+                    options.ClaimActions.MapUniqueJsonKey("name", "name");
+                    options.ClaimActions.MapUniqueJsonKey("given_name", "given_name");
+                    options.ClaimActions.MapJsonKey("groups", "groups");
+                    options.ClaimActions.MapJsonKey("roles", "roles");
 
                     options.CallbackPath = new PathString("/sso/callback");
 
@@ -1949,9 +1966,12 @@ namespace DnsServerCore
 
             _webService.UseRouting();
 
+            //status
+            _webService.MapGetAndPost("/api/status", _authApi.StatusAsync);
+
             //sso
             _webService.MapGetAndPost("/sso/login", _authApi.SsoLoginAsync);
-            _webService.MapGetAndPost("/api/sso/status", _authApi.SsoStatusAsync);
+            _webService.MapGetAndPost("/api/sso/status", _authApi.StatusAsync); //depricated
 
             //user auth
             _webService.MapGetAndPost("/api/user/login", delegate (HttpContext context) { return _authApi.LoginAsync(context, UserSessionType.Standard); });
@@ -2048,6 +2068,7 @@ namespace DnsServerCore
 
             //dns client
             _webService.MapGetAndPost("/api/dnsClient/resolve", _api.ResolveQueryAsync);
+            _webService.MapGetAndPost("/api/dnsClient/healthCheck", _api.HealthCheckAsync);
 
             //settings
             _webService.MapGetAndPost("/api/settings/get", _settingsApi.GetDnsSettings);
@@ -2168,6 +2189,7 @@ namespace DnsServerCore
 
                 case "/sso/login":
                 case "/sso/callback":
+                case "/api/status":
                 case "/api/sso/status":
 
                 case "/api/user/login":
@@ -2248,6 +2270,7 @@ namespace DnsServerCore
 
             switch (request.Path)
             {
+                case "/api/status":
                 case "/api/sso/status":
                 case "/api/user/login":
                 case "/api/user/createToken":
@@ -2518,7 +2541,7 @@ namespace DnsServerCore
                         }
                         catch (Exception ex)
                         {
-                            _log.Write("DNS Server encountered an error while updating Web Service TLS Certificate: " + webServiceTlsCertificatePath + "\r\n" + ex.ToString());
+                            _log.Write("DNS Server encountered an error while updating Web Service TLS Certificate: " + webServiceTlsCertificatePath, ex);
                         }
                     }
                 }, null, TLS_CERTIFICATE_UPDATE_TIMER_INITIAL_INTERVAL, TLS_CERTIFICATE_UPDATE_TIMER_INTERVAL);
@@ -2616,7 +2639,7 @@ namespace DnsServerCore
             }
             catch (Exception ex)
             {
-                _log.Write("DNS Server encountered an error while loading Web Service TLS Certificate: " + webServiceTlsCertificatePath + "\r\n" + ex.ToString());
+                _log.Write("DNS Server encountered an error while loading Web Service TLS Certificate: " + webServiceTlsCertificatePath, ex);
             }
 
             _webServiceTlsCertificatePath = ConvertToRelativePath(webServiceTlsCertificatePath);
@@ -2681,7 +2704,7 @@ namespace DnsServerCore
                     }
                     catch (Exception ex)
                     {
-                        _log.Write("DNS Server encountered an error while loading self signed Web Service TLS certificate: " + selfSignedCertificateFilePath + "\r\n" + ex.ToString());
+                        _log.Write("DNS Server encountered an error while loading self signed Web Service TLS certificate: " + selfSignedCertificateFilePath, ex);
 
                         if (throwException)
                             throw;
@@ -2841,7 +2864,7 @@ namespace DnsServerCore
             }
             catch (Exception ex)
             {
-                _log.Write("Failed to start DNS Server (v" + _currentVersion.ToString() + ")\r\n" + ex.ToString());
+                _log.Write("Failed to start DNS Server (v" + _currentVersion.ToString() + ").", ex);
                 throw;
             }
         }
@@ -2871,7 +2894,7 @@ namespace DnsServerCore
             }
             catch (Exception ex)
             {
-                _log.Write("Failed to stop DNS Server (v" + _currentVersion.ToString() + ")\r\n" + ex.ToString());
+                _log.Write("Failed to stop DNS Server (v" + _currentVersion.ToString() + ").", ex);
                 throw;
             }
         }
