@@ -288,6 +288,7 @@ namespace DnsServerCore
 
                 jsonWriter.WriteBoolean("randomizeName", _dnsWebService._dnsServer.RandomizeName);
                 jsonWriter.WriteBoolean("qnameMinimization", _dnsWebService._dnsServer.QnameMinimization);
+                jsonWriter.WriteBoolean("locallyServedDnsZones", _dnsWebService._dnsServer.LocallyServedDnsZones);
 
                 jsonWriter.WriteNumber("resolverRetries", _dnsWebService._dnsServer.ResolverRetries);
                 jsonWriter.WriteNumber("resolverTimeout", _dnsWebService._dnsServer.ResolverTimeout);
@@ -436,6 +437,7 @@ namespace DnsServerCore
                 jsonWriter.WriteString("loggingType", _dnsWebService._log.LoggingType.ToString());
                 jsonWriter.WriteBoolean("ignoreResolverLogs", _dnsWebService._dnsServer.ResolverLogManager == null);
                 jsonWriter.WriteBoolean("logQueries", _dnsWebService._dnsServer.QueryLogManager != null);
+                jsonWriter.WriteBoolean("noStackTrace", _dnsWebService._log.NoStackTrace);
                 jsonWriter.WriteBoolean("useLocalTime", _dnsWebService._log.UseLocalTime);
                 jsonWriter.WriteString("logFolder", _dnsWebService._log.LogFolder);
                 jsonWriter.WriteNumber("maxLogFileDays", _dnsWebService._log.MaxLogFileDays);
@@ -1259,6 +1261,13 @@ namespace DnsServerCore
                             clusterParameters.Add("qnameMinimization", qnameMinimization.ToString());
                         }
 
+                        if (request.TryGetQueryOrForm("locallyServedDnsZones", bool.Parse, out bool locallyServedDnsZones))
+                        {
+                            _dnsWebService._dnsServer.LocallyServedDnsZones = locallyServedDnsZones;
+
+                            clusterParameters.Add("locallyServedDnsZones", locallyServedDnsZones.ToString());
+                        }
+
                         if (request.TryGetQueryOrForm("resolverRetries", int.Parse, out int resolverRetries))
                         {
                             _dnsWebService._dnsServer.ResolverRetries = resolverRetries;
@@ -1565,6 +1574,9 @@ namespace DnsServerCore
 
                         if (request.TryGetQueryOrForm("logQueries", bool.Parse, out bool logQueries))
                             _dnsWebService._dnsServer.QueryLogManager = logQueries ? _dnsWebService._log : null;
+
+                        if (request.TryGetQueryOrForm("noStackTrace", bool.Parse, out bool noStackTrace))
+                            _dnsWebService._log.NoStackTrace = noStackTrace;
 
                         if (request.TryGetQueryOrForm("useLocalTime", bool.Parse, out bool useLocalTime))
                             _dnsWebService._log.UseLocalTime = useLocalTime;
