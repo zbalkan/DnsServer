@@ -581,7 +581,7 @@ namespace DnsServerCore.Dhcp
             else if (string.IsNullOrWhiteSpace(request.ClientFullyQualifiedDomainName.DomainName))
             {
                 //client domain empty and expects server for a fqdn domain name
-                if (request.HostName is null)
+                if ((request.HostName is null) || string.IsNullOrWhiteSpace(request.HostName.HostName))
                     return null; //server unable to decide a name for client
 
                 clientDomainName = DhcpServer.GetSanitizedHostName(request.HostName.HostName) + "." + _domainName;
