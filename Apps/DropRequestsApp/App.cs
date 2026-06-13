@@ -178,12 +178,15 @@ namespace DropRequests
                 return Task.FromResult(DnsRequestControllerAction.DropSilently);
             }
 
-            DnsQuestionRecord requestQuestion = request.Question[0];
-
-            foreach (BlockedQuestion blockedQuestion in _blockedQuestions)
+            if (request.Question.Count > 0)
             {
-                if (blockedQuestion.Matches(requestQuestion))
-                    return Task.FromResult(DnsRequestControllerAction.DropSilently);
+                DnsQuestionRecord requestQuestion = request.Question[0];
+
+                foreach (BlockedQuestion blockedQuestion in _blockedQuestions)
+                {
+                    if (blockedQuestion.Matches(requestQuestion))
+                        return Task.FromResult(DnsRequestControllerAction.DropSilently);
+                }
             }
 
             return Task.FromResult(DnsRequestControllerAction.Allow);
