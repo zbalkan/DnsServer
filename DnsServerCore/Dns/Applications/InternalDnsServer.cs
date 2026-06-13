@@ -74,7 +74,12 @@ namespace DnsServerCore.Dns.Applications
 
         public void WriteLog(Exception ex)
         {
-            _dnsServer.LogManager.Write("DNS App [" + _applicationName + "]: " + ex.ToString());
+            _dnsServer.LogManager.Write("DNS App [" + _applicationName + "]: ", ex);
+        }
+
+        public void WriteLog(string message, Exception ex)
+        {
+            _dnsServer.LogManager.Write("DNS App [" + _applicationName + "]: " + message, ex);
         }
 
         #endregion
