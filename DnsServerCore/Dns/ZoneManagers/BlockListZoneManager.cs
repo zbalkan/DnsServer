@@ -166,7 +166,10 @@ namespace DnsServerCore.Dns.ZoneManagers
             }
             catch (FileNotFoundException)
             {
-                SaveConfigFileInternal();
+                lock (_saveLock)
+                {
+                    SaveConfigFileInternal();
+                }
             }
             catch (Exception ex)
             {
