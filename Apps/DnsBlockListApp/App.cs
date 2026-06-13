@@ -619,7 +619,7 @@ namespace DnsBlockList
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.WriteLog("The app failed to read IP block list file: " + _blockListFile + "\r\n" + ex.ToString());
+                    _dnsServer.WriteLog("The app failed to read IP block list file: " + _blockListFile, ex);
                 }
             }
 
@@ -755,7 +755,7 @@ namespace DnsBlockList
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.WriteLog("The app failed to read domain block list file: " + _blockListFile + "\r\n" + ex.ToString());
+                    _dnsServer.WriteLog("The app failed to read domain block list file: " + _blockListFile, ex);
                 }
             }
 

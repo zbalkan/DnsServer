@@ -435,7 +435,7 @@ namespace BlockPage
                             }
                             catch (Exception ex)
                             {
-                                _dnsServer.WriteLog("Web server '" + _name + "' encountered an error while updating TLS Certificate: " + _webServerTlsCertificateFilePath + "\r\n" + ex.ToString());
+                                _dnsServer.WriteLog("Web server '" + _name + "' encountered an error while updating TLS Certificate: " + _webServerTlsCertificateFilePath, ex);
                             }
                         }
 

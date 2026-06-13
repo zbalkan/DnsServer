@@ -1244,7 +1244,7 @@ namespace AdvancedBlocking
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.WriteLog("Advanced Blocking app failed to download " + (_isAdblockList ? "adblock" : (_isRegexList ? "regex " : "") + (_isAllowList ? "allow" : "block")) + " list and will use previously downloaded file (if available): " + _listUrl.AbsoluteUri + "\r\n" + ex.ToString());
+                    _dnsServer.WriteLog("Advanced Blocking app failed to download " + (_isAdblockList ? "adblock" : (_isRegexList ? "regex " : "") + (_isAllowList ? "allow" : "block")) + " list and will use previously downloaded file (if available): " + _listUrl.AbsoluteUri, ex);
                     return false;
                 }
             }
@@ -1449,7 +1449,7 @@ namespace AdvancedBlocking
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.WriteLog("Advanced Blocking app failed to read " + (_isAllowList ? "allow" : "block") + " list from: " + _listUrl.AbsoluteUri + "\r\n" + ex.ToString());
+                    _dnsServer.WriteLog("Advanced Blocking app failed to read " + (_isAllowList ? "allow" : "block") + " list from: " + _listUrl.AbsoluteUri, ex);
                 }
 
                 return domains;
@@ -1537,7 +1537,7 @@ namespace AdvancedBlocking
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.WriteLog("Advanced Blocking app failed to read regex " + (_isAllowList ? "allow" : "block") + " list from: " + _listUrl.AbsoluteUri + "\r\n" + ex.ToString());
+                    _dnsServer.WriteLog("Advanced Blocking app failed to read regex " + (_isAllowList ? "allow" : "block") + " list from: " + _listUrl.AbsoluteUri, ex);
                 }
 
                 return regices;
@@ -1673,7 +1673,7 @@ namespace AdvancedBlocking
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.WriteLog("Advanced Blocking app failed to read adblock list from: " + _listUrl.AbsoluteUri + "\r\n" + ex.ToString());
+                    _dnsServer.WriteLog("Advanced Blocking app failed to read adblock list from: " + _listUrl.AbsoluteUri, ex);
                 }
             }
 

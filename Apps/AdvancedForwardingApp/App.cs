@@ -717,7 +717,7 @@ namespace AdvancedForwarding
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.WriteLog("The app failed to read AdGuard Upstreams config file: " + _configFile + "\r\n" + ex.ToString());
+                    _dnsServer.WriteLog("The app failed to read AdGuard Upstreams config file: " + _configFile, ex);
                 }
             }
 
