@@ -56,6 +56,7 @@ namespace DnsServerCore
 
         LoggingType _loggingType;
         string _logFolder;
+        bool _noStackTrace;
         int _maxLogFileDays;
         bool _useLocalTime;
 
@@ -271,7 +272,10 @@ namespace DnsServerCore
                 if (!string.IsNullOrEmpty(strUseLocalTime))
                     _useLocalTime = bool.Parse(strUseLocalTime);
 
-                SaveConfigFileInternal();
+                lock (_saveLock)
+                {
+                    SaveConfigFileInternal();
+                }
             }
             catch (Exception ex)
             {
@@ -361,8 +365,15 @@ namespace DnsServerCore
             switch (version)
             {
                 case 1:
+                case 2:
                     _loggingType = (LoggingType)bR.ReadByte();
                     _logFolder = s.ReadShortString();
+
+                    if (version >= 2)
+                        _noStackTrace = bR.ReadBoolean();
+                    else
+                        _noStackTrace = false;
+
                     _maxLogFileDays = bR.ReadInt32();
                     _useLocalTime = bR.ReadBoolean();
                     break;
@@ -377,10 +388,11 @@ namespace DnsServerCore
             BinaryWriter bW = new BinaryWriter(s);
 
             bW.Write(Encoding.ASCII.GetBytes("LS")); //format
-            bW.Write((byte)1); //version
+            bW.Write((byte)2); //version
 
             bW.Write((byte)_loggingType);
             s.WriteShortString(_logFolder);
+            bW.Write(_noStackTrace);
             bW.Write(_maxLogFileDays);
             bW.Write(_useLocalTime);
         }
@@ -623,6 +635,20 @@ namespace DnsServerCore
             }
         }
 
+        private static string GetIpInfo(IPEndPoint ep)
+        {
+            string ipInfo;
+
+            if (ep is null)
+                ipInfo = "";
+            else if (ep.Address.IsIPv4MappedToIPv6)
+                ipInfo = "[" + ep.Address.MapToIPv4().ToString() + ":" + ep.Port + "] ";
+            else
+                ipInfo = "[" + ep.ToString() + "] ";
+
+            return ipInfo;
+        }
+
         #endregion
 
         #region public
@@ -715,31 +741,32 @@ namespace DnsServerCore
 
         public void Write(Exception ex)
         {
-            Write(ex.ToString());
+            Write(_noStackTrace ? ex.Message : ex.ToString());
+        }
+
+        public void Write(string message, Exception ex)
+        {
+            Write(message + "\r\n" + (_noStackTrace ? ex.Message : ex.ToString()));
         }
 
         public void Write(IPEndPoint ep, Exception ex)
         {
-            Write(ep, ex.ToString());
+            Write(ep, _noStackTrace ? ex.Message : ex.ToString());
         }
 
         public void Write(IPEndPoint ep, string message)
         {
-            string ipInfo;
+            Write(GetIpInfo(ep) + message);
+        }
 
-            if (ep == null)
-                ipInfo = "";
-            else if (ep.Address.IsIPv4MappedToIPv6)
-                ipInfo = "[" + ep.Address.MapToIPv4().ToString() + ":" + ep.Port + "] ";
-            else
-                ipInfo = "[" + ep.ToString() + "] ";
-
-            Write(ipInfo + message);
+        public void Write(IPEndPoint ep, string message, Exception ex)
+        {
+            Write(GetIpInfo(ep) + message + "\r\n" + (_noStackTrace ? ex.Message : ex.ToString()));
         }
 
         public void Write(IPEndPoint ep, DnsTransportProtocol protocol, Exception ex)
         {
-            Write(ep, protocol, ex.ToString());
+            Write(ep, protocol, _noStackTrace ? ex.Message : ex.ToString());
         }
 
         public void Write(IPEndPoint ep, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response)
@@ -847,18 +874,19 @@ namespace DnsServerCore
             Write(ep, protocol.ToString(), message);
         }
 
+        public void Write(IPEndPoint ep, DnsTransportProtocol protocol, string message, Exception ex)
+        {
+            Write(ep, protocol.ToString(), message, ex);
+        }
+
         public void Write(IPEndPoint ep, string protocol, string message)
         {
-            string ipInfo;
+            Write(GetIpInfo(ep) + "[" + protocol.ToUpper() + "] " + message);
+        }
 
-            if (ep == null)
-                ipInfo = "";
-            else if (ep.Address.IsIPv4MappedToIPv6)
-                ipInfo = "[" + ep.Address.MapToIPv4().ToString() + ":" + ep.Port + "] ";
-            else
-                ipInfo = "[" + ep.ToString() + "] ";
-
-            Write(ipInfo + "[" + protocol.ToUpper() + "] " + message);
+        public void Write(IPEndPoint ep, string protocol, string message, Exception ex)
+        {
+            Write(GetIpInfo(ep) + "[" + protocol.ToUpper() + "] " + message + "\r\n" + (_noStackTrace ? ex.Message : ex.ToString()));
         }
 
         public void Write(string message)
@@ -921,6 +949,12 @@ namespace DnsServerCore
                     ApplyLogFolder();
                 }
             }
+        }
+
+        public bool NoStackTrace
+        {
+            get { return _noStackTrace; }
+            set { _noStackTrace = value; }
         }
 
         public int MaxLogFileDays
