@@ -444,6 +444,21 @@ namespace DnsServerCore
                 jsonWriter.WriteEndArray();
             }
 
+            public async Task HealthCheckAsync(HttpContext context)
+            {
+                User sessionUser = _dnsWebService.GetSessionUser(context);
+
+                if (!_dnsWebService._authManager.IsPermitted(PermissionSection.DnsClient, sessionUser, PermissionFlag.View))
+                    throw new DnsWebServiceException("Access was denied.");
+
+                HttpRequest request = context.Request;
+
+                string domain = request.GetQueryOrForm("domain", "localhost");
+                DnsResourceRecordType type = request.GetQueryOrFormEnum("type", DnsResourceRecordType.A);
+
+                _ = DnsClient.ParseResponseA(await _dnsWebService._dnsServer.DirectQueryAsync(new DnsQuestionRecord(domain, type, DnsClass.IN)));
+            }
+
             #endregion
         }
     }
