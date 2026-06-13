@@ -64,6 +64,13 @@ namespace DnsServerCore.ApplicationCommon
         void WriteLog(Exception ex);
 
         /// <summary>
+        /// Writes a log entry to the DNS server log file.
+        /// </summary>
+        /// <param name="message">The message to log.</param>
+        /// <param name="ex">The exception to log.</param>
+        void WriteLog(string message, Exception ex);
+
+        /// <summary>
         /// The name of this installed application.
         /// </summary>
         string ApplicationName { get; }
