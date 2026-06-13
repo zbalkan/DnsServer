@@ -220,7 +220,7 @@ namespace DnsServerCore.Cluster
             }
             catch (Exception ex)
             {
-                _dnsWebService.LogManager.Write("DNS Server encountered an error while loading the Cluster config file: " + configFile + "\r\n" + ex.ToString());
+                _dnsWebService.LogManager.Write("DNS Server encountered an error while loading the Cluster config file: " + configFile, ex);
             }
         }
 
@@ -346,7 +346,7 @@ namespace DnsServerCore.Cluster
                 }
                 catch (Exception ex)
                 {
-                    _dnsWebService.LogManager.Write("DNS Server encountered an error while deleting the Cluster config file: " + configFile + "\r\n" + ex.ToString());
+                    _dnsWebService.LogManager.Write("DNS Server encountered an error while deleting the Cluster config file: " + configFile, ex);
                 }
 
                 if (_pendingSave)
@@ -661,8 +661,8 @@ namespace DnsServerCore.Cluster
             _dnsWebService.DnsServer.ServerDomain = selfPrimaryNode.Name;
 
             //save all changes
-            _dnsWebService.DnsServer.SaveConfigFile();
-            _dnsWebService.AuthManager.SaveConfigFile();
+            _dnsWebService.DnsServer.SaveConfigFile(true);
+            _dnsWebService.AuthManager.SaveConfigFile(true);
             SaveConfigFile();
         }
 
@@ -1019,7 +1019,7 @@ namespace DnsServerCore.Cluster
                 AuthZoneInfo reverseZoneInfo = _dnsWebService.DnsServer.AuthZoneManager.FindAuthZoneInfo(ptrDomain);
                 if (reverseZoneInfo is not null)
                 {
-                    if (!reverseZoneInfo.Internal && ((reverseZoneInfo.Type == AuthZoneType.Primary) || (reverseZoneInfo.Type == AuthZoneType.Forwarder)))
+                    if ((reverseZoneInfo.Type == AuthZoneType.Primary) || (reverseZoneInfo.Type == AuthZoneType.Forwarder))
                         _dnsWebService.DnsServer.AuthZoneManager.DeleteRecord(reverseZoneInfo.Name, ptrDomain, DnsResourceRecordType.PTR, new DnsPTRRecordData(node.Name));
                 }
             }
@@ -1100,7 +1100,7 @@ namespace DnsServerCore.Cluster
                 AuthZoneInfo reverseZoneInfo = _dnsWebService.DnsServer.AuthZoneManager.FindAuthZoneInfo(ptrDomain);
                 if (reverseZoneInfo is not null)
                 {
-                    if (!reverseZoneInfo.Internal && ((reverseZoneInfo.Type == AuthZoneType.Primary) || (reverseZoneInfo.Type == AuthZoneType.Forwarder)))
+                    if ((reverseZoneInfo.Type == AuthZoneType.Primary) || (reverseZoneInfo.Type == AuthZoneType.Forwarder))
                     {
                         DnsResourceRecord ptrRecord = new DnsResourceRecord(ptrDomain, DnsResourceRecordType.PTR, DnsClass.IN, aTtl, new DnsPTRRecordData(node.Name));
 
@@ -1279,6 +1279,9 @@ namespace DnsServerCore.Cluster
             try
             {
                 IReadOnlyDictionary<int, ClusterNode> clusterNodes = _clusterNodes;
+                if ((clusterNodes is null) || (clusterNodes.Count < 1))
+                    return; //cluster not initialized
+
                 ClusterNode primaryNode = null;
 
                 foreach (KeyValuePair<int, ClusterNode> clusterNode in clusterNodes)
@@ -1673,7 +1676,7 @@ namespace DnsServerCore.Cluster
             }
             catch (Exception ex)
             {
-                _dnsWebService.LogManager.Write("Failed to sync server configuration from the Primary node.\r\n" + ex.ToString());
+                _dnsWebService.LogManager.Write("Failed to sync server configuration from the Primary node.", ex);
             }
             finally
             {
@@ -1784,7 +1787,7 @@ namespace DnsServerCore.Cluster
             }
             catch (Exception ex)
             {
-                _dnsWebService.LogManager.Write("DNS Server failed to update this Secondary node's details on the Primary node." + ex.ToString());
+                _dnsWebService.LogManager.Write("DNS Server failed to update this Secondary node's details on the Primary node.", ex);
             }
             finally
             {
