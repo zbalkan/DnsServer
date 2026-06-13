@@ -454,7 +454,7 @@ namespace DnsServerCore.Dns.Zones
                         _notifyFailed.Add(nameServerHost);
                 }
 
-                _dnsServer.LogManager.Write("DNS Server failed to notify name server '" + nameServerHost + "' for zone: " + ToString() + "\r\n" + ex.ToString());
+                _dnsServer.LogManager.Write("DNS Server failed to notify name server '" + nameServerHost + "' for zone: " + ToString(), ex);
             }
             finally
             {

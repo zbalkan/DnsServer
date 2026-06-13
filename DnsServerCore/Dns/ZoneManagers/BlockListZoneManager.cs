@@ -170,7 +170,7 @@ namespace DnsServerCore.Dns.ZoneManagers
             }
             catch (Exception ex)
             {
-                _dnsServer.LogManager.Write("DNS Server encountered an error while loading block list config file: " + blockListConfigFile + "\r\n" + ex.ToString());
+                _dnsServer.LogManager.Write("DNS Server encountered an error while loading block list config file: " + blockListConfigFile, ex);
             }
         }
 
@@ -470,7 +470,7 @@ namespace DnsServerCore.Dns.ZoneManagers
             }
             catch (Exception ex)
             {
-                _dnsServer.LogManager.Write("DNS Server failed to read " + (isAllowList ? "allow" : "block") + " list from: " + listUrl.AbsoluteUri + "\r\n" + ex.ToString());
+                _dnsServer.LogManager.Write("DNS Server failed to read " + (isAllowList ? "allow" : "block") + " list from: " + listUrl.AbsoluteUri, ex);
             }
 
             return domains;
@@ -639,7 +639,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                 }
                 catch (Exception ex)
                 {
-                    _dnsServer.LogManager.Write("DNS Server failed to download " + (isAllowList ? "allow" : "block") + " list and will use previously downloaded file (if available): " + listUrl.AbsoluteUri + "\r\n" + ex.ToString());
+                    _dnsServer.LogManager.Write("DNS Server failed to download " + (isAllowList ? "allow" : "block") + " list and will use previously downloaded file (if available): " + listUrl.AbsoluteUri, ex);
                 }
             }
 
@@ -714,7 +714,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                     }
                     catch (Exception ex)
                     {
-                        _dnsServer.LogManager.Write("DNS Server encountered an error while updating block lists.\r\n" + ex.ToString());
+                        _dnsServer.LogManager.Write("DNS Server encountered an error while updating block lists.", ex);
                     }
                     finally
                     {

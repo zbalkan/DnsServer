@@ -134,7 +134,7 @@ namespace DnsServerCore
                 }
                 catch (Exception ex)
                 {
-                    _dnsWebService._log.Write(_dnsWebService.GetRemoteEndPoint(context), "Check for update was done {updateAvailable: False;}\r\n" + ex.ToString());
+                    _dnsWebService._log.Write(_dnsWebService.GetRemoteEndPoint(context), "Check for update was done {updateAvailable: False;}", ex);
 
                     jsonWriter.WriteBoolean("updateAvailable", false);
                 }

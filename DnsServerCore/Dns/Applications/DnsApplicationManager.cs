@@ -259,7 +259,7 @@ namespace DnsServerCore.Dns.Applications
                                         }
                                         catch (Exception ex)
                                         {
-                                            _dnsServer.LogManager.Write("Failed to automatically download and update DNS application '" + application.Name + "': " + ex.ToString());
+                                            _dnsServer.LogManager.Write("Failed to automatically download and update DNS application '" + application.Name + "'.", ex);
                                         }
                                     }
 
@@ -352,7 +352,7 @@ namespace DnsServerCore.Dns.Applications
                     }
                     catch (Exception ex)
                     {
-                        _dnsServer.LogManager.Write("DNS Server failed to load DNS application: " + Path.GetFileName(applicationFolder) + "\r\n" + ex.ToString());
+                        _dnsServer.LogManager.Write("DNS Server failed to load DNS application: " + Path.GetFileName(applicationFolder), ex);
                     }
                 }));
             }
