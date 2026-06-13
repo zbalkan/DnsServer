@@ -425,6 +425,14 @@ namespace DnsServerCore
 
             #region public
 
+            public async Task StatusAsync(HttpContext context)
+            {
+                Utf8JsonWriter jsonWriter = context.GetCurrentJsonWriter();
+
+                jsonWriter.WriteBoolean("hasDefaultCredentials", _dnsWebService._authManager.HasDefaultCredentials());
+                jsonWriter.WriteBoolean("ssoEnabled", _dnsWebService._ssoEnabled);
+            }
+
             public async Task SsoLoginAsync(HttpContext context)
             {
                 try
@@ -436,13 +444,6 @@ namespace DnsServerCore
                     _dnsWebService._log.Write(_dnsWebService.GetRemoteEndPoint(context), ex);
                     context.Response.Redirect("/#error=" + Uri.EscapeDataString("Failed to reach SSO provider. Please contact your administrator."));
                 }
-            }
-
-            public async Task SsoStatusAsync(HttpContext context)
-            {
-                Utf8JsonWriter jsonWriter = context.GetCurrentJsonWriter();
-
-                jsonWriter.WriteBoolean("ssoEnabled", _dnsWebService._ssoEnabled);
             }
 
             public async Task SsoLoginFinalizeAsync(HttpContext context, ClaimsPrincipal principal)
