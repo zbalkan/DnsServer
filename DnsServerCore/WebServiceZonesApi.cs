@@ -275,12 +275,35 @@ namespace DnsServerCore
                             if (record.RDATA is DnsTXTRecordData rdata)
                             {
                                 jsonWriter.WriteString("text", rdata.GetText());
-                                jsonWriter.WriteBoolean("splitText", rdata.CharacterStrings.Count > 1);
+
+                                bool splitText = false;
+
+                                if (rdata.CharacterStrings.Count > 1)
+                                {
+                                    //find if the TXT record character strings were automatically split or explicitly split
+                                    for (int i = 0; i < rdata.CharacterStrings.Count - 1; i++)
+                                    {
+                                        if (rdata.CharacterStrings[i].Count != 255)
+                                        {
+                                            splitText = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                jsonWriter.WriteBoolean("splitText", splitText);
 
                                 jsonWriter.WriteStartArray("characterStrings");
 
-                                foreach (string characterString in rdata.CharacterStrings)
-                                    jsonWriter.WriteStringValue(characterString);
+                                foreach (ArraySegment<byte> characterString in rdata.CharacterStrings)
+                                    jsonWriter.WriteStringValue(Encoding.UTF8.GetString(characterString));
+
+                                jsonWriter.WriteEndArray();
+
+                                jsonWriter.WriteStartArray("characterStringsBase64");
+
+                                foreach (ArraySegment<byte> characterString in rdata.CharacterStrings)
+                                    jsonWriter.WriteStringValue(Convert.ToBase64String(characterString));
 
                                 jsonWriter.WriteEndArray();
                             }
@@ -920,13 +943,6 @@ namespace DnsServerCore
                 switch (zoneInfo.Type)
                 {
                     case AuthZoneType.Primary:
-                        jsonWriter.WriteBoolean("internal", zoneInfo.Internal);
-                        break;
-                }
-
-                switch (zoneInfo.Type)
-                {
-                    case AuthZoneType.Primary:
                     case AuthZoneType.Secondary:
                     case AuthZoneType.Stub:
                     case AuthZoneType.Forwarder:
@@ -969,20 +985,17 @@ namespace DnsServerCore
                     case AuthZoneType.Secondary:
                     case AuthZoneType.Forwarder:
                     case AuthZoneType.Catalog:
-                        if (!zoneInfo.Internal)
-                        {
-                            string[] notifyFailed = zoneInfo.NotifyFailed;
+                        string[] notifyFailed = zoneInfo.NotifyFailed;
 
-                            jsonWriter.WriteBoolean("notifyFailed", notifyFailed.Length > 0);
+                        jsonWriter.WriteBoolean("notifyFailed", notifyFailed.Length > 0);
 
-                            jsonWriter.WritePropertyName("notifyFailedFor");
-                            jsonWriter.WriteStartArray();
+                        jsonWriter.WritePropertyName("notifyFailedFor");
+                        jsonWriter.WriteStartArray();
 
-                            foreach (string server in notifyFailed)
-                                jsonWriter.WriteStringValue(server);
+                        foreach (string server in notifyFailed)
+                            jsonWriter.WriteStringValue(server);
 
-                            jsonWriter.WriteEndArray();
-                        }
+                        jsonWriter.WriteEndArray();
                         break;
                 }
 
@@ -1450,11 +1463,45 @@ namespace DnsServerCore
                     throw new DnsWebServiceException("Access was denied.");
 
                 HttpRequest request = context.Request;
+
+                string filterName = request.GetQueryOrForm("filterName", null);
+                AuthZoneType filterType = request.GetQueryOrFormEnum("filterType", AuthZoneType.Unknown);
+
+                System.Text.RegularExpressions.Regex filterRegex = null;
+
+                if (filterName is not null)
+                {
+                    string pattern = filterName.Trim().Replace(".", "\\.").Replace("*", ".*").Replace("?", ".{1}");
+
+                    if (filterName.Contains('*'))
+                    {
+                        if (!filterName.StartsWith('*'))
+                            pattern = "^" + pattern;
+
+                        if (!filterName.EndsWith('*'))
+                            pattern += "$";
+                    }
+
+                    filterRegex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.Compiled);
+                }
+
                 Utf8JsonWriter jsonWriter = context.GetCurrentJsonWriter();
 
                 IReadOnlyList<AuthZoneInfo> zoneInfoList = _dnsWebService._dnsServer.AuthZoneManager.GetZones(delegate (AuthZoneInfo zoneInfo)
                 {
-                    return _dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.View);
+                    if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.View))
+                        return false;
+
+                    if ((filterType != AuthZoneType.Unknown) && (filterType != zoneInfo.Type))
+                        return false;
+
+                    if (filterRegex is not null)
+                    {
+                        if (!filterRegex.IsMatch(zoneInfo.Name) && (!DnsClient.TryConvertDomainNameToUnicode(zoneInfo.Name, out string nameIdn) || !filterRegex.IsMatch(nameIdn)))
+                            return false;
+                    }
+
+                    return true;
                 });
 
                 if (request.TryGetQueryOrForm("pageNumber", int.Parse, out int pageNumber))
@@ -1886,9 +1933,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Modify))
                     throw new DnsWebServiceException("Access was denied.");
 
@@ -1945,9 +1989,6 @@ namespace DnsServerCore
                 AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.GetAuthZoneInfo(zoneName);
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
-
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
 
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.View))
                     throw new DnsWebServiceException("Access was denied.");
@@ -2072,9 +2113,6 @@ namespace DnsServerCore
                 AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.GetAuthZoneInfo(zoneName);
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
-
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
 
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Delete))
                     throw new DnsWebServiceException("Access was denied.");
@@ -2274,9 +2312,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Delete))
                     throw new DnsWebServiceException("Access was denied.");
 
@@ -2304,9 +2339,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (zoneInfo.Type != AuthZoneType.Primary)
                     throw new DnsWebServiceException("The zone must be a primary zone.");
 
@@ -2322,7 +2354,6 @@ namespace DnsServerCore
 
                 jsonWriter.WriteString("name", zoneInfo.Name);
                 jsonWriter.WriteString("type", zoneInfo.Type.ToString());
-                jsonWriter.WriteBoolean("internal", zoneInfo.Internal);
                 jsonWriter.WriteBoolean("disabled", zoneInfo.Disabled);
                 jsonWriter.WriteString("dnssecStatus", zoneInfo.ApexZone.DnssecStatus.ToString());
 
@@ -2407,9 +2438,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (zoneInfo.Type != AuthZoneType.Primary)
                     throw new DnsWebServiceException("The zone must be a primary zone.");
 
@@ -2420,7 +2448,6 @@ namespace DnsServerCore
 
                 jsonWriter.WriteString("name", zoneInfo.Name);
                 jsonWriter.WriteString("type", zoneInfo.Type.ToString());
-                jsonWriter.WriteBoolean("internal", zoneInfo.Internal);
                 jsonWriter.WriteBoolean("disabled", zoneInfo.Disabled);
                 jsonWriter.WriteString("dnssecStatus", zoneInfo.ApexZone.DnssecStatus.ToString());
 
@@ -2865,9 +2892,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Delete))
                     throw new DnsWebServiceException("Access was denied.");
 
@@ -2914,9 +2938,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Modify))
                     throw new DnsWebServiceException("Access was denied.");
 
@@ -2944,9 +2965,6 @@ namespace DnsServerCore
                 AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.GetAuthZoneInfo(zoneName);
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
-
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
 
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Modify))
                     throw new DnsWebServiceException("Access was denied.");
@@ -2996,9 +3014,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.View))
                     throw new DnsWebServiceException("Access was denied.");
 
@@ -3010,9 +3025,6 @@ namespace DnsServerCore
                     jsonWriter.WriteString("nameIdn", nameIdn);
 
                 jsonWriter.WriteString("type", zoneInfo.Type.ToString());
-
-                if (zoneInfo.Type == AuthZoneType.Primary)
-                    jsonWriter.WriteBoolean("internal", zoneInfo.Internal);
 
                 switch (zoneInfo.Type)
                 {
@@ -3028,20 +3040,17 @@ namespace DnsServerCore
                     case AuthZoneType.Secondary:
                     case AuthZoneType.Forwarder:
                     case AuthZoneType.Catalog:
-                        if (!zoneInfo.Internal)
-                        {
-                            string[] notifyFailed = zoneInfo.NotifyFailed;
+                        string[] notifyFailed = zoneInfo.NotifyFailed;
 
-                            jsonWriter.WriteBoolean("notifyFailed", notifyFailed.Length > 0);
+                        jsonWriter.WriteBoolean("notifyFailed", notifyFailed.Length > 0);
 
-                            jsonWriter.WritePropertyName("notifyFailedFor");
-                            jsonWriter.WriteStartArray();
+                        jsonWriter.WritePropertyName("notifyFailedFor");
+                        jsonWriter.WriteStartArray();
 
-                            foreach (string server in notifyFailed)
-                                jsonWriter.WriteStringValue(server);
+                        foreach (string server in notifyFailed)
+                            jsonWriter.WriteStringValue(server);
 
-                            jsonWriter.WriteEndArray();
-                        }
+                        jsonWriter.WriteEndArray();
                         break;
                 }
 
@@ -3332,9 +3341,6 @@ namespace DnsServerCore
                 AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.GetAuthZoneInfo(zoneName);
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
-
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
 
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Delete))
                     throw new DnsWebServiceException("Access was denied.");
@@ -3729,9 +3735,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Modify))
                     throw new DnsWebServiceException("Access was denied.");
 
@@ -3770,9 +3773,6 @@ namespace DnsServerCore
                 AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(string.IsNullOrEmpty(zoneName) ? domain : zoneName);
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + domain);
-
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
 
                 User sessionUser = _dnsWebService.GetSessionUser(context);
 
@@ -3838,9 +3838,6 @@ namespace DnsServerCore
                                     _dnsWebService._authManager.SetPermission(PermissionSection.Zones, reverseZoneInfo.Name, _dnsWebService._authManager.GetGroup(Group.DNS_ADMINISTRATORS), PermissionFlag.ViewModifyDelete);
                                     _dnsWebService._authManager.SaveConfigFile();
                                 }
-
-                                if (reverseZoneInfo.Internal)
-                                    throw new DnsWebServiceException("Reverse zone '" + reverseZoneInfo.DisplayName + "' is an internal zone.");
 
                                 if ((reverseZoneInfo.Type != AuthZoneType.Primary) && (reverseZoneInfo.Type != AuthZoneType.Forwarder))
                                     throw new DnsWebServiceException("Reverse zone '" + reverseZoneInfo.DisplayName + "' is not a primary or forwarder zone.");
@@ -3919,10 +3916,21 @@ namespace DnsServerCore
 
                     case DnsResourceRecordType.TXT:
                         {
-                            string text = request.GetQueryOrFormAlt("text", "value");
-                            bool splitText = request.GetQueryOrForm("splitText", bool.Parse, false);
+                            DnsTXTRecordData txtRData;
 
-                            newRecord = new DnsResourceRecord(domain, type, DnsClass.IN, ttl, splitText ? new DnsTXTRecordData(DecodeCharacterStrings(text)) : new DnsTXTRecordData(text));
+                            if (request.TryQueryOrFormArray("characterStringsBase64", delegate (string value) { return Convert.FromBase64String(value); }, out ArraySegment<byte>[] characterStrings))
+                            {
+                                txtRData = new DnsTXTRecordData(characterStrings);
+                            }
+                            else
+                            {
+                                string text = request.GetQueryOrFormAlt("text", "value");
+                                bool splitText = request.GetQueryOrForm("splitText", bool.Parse, false);
+
+                                txtRData = splitText ? new DnsTXTRecordData(DecodeCharacterStrings(text)) : new DnsTXTRecordData(text);
+                            }
+
+                            newRecord = new DnsResourceRecord(domain, type, DnsClass.IN, ttl, txtRData);
                         }
                         break;
 
@@ -4263,9 +4271,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + domain);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 User sessionUser = _dnsWebService.GetSessionUser(context);
 
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Delete))
@@ -4292,7 +4297,7 @@ namespace DnsServerCore
 
                             string ptrDomain = Zone.GetReverseZone(ipAddress, type == DnsResourceRecordType.A ? 32 : 128);
                             AuthZoneInfo reverseZoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(ptrDomain);
-                            if ((reverseZoneInfo is not null) && !reverseZoneInfo.Internal && ((reverseZoneInfo.Type == AuthZoneType.Primary) || (reverseZoneInfo.Type == AuthZoneType.Forwarder)))
+                            if ((reverseZoneInfo is not null) && ((reverseZoneInfo.Type == AuthZoneType.Primary) || (reverseZoneInfo.Type == AuthZoneType.Forwarder)))
                             {
                                 IReadOnlyList<DnsResourceRecord> ptrRecords = _dnsWebService._dnsServer.AuthZoneManager.GetRecords(reverseZoneInfo.Name, ptrDomain, DnsResourceRecordType.PTR);
                                 if (ptrRecords.Count > 0)
@@ -4355,10 +4360,21 @@ namespace DnsServerCore
 
                     case DnsResourceRecordType.TXT:
                         {
-                            string text = request.GetQueryOrFormAlt("text", "value");
-                            bool splitText = request.GetQueryOrForm("splitText", bool.Parse, false);
+                            DnsTXTRecordData txtRData;
 
-                            if (!_dnsWebService._dnsServer.AuthZoneManager.DeleteRecord(zoneInfo.Name, domain, type, splitText ? new DnsTXTRecordData(DecodeCharacterStrings(text)) : new DnsTXTRecordData(text)))
+                            if (request.TryQueryOrFormArray("characterStringsBase64", delegate (string value) { return Convert.FromBase64String(value); }, out ArraySegment<byte>[] characterStrings))
+                            {
+                                txtRData = new DnsTXTRecordData(characterStrings);
+                            }
+                            else
+                            {
+                                string text = request.GetQueryOrFormAlt("text", "value");
+                                bool splitText = request.GetQueryOrForm("splitText", bool.Parse, false);
+
+                                txtRData = splitText ? new DnsTXTRecordData(DecodeCharacterStrings(text)) : new DnsTXTRecordData(text);
+                            }
+
+                            if (!_dnsWebService._dnsServer.AuthZoneManager.DeleteRecord(zoneInfo.Name, domain, type, txtRData))
                                 throw new DnsWebServiceException("Cannot delete record: no such record exists.");
                         }
                         break;
@@ -4563,9 +4579,6 @@ namespace DnsServerCore
                 if (zoneInfo is null)
                     throw new DnsWebServiceException("No such zone was found: " + domain);
 
-                if (zoneInfo.Internal)
-                    throw new DnsWebServiceException("Access was denied to manage internal DNS Server zone.");
-
                 User sessionUser = _dnsWebService.GetSessionUser(context);
 
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Modify))
@@ -4634,16 +4647,13 @@ namespace DnsServerCore
                                     _dnsWebService._authManager.SaveConfigFile();
                                 }
 
-                                if (newReverseZoneInfo.Internal)
-                                    throw new DnsWebServiceException("Reverse zone '" + newReverseZoneInfo.DisplayName + "' is an internal zone.");
-
                                 if ((newReverseZoneInfo.Type != AuthZoneType.Primary) && (newReverseZoneInfo.Type != AuthZoneType.Forwarder))
                                     throw new DnsWebServiceException("Reverse zone '" + newReverseZoneInfo.DisplayName + "' is not a primary or forwarder zone.");
 
                                 string oldPtrDomain = Zone.GetReverseZone(ipAddress, type == DnsResourceRecordType.A ? 32 : 128);
 
                                 AuthZoneInfo oldReverseZoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(oldPtrDomain);
-                                if ((oldReverseZoneInfo is not null) && !oldReverseZoneInfo.Internal && ((oldReverseZoneInfo.Type == AuthZoneType.Primary) || (oldReverseZoneInfo.Type == AuthZoneType.Forwarder)))
+                                if ((oldReverseZoneInfo is not null) && ((oldReverseZoneInfo.Type == AuthZoneType.Primary) || (oldReverseZoneInfo.Type == AuthZoneType.Forwarder)))
                                 {
                                     //delete old PTR record if any and save old reverse zone
                                     _dnsWebService._dnsServer.AuthZoneManager.DeleteRecords(oldReverseZoneInfo.Name, oldPtrDomain, DnsResourceRecordType.PTR);
@@ -4774,14 +4784,41 @@ namespace DnsServerCore
 
                     case DnsResourceRecordType.TXT:
                         {
-                            string text = request.GetQueryOrFormAlt("text", "value");
-                            string newText = request.GetQueryOrFormAlt("newText", "newValue", text);
+                            string text = null;
+                            bool splitText = false;
+                            DnsTXTRecordData oldTxtRData;
 
-                            bool splitText = request.GetQueryOrForm("splitText", bool.Parse, false);
-                            bool newSplitText = request.GetQueryOrForm("newSplitText", bool.Parse, splitText);
+                            if (request.TryQueryOrFormArray("characterStringsBase64", delegate (string value) { return Convert.FromBase64String(value); }, out ArraySegment<byte>[] characterStrings))
+                            {
+                                oldTxtRData = new DnsTXTRecordData(characterStrings);
+                            }
+                            else
+                            {
+                                text = request.GetQueryOrFormAlt("text", "value");
+                                splitText = request.GetQueryOrForm("splitText", bool.Parse, false);
 
-                            oldRecord = new DnsResourceRecord(domain, type, DnsClass.IN, 0, splitText ? new DnsTXTRecordData(DecodeCharacterStrings(text)) : new DnsTXTRecordData(text));
-                            newRecord = new DnsResourceRecord(newDomain, type, DnsClass.IN, ttl, newSplitText ? new DnsTXTRecordData(DecodeCharacterStrings(newText)) : new DnsTXTRecordData(newText));
+                                oldTxtRData = splitText ? new DnsTXTRecordData(DecodeCharacterStrings(text)) : new DnsTXTRecordData(text);
+                            }
+
+                            DnsTXTRecordData newTxtRData;
+
+                            if (request.TryQueryOrFormArray("newCharacterStringsBase64", delegate (string value) { return Convert.FromBase64String(value); }, out ArraySegment<byte>[] newCharacterStrings))
+                            {
+                                newTxtRData = new DnsTXTRecordData(newCharacterStrings);
+                            }
+                            else
+                            {
+                                string newText = request.GetQueryOrFormAlt("newText", "newValue", text);
+                                bool newSplitText = request.GetQueryOrForm("newSplitText", bool.Parse, splitText);
+
+                                if (newText is null)
+                                    newTxtRData = new DnsTXTRecordData(characterStrings);
+                                else
+                                    newTxtRData = newSplitText ? new DnsTXTRecordData(DecodeCharacterStrings(newText)) : new DnsTXTRecordData(newText);
+                            }
+
+                            oldRecord = new DnsResourceRecord(domain, type, DnsClass.IN, 0, oldTxtRData);
+                            newRecord = new DnsResourceRecord(newDomain, type, DnsClass.IN, ttl, newTxtRData);
                         }
                         break;
 
