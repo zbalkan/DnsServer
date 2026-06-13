@@ -64,10 +64,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </a>
             <ul class="dropdown-menu">
                 <li><a href="#" onclick="showMyProfileModal(); return false;">My Profile</a></li>
-                <li><a href="#" onclick="showCreateMyApiTokenModal(); return false;">Create API Token</a></li>
                 <li><a id="mnuUserChangePassword" href="#" onclick="showChangePasswordModal(); return false;">Change Password</a></li>
                 <li><a id="mnuUserConfigure2FA" href="#" onclick="showConfigure2FAModal(); return false;">Configure 2FA</a></li>
+                <li><a href="#" onclick="showCreateMyApiTokenModal(); return false;">Create API Token</a></li>
+                <li role="separator" class="divider"></li>
                 <li><a href="#" onclick="showChangeThemeModal(); return false;">Change Theme</a></li>
+                <li><a id="mnuDisableCheckForUpdate" href="#" onclick="disableCheckForUpdate(); return false;" style="display: none;">Disable Update Check</a></li>
+                <li><a id="mnuEnableCheckForUpdate" href="#" onclick="enableCheckForUpdate(); return false;" style="display: none;">Enable Update Check</a></li>
                 <li role="separator" class="divider"></li>
                 <li><a href="#" onclick="logout(); return false;">Logout</a></li>
             </ul>
@@ -428,20 +431,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                             <div class="pull-right">
                                                 <div class="form-group" style="margin-right: 0px;">
                                                     <button type="button" class="btn btn-primary" style="padding: 2px 0px; width: 100px;" onclick="showAddZoneModal();">Add Zone</button>
+                                                    <button type="button" class="btn btn-danger" style="padding: 2px 0px; width: 100px;" onclick="deleteSelectedZones(this);">Delete Zones</button>
                                                     <select id="optZonesClusterNode" class="form-control cluster-node-dropdown" onchange="refreshZones();"></select>
                                                 </div>
                                             </div>
                                             <div class="clearfix"></div>
                                         </div>
 
-                                        <div class="form-inline">
-                                            <form class="pull-left">
+                                        <form class="form-inline well" style="padding: 10px 10px 0 10px; margin-bottom: 10px;">
+                                            <div class="pull-left">
                                                 <div class="form-group">
-                                                    <input id="txtZonesEdit" class="form-control" style="width: 300px;" type="text" placeholder="example.com" />
-                                                    <button type="submit" class="btn btn-primary" onclick="showEditZone(); return false;">Edit</button>
+                                                    <label for="txtZonesFilterName">Name</label>
+                                                    <input id="txtZonesFilterName" class="form-control" style="width: 300px;" type="text" placeholder="abc or a* or *b* or a?c" />
                                                 </div>
-                                            </form>
-                                            <form class="pull-right">
+                                                <div class="form-group">
+                                                    <label for="optZonesFilterType">Type</label>
+                                                    <select class="form-control" id="optZonesFilterType">
+                                                        <option selected></option>
+                                                        <option>Primary</option>
+                                                        <option>Secondary</option>
+                                                        <option>Stub</option>
+                                                        <option>Forwarder</option>
+                                                        <option>SecondaryForwarder</option>
+                                                        <option>Catalog</option>
+                                                        <option>SecondaryCatalog</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="pull-right">
                                                 <div class="form-group">
                                                     <label for="txtZonesPageNumber">Page Number</label>
                                                     <input id="txtZonesPageNumber" class="form-control" style="width: 100px;" type="number" />
@@ -458,9 +475,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                     </select>
                                                 </div>
                                                 <button type="submit" class="btn btn-primary form-group" style="margin-right: 0px;" onclick="refreshZones(); return false;">Go</button>
-                                            </form>
+                                            </div>
                                             <div class="clearfix"></div>
-                                        </div>
+                                        </form>
 
                                         <div style="padding: 8px;">
                                             <div class="pull-left" style="padding-top: 8px;">
@@ -481,21 +498,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                         <table id="tableZones" class="table table-hover">
                                             <thead>
                                                 <tr>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 0); return false;">#</a></th>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 1); return false;">Zone</a></th>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 2); return false;">Type</a></th>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 3); return false;">DNSSEC</a></th>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 4); return false;">Status</a></th>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 5); return false;">Serial</a></th>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 6); return false;">Expiry</a></th>
-                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 7); return false;">Last Modified</a></th>
+                                                    <th style="width: 30px;"><input id="chkZonesTableCheckAll" type="checkbox" /></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 1); return false;">#</a></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 2); return false;">Zone</a></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 3); return false;">Type</a></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 4); return false;">DNSSEC</a></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 5); return false;">Status</a></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 6); return false;">Serial</a></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 7); return false;">Expiry</a></th>
+                                                    <th><a href="#" onclick="sortTable('tableZonesBody', 8); return false;">Last Modified</a></th>
                                                     <th style="width: 36px;"></th>
                                                 </tr>
                                             </thead>
                                             <tbody id="tableZonesBody"></tbody>
                                             <tfoot>
                                                 <tr>
-                                                    <td colspan="9">
+                                                    <td colspan="10">
                                                         <div>
                                                             <div class="pull-left" style="padding-top: 8px;">
                                                                 <b id="tableZonesFooterStatus">0 zones</b>
@@ -577,7 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                             <div style="clear: both;"></div>
                                         </div>
 
-                                        <div class="form-inline well" style="padding: 10px 10px 0 10px;margin-bottom: 10px;">
+                                        <div class="form-inline well" style="padding: 10px 10px 0 10px; margin-bottom: 10px;">
                                             <form>
                                                 <div class="pull-left">
                                                     <div class="form-group">
@@ -1740,6 +1758,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                                     </label>
                                                                 </div>
                                                                 <div style="padding-top: 5px; padding-left: 20px;">Enables <a href="https://datatracker.ietf.org/doc/rfc9156/" target="_blank">QNAME minimization</a> for recursive resolution to improve privacy.</div>
+
+                                                                <div class="checkbox">
+                                                                    <label>
+                                                                        <input id="chkLocallyServedDnsZones" type="checkbox"> Locally Served DNS Zones
+                                                                    </label>
+                                                                </div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">Enables <a href="https://datatracker.ietf.org/doc/rfc6303/" target="_blank">Locally Served DNS Zones</a> and <a href="https://datatracker.ietf.org/doc/rfc6761/" target="_blank">Special-Use Domain Names</a> for recursive resolution to avoid leakage of queries and reduce load on the root servers.</div>
                                                             </div>
                                                         </div>
 
@@ -2280,7 +2305,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                                         <input id="chkIgnoreResolverLogs" type="checkbox"> Ignore Resolver Error Logs
                                                                     </label>
                                                                 </div>
-                                                                <div style="padding-top: 5px; padding-left: 20px;">Enable this option to stop logging domain name resolution errors into the log file.</div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">Enable this option to stop logging domain name resolution errors.</div>
+
+                                                                <div class="checkbox">
+                                                                    <label>
+                                                                        <input id="chkNoStackTrace" type="checkbox"> No Stack Trace
+                                                                    </label>
+                                                                </div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">Enable to log only short error messages instead of full exception stack trace.</div>
 
                                                                 <div class="checkbox">
                                                                     <label>
@@ -2348,7 +2380,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                                             <div class="form-group" style="margin-bottom: 0px;">
                                                 <div class="pull-left">
-                                                    <button type="button" class="btn btn-primary" data-loading-text="Saving..." onclick="saveDnsSettings(this);">Save Settings</button>
+                                                    <button id="btnSaveSettings" type="button" class="btn btn-primary" data-loading-text="Saving..." onclick="saveDnsSettings(this);">Save Settings</button>
                                                     <button id="btnSettingsFlushCache" type="button" class="btn btn-danger" data-loading-text="Flushing..." onclick="flushDnsCache(this, $('#optSettingsClusterNode').val());" style="margin-left: 6px;">Flush Cache</button>
                                                 </div>
                                                 <div class="pull-right">
@@ -3036,7 +3068,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                                 </thead>
                                                                 <tbody id="tableAdminSsoGroupMap"></tbody>
                                                             </table>
-                                                            <div style="padding-top: 5px;">Map Remote Groups at Single Sign-On (SSO) provider to Local Groups for both new and existing users signed up via Single Sign-On (SSO). A SSO user's group membership will be automatically synced to the mapped Local Groups each time they log in. If your SSO provider does not include group membership claim by default then you will have to add <code>group</code> or <code>roles</code> scope in the <b>Scopes</b> option above as required by the SSO provider.</div>
+                                                            <div style="padding-top: 5px;">Map Remote Groups at Single Sign-On (SSO) provider to Local Groups for both new and existing users signed up via Single Sign-On (SSO). A SSO user's group membership will be automatically synced to the mapped Local Groups each time they log in. If your SSO provider does not include group membership claim by default then you will have to add <code>groups</code> or <code>roles</code> scope in the <b>Scopes</b> option above as required by the SSO provider.</div>
                                                         </div>
                                                     </div>
 
