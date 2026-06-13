@@ -42,8 +42,7 @@ $(function () {
             token = localStorage.getItem("token");
 
         if (token == null) {
-            showPageLogin();
-            login("admin", "admin");
+            showPageLogin(true);
         }
         else {
             HTTPRequest({
@@ -64,7 +63,7 @@ $(function () {
                     showPageMain();
                 },
                 error: function () {
-                    showPageLogin();
+                    showPageLogin(true);
                 }
             });
         }
