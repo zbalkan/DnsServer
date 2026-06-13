@@ -605,7 +605,7 @@ namespace DnsServerCore.Dhcp
 
                             if (string.IsNullOrWhiteSpace(clientDomainName))
                             {
-                                if (request.HostName is not null)
+                                if ((request.HostName is not null) && !string.IsNullOrWhiteSpace(request.HostName.HostName))
                                     clientDomainName = GetSanitizedHostName(request.HostName.HostName) + "." + scope.DomainName;
                             }
 
@@ -1158,7 +1158,7 @@ namespace DnsServerCore.Dhcp
             }
             catch (Exception ex)
             {
-                _log.Write(dhcpEP, "DHCP Server failed to activate scope: " + scope.Name + "\r\n" + ex.ToString());
+                _log.Write(dhcpEP, "DHCP Server failed to activate scope: " + scope.Name, ex);
 
                 if (throwException)
                     throw;
@@ -1194,7 +1194,7 @@ namespace DnsServerCore.Dhcp
             }
             catch (Exception ex)
             {
-                _log.Write(dhcpEP, "DHCP Server failed to deactivate scope: " + scope.Name + "\r\n" + ex.ToString());
+                _log.Write(dhcpEP, "DHCP Server failed to deactivate scope: " + scope.Name, ex);
 
                 if (throwException)
                     throw;
@@ -1260,7 +1260,7 @@ namespace DnsServerCore.Dhcp
             }
             catch (Exception ex)
             {
-                _log.Write("DHCP Server failed to load scope file: " + scopeFile + "\r\n" + ex.ToString());
+                _log.Write("DHCP Server failed to load scope file: " + scopeFile, ex);
             }
         }
 
@@ -1291,7 +1291,7 @@ namespace DnsServerCore.Dhcp
             }
             catch (Exception ex)
             {
-                _log.Write("DHCP Server failed to save scope file: " + scopeFile + "\r\n" + ex.ToString());
+                _log.Write("DHCP Server failed to save scope file: " + scopeFile, ex);
             }
         }
 
@@ -1307,7 +1307,7 @@ namespace DnsServerCore.Dhcp
             }
             catch (Exception ex)
             {
-                _log.Write("DHCP Server failed to delete scope file: " + scopeFile + "\r\n" + ex.ToString());
+                _log.Write("DHCP Server failed to delete scope file: " + scopeFile, ex);
             }
         }
 
