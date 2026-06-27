@@ -39,6 +39,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Mail;
+using System.Net.NetworkInformation;
 using System.Net.Quic;
 using System.Net.Security;
 using System.Net.Sockets;
@@ -94,6 +95,9 @@ namespace DnsServerCore.Dns
 
         #region variables
 
+        const int SOL_SOCKET = 1;
+        const int SO_BINDTODEVICE = 25;
+
         readonly static char[] commaSeparator = new char[] { ',' };
 
         internal const int MAX_CNAME_HOPS = 16;
@@ -140,6 +144,9 @@ namespace DnsServerCore.Dns
 
         IReadOnlyCollection<NetworkAddress> _zoneTransferAllowedNetworks;
         IReadOnlyCollection<NetworkAddress> _notifyAllowedNetworks;
+
+        bool _enableCheckForUpdate = true;
+
         IPv6Mode _ipv6Mode;
         bool _enableUdpSocketPool;
         ushort _udpPayloadSize = DnsDatagram.EDNS_DEFAULT_UDP_PAYLOAD_SIZE;
@@ -187,6 +194,7 @@ namespace DnsServerCore.Dns
         bool _enableDnsOverHttps;
         bool _enableDnsOverHttp3;
         bool _enableDnsOverQuic;
+        bool _enableDnsOverHttpHelpRedirect = true;
         int _dnsOverUdpProxyPort = 538;
         int _dnsOverTcpProxyPort = 538;
         int _dnsOverHttpPort = 80;
@@ -213,8 +221,8 @@ namespace DnsServerCore.Dns
         IReadOnlyCollection<NetworkAccessControl> _recursionNetworkACL;
 
         bool _randomizeName;
-        bool _qnameMinimization;
-        bool _locallyServedDnsZones;
+        bool _qnameMinimization = true;
+        bool _locallyServedDnsZones = true;
 
         int _resolverRetries = 2;
         int _resolverTimeout = 1500;
@@ -470,6 +478,7 @@ namespace DnsServerCore.Dns
                 if (!string.IsNullOrEmpty(serverDomain))
                     ServerDomain = serverDomain;
 
+                EnableCheckForUpdate = true;
                 _dnsApplicationManager.EnableAutomaticUpdate = true;
 
                 string strPreferIPv6 = Environment.GetEnvironmentVariable("DNS_SERVER_PREFER_IPV6");
@@ -485,11 +494,13 @@ namespace DnsServerCore.Dns
                 EnableUdpSocketPool = Environment.OSVersion.Platform == PlatformID.Win32NT;
 
                 //optional protocols
-                _enableEDnsClientSubnetSourceAddress = false;
+                EnableEDnsClientSubnetSourceAddress = false;
 
                 string strDnsOverHttp = Environment.GetEnvironmentVariable("DNS_SERVER_OPTIONAL_PROTOCOL_DNS_OVER_HTTP");
                 if (!string.IsNullOrEmpty(strDnsOverHttp))
                     EnableDnsOverHttp = bool.Parse(strDnsOverHttp);
+
+                EnableDnsOverHttpHelpRedirect = true;
 
                 //recursion
                 string strRecursion = Environment.GetEnvironmentVariable("DNS_SERVER_RECURSION");
@@ -735,6 +746,11 @@ namespace DnsServerCore.Dns
             _zoneTransferAllowedNetworks = AuthZoneInfo.ReadNetworkAddressesFrom(bR);
             _notifyAllowedNetworks = AuthZoneInfo.ReadNetworkAddressesFrom(bR);
 
+            if (version >= 4)
+                _enableCheckForUpdate = bR.ReadBoolean();
+            else
+                _enableCheckForUpdate = true;
+
             _dnsApplicationManager.EnableAutomaticUpdate = bR.ReadBoolean();
 
             if (version >= 3)
@@ -866,6 +882,18 @@ namespace DnsServerCore.Dns
             bool enableDnsOverQuic = bR.ReadBoolean();
             if (!isConfigTransfer)
                 _enableDnsOverQuic = enableDnsOverQuic;
+
+            if (version >= 4)
+            {
+                bool enableDnsOverHttpHelpRedirect = bR.ReadBoolean();
+                if (!isConfigTransfer)
+                    _enableDnsOverHttpHelpRedirect = enableDnsOverHttpHelpRedirect;
+            }
+            else
+            {
+                if (!isConfigTransfer)
+                    _enableDnsOverHttpHelpRedirect = true;
+            }
 
             int dnsOverUdpProxyPort = bR.ReadInt32();
             if (!isConfigTransfer)
@@ -1182,6 +1210,7 @@ namespace DnsServerCore.Dns
             AuthZoneInfo.WriteNetworkAddressesTo(_zoneTransferAllowedNetworks, bW);
             AuthZoneInfo.WriteNetworkAddressesTo(_notifyAllowedNetworks, bW);
 
+            bW.Write(_enableCheckForUpdate);
             bW.Write(_dnsApplicationManager.EnableAutomaticUpdate);
 
             bW.Write((byte)_ipv6Mode);
@@ -1283,6 +1312,8 @@ namespace DnsServerCore.Dns
             bW.Write(_enableDnsOverHttps);
             bW.Write(_enableDnsOverHttp3);
             bW.Write(_enableDnsOverQuic);
+
+            bW.Write(_enableDnsOverHttpHelpRedirect);
 
             bW.Write(_dnsOverUdpProxyPort);
             bW.Write(_dnsOverTcpProxyPort);
@@ -1600,7 +1631,7 @@ namespace DnsServerCore.Dns
 
         #region private
 
-        private Socket GetUdpListnerSocket(AddressFamily addressFamily)
+        private Socket GetUdpListenerSocket(AddressFamily addressFamily)
         {
             Socket udpListener = new Socket(addressFamily, SocketType.Dgram, ProtocolType.Udp);
 
@@ -1624,6 +1655,39 @@ namespace DnsServerCore.Dns
             udpListener.ReceiveBufferSize = _udpReceiveBufferSizeKB * 1024;
 
             return udpListener;
+        }
+
+        private bool TryBindToDevice(Socket socket, IPAddress interfaceIpAddress, out string interfaceName)
+        {
+            if (!IPAddress.Any.Equals(interfaceIpAddress) && !IPAddress.IPv6Any.Equals(interfaceIpAddress))
+            {
+                try
+                {
+                    foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
+                    {
+                        if (nic.OperationalStatus != OperationalStatus.Up)
+                            continue;
+
+                        foreach (UnicastIPAddressInformation ip in nic.GetIPProperties().UnicastAddresses)
+                        {
+                            if (interfaceIpAddress.Equals(ip.Address))
+                            {
+                                //found interface
+                                interfaceName = nic.Name;
+                                socket.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.ASCII.GetBytes(interfaceName));
+                                return true;
+                            }
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _log.Write(ex);
+                }
+            }
+
+            interfaceName = null;
+            return false;
         }
 
         private async Task ReadUdpRequestAsync(Socket udpListener, DnsTransportProtocol protocol)
@@ -1802,7 +1866,11 @@ namespace DnsServerCore.Dns
                                         if (newUdpListener is null)
                                         {
                                             //create new socket and bind socket to source EP
-                                            newUdpListener = GetUdpListnerSocket(sourceEP.AddressFamily);
+                                            newUdpListener = GetUdpListenerSocket(sourceEP.AddressFamily);
+
+                                            if ((Environment.OSVersion.Platform == PlatformID.Unix) && TryBindToDevice(newUdpListener, sourceEP.Address, out string interfaceName))
+                                                _log.Write(sourceEP, protocol, $"Socket was bound to device '{interfaceName}' successfully.");
+
                                             newUdpListener.Bind(sourceEP);
 
                                             listeners.Add(newUdpListener);
@@ -2442,29 +2510,32 @@ namespace DnsServerCore.Dns
                 switch (request.Method)
                 {
                     case "GET":
-                        bool acceptsDoH = false;
+                        if (_enableDnsOverHttpHelpRedirect)
+                        {
+                            bool acceptsDoH = false;
 
-                        string requestAccept = request.Headers.Accept;
-                        if (string.IsNullOrEmpty(requestAccept))
-                        {
-                            acceptsDoH = true;
-                        }
-                        else
-                        {
-                            foreach (string mediaType in requestAccept.Split(','))
+                            string requestAccept = request.Headers.Accept;
+                            if (string.IsNullOrEmpty(requestAccept))
                             {
-                                if (mediaType.Equals("application/dns-message", StringComparison.OrdinalIgnoreCase))
+                                acceptsDoH = true;
+                            }
+                            else
+                            {
+                                foreach (string mediaType in requestAccept.Split(','))
                                 {
-                                    acceptsDoH = true;
-                                    break;
+                                    if (mediaType.Equals("application/dns-message", StringComparison.OrdinalIgnoreCase))
+                                    {
+                                        acceptsDoH = true;
+                                        break;
+                                    }
                                 }
                             }
-                        }
 
-                        if (!acceptsDoH)
-                        {
-                            response.Redirect((request.IsHttps ? "https://" : "http://") + request.Headers.Host);
-                            return;
+                            if (!acceptsDoH)
+                            {
+                                response.Redirect((request.IsHttps ? "https://" : "http://") + request.Headers.Host);
+                                return;
+                            }
                         }
 
                         string dnsRequestBase64Url = request.Query["dns"];
@@ -5623,35 +5694,43 @@ namespace DnsServerCore.Dns
                     return newOptions;
                 }
 
-                if ((request.EDNS is not null) && (response.EDNS is not null) && ((response.EDNS.Options.Count > 0) || (response.DnsClientExtendedErrors.Count > 0)))
+                if (request.EDNS is null)
                 {
-                    //update OPT with filtered EDNS options
-                    List<DnsResourceRecord> newAdditional = RemoveOPTFromAdditional();
-
-                    IReadOnlyList<EDnsOption> options = FilterEDnsOptions();
-                    newAdditional.Add(DnsDatagramEdns.GetOPTFor(_udpPayloadSize, rCode, 0, dnssecOk ? EDnsHeaderFlags.DNSSEC_OK : EDnsHeaderFlags.None, options));
-
-                    additional = newAdditional;
+                    //request does not have OPT
+                    if (response.EDNS is not null)
+                    {
+                        //remove OPT from additional
+                        //this is optimization step to avoid request object cloning at PostProcessQueryAsync()
+                        if ((additional.Count == 1) && (additional[0].Type == DnsResourceRecordType.OPT))
+                            additional = [];
+                        else
+                            additional = RemoveOPTFromAdditional();
+                    }
                 }
-                else if ((request.EDNS is null) && (response.EDNS is not null))
+                else
                 {
-                    //request does not have OPT; remove OPT from additional
-                    //this is optimization step to avoid request object cloning at PostProcessQueryAsync()
-                    if ((additional.Count == 1) && (additional[0].Type == DnsResourceRecordType.OPT))
-                        additional = [];
-                    else
-                        additional = RemoveOPTFromAdditional();
-                }
-                else if ((request.EDNS is not null) && (response.EDNS is null))
-                {
-                    //request has OPT; add OPT to additional
-                    //this is optimization step to avoid request object cloning at PostProcessQueryAsync()
-                    DnsResourceRecord optRecord = DnsDatagramEdns.GetOPTFor(_udpPayloadSize, rCode, 0, dnssecOk ? EDnsHeaderFlags.DNSSEC_OK : EDnsHeaderFlags.None, null);
+                    //request has OPT
+                    if (response.EDNS is null)
+                    {
+                        //add OPT to additional
+                        //this is optimization step to avoid request object cloning at PostProcessQueryAsync()
+                        DnsResourceRecord optRecord = DnsDatagramEdns.GetOPTFor(_udpPayloadSize, rCode, 0, dnssecOk ? EDnsHeaderFlags.DNSSEC_OK : EDnsHeaderFlags.None, null);
 
-                    if (additional.Count == 0)
-                        additional = [optRecord];
+                        if (additional.Count == 0)
+                            additional = [optRecord];
+                        else
+                            additional = [.. additional, optRecord];
+                    }
                     else
-                        additional = [.. additional, optRecord];
+                    {
+                        //update OPT with filtered EDNS options
+                        List<DnsResourceRecord> newAdditional = RemoveOPTFromAdditional();
+
+                        IReadOnlyList<EDnsOption> options = FilterEDnsOptions();
+                        newAdditional.Add(DnsDatagramEdns.GetOPTFor(_udpPayloadSize, rCode, 0, dnssecOk ? EDnsHeaderFlags.DNSSEC_OK : EDnsHeaderFlags.None, options));
+
+                        additional = newAdditional;
+                    }
                 }
             }
 
@@ -6426,7 +6505,10 @@ namespace DnsServerCore.Dns
 
                 try
                 {
-                    udpListener = GetUdpListnerSocket(localEP.AddressFamily);
+                    udpListener = GetUdpListenerSocket(localEP.AddressFamily);
+
+                    if ((Environment.OSVersion.Platform == PlatformID.Unix) && TryBindToDevice(udpListener, localEP.Address, out string interfaceName))
+                        _log.Write(localEP, DnsTransportProtocol.Udp, $"Socket was bound to device '{interfaceName}' successfully.");
 
                     try
                     {
@@ -6467,7 +6549,10 @@ namespace DnsServerCore.Dns
 
                     try
                     {
-                        udpProxyListener = GetUdpListnerSocket(udpProxyEP.AddressFamily);
+                        udpProxyListener = GetUdpListenerSocket(udpProxyEP.AddressFamily);
+
+                        if ((Environment.OSVersion.Platform == PlatformID.Unix) && TryBindToDevice(udpProxyListener, udpProxyEP.Address, out string interfaceName))
+                            _log.Write(udpProxyEP, DnsTransportProtocol.UdpProxy, $"Socket was bound to device '{interfaceName}' successfully.");
 
                         udpProxyListener.Bind(udpProxyEP);
 
@@ -6973,6 +7058,12 @@ namespace DnsServerCore.Dns
             }
         }
 
+        public bool EnableCheckForUpdate
+        {
+            get { return _enableCheckForUpdate; }
+            set { _enableCheckForUpdate = value; }
+        }
+
         public IPv6Mode IPv6Mode
         {
             get { return _ipv6Mode; }
@@ -7390,6 +7481,12 @@ namespace DnsServerCore.Dns
         {
             get { return _enableDnsOverQuic; }
             set { _enableDnsOverQuic = value; }
+        }
+
+        public bool EnableDnsOverHttpHelpRedirect
+        {
+            get { return _enableDnsOverHttpHelpRedirect; }
+            set { _enableDnsOverHttpHelpRedirect = value; }
         }
 
         public int DnsOverUdpProxyPort
