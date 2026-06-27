@@ -261,14 +261,10 @@ namespace DnsServerCore.Dhcp
                         else
                             udpSocket = udpListener; //no appropriate socket found so use default socket
 
-						if (OperatingSystem.IsMacOS())
-						{
+                        if (OperatingSystem.IsMacOS())
                             await udpSocket.SendToAsync(new ArraySegment<byte>(sendBuffer, 0, (int)sendBufferStream.Position), SocketFlags.None, new IPEndPoint(IPAddress.Broadcast, 68));
-						}
-						else
-						{
-							await udpSocket.SendToAsync(new ArraySegment<byte>(sendBuffer, 0, (int)sendBufferStream.Position), SocketFlags.DontRoute, new IPEndPoint(IPAddress.Broadcast, 68)); //no routing for broadcast
-						}
+                        else
+                            await udpSocket.SendToAsync(new ArraySegment<byte>(sendBuffer, 0, (int)sendBufferStream.Position), SocketFlags.DontRoute, new IPEndPoint(IPAddress.Broadcast, 68)); //no routing for broadcast
                     }
                 }
             }
