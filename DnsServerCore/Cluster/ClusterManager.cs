@@ -1330,13 +1330,16 @@ namespace DnsServerCore.Cluster
             if (!_dnsWebService.IsWebServiceTlsEnabled)
                 throw new InvalidOperationException();
 
+            if (IPAddress.TryParse(primaryNodeUrl.Host, out _))
+                throw new DnsServerException("Failed to join Cluster: the Primary Node URL must use the domain name of the Primary node and not its IP address.");
+
             if (primaryNodeIpAddresses is null)
             {
                 try
                 {
                     IReadOnlyList<IPAddress> ipAddresses = await DnsClient.ResolveIPAsync(_dnsWebService.DnsServer, primaryNodeUrl.Host, _dnsWebService.DnsServer.IPv6Mode, cancellationToken);
                     if (ipAddresses.Count < 1)
-                        throw new DnsServerException($"The domain name '{primaryNodeUrl.Host}' does not have an A/AAAA record configured.");
+                        throw new DnsServerException($"Failed to join Cluster: the domain name '{primaryNodeUrl.Host}' does not have an A/AAAA record configured.");
 
                     primaryNodeIpAddresses = ipAddresses;
                 }
@@ -1347,7 +1350,7 @@ namespace DnsServerCore.Cluster
             }
 
             //login to primary node API
-            using HttpApiClient primaryNodeApiClient = new HttpApiClient(primaryNodeUrl, _dnsWebService.DnsServer.Proxy, _dnsWebService.DnsServer.IPv6Mode, ignoreCertificateErrors, new InternalDnsClient(_dnsWebService.DnsServer, primaryNodeIpAddresses), TimeSpan.FromSeconds(300));
+            using HttpApiClient primaryNodeApiClient = new HttpApiClient(primaryNodeUrl, _dnsWebService.DnsServer.Proxy, _dnsWebService.DnsServer.IPv6Mode, ignoreCertificateErrors, new InternalDnsClient(_dnsWebService.DnsServer, primaryNodeIpAddresses));
 
             try
             {
@@ -1714,7 +1717,8 @@ namespace DnsServerCore.Cluster
 
                     await using (Stream stream = response.Item1)
                     {
-                        await stream.CopyToAsync(configZipStream, cancellationToken);
+                        //copy stream with idle timeout
+                        await stream.CopyToAsync(configZipStream, TimeSpan.FromSeconds(60), cancellationToken);
                     }
 
                     //dynamically load config
