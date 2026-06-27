@@ -1415,22 +1415,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                             <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Local addresses are the network interface IP addresses you want the Web Service to listen for requests. ANY addresses (0.0.0.0 &amp; [::]) cannot be used together with unicast IP addresses. The web server uses dual-mode sockets by default so the IPv6 ANY address ([::]) works for IPv4 too. The default values work for most scenarios so, do not change these defaults unless you have a requirement for the Web Service to listen on specific networks. Configured unicast IP addresses will be included as Subject Alternative Name (SAN) in the self signed TLS certificate.</div>
                                                         </div>
 
-                                                        <div class="form-group unix-socket-option">
-                                                            <label for="txtWebServiceHttpUnixSocket" class="col-sm-3 control-label">Web Service HTTP Unix Socket</label>
-                                                            <div class="col-sm-6">
-                                                                <input type="text" id="txtWebServiceHttpUnixSocket" class="form-control" spellcheck="false" placeholder="/path/to/socket.sock">
-                                                            </div>
-                                                            <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Optional Unix domain socket path you want the web service to listen on for HTTP requests.</div>
-                                                        </div>
-
-                                                        <div class="form-group unix-socket-option">
-                                                            <label for="txtWebServiceTlsUnixSocket" class="col-sm-3 control-label">Web Service HTTPS Unix Socket</label>
-                                                            <div class="col-sm-6">
-                                                                <input type="text" id="txtWebServiceTlsUnixSocket" class="form-control" spellcheck="false" placeholder="/path/to/socket.sock">
-                                                            </div>
-                                                            <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Optional Unix domain socket path you want the web service to listen on for HTTPS requests.</div>
-                                                        </div>
-
                                                         <div class="form-group">
                                                             <label for="txtWebServiceHttpPort" class="col-sm-3 control-label">Web Service HTTP Port</label>
                                                             <div class="col-sm-6">
@@ -1438,6 +1422,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                                 <span>(default 5380)</span>
                                                             </div>
                                                             <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Specify the TCP port number for this web console over HTTP protocol.</div>
+                                                        </div>
+
+                                                        <div class="form-group">
+                                                            <label class="col-sm-3 control-label">Unix Socket</label>
+                                                            <div class="col-sm-8">
+                                                                <div class="checkbox">
+                                                                    <label>
+                                                                        <input id="chkWebServiceEnableHttpUnixSocket" type="checkbox"> Enable HTTP Unix Socket
+                                                                    </label>
+                                                                </div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">Enables Web Service HTTP over Unix socket.</div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="form-group">
+                                                            <label for="txtWebServiceHttpUnixSocket" class="col-sm-3 control-label">Web Service HTTP Unix Socket</label>
+                                                            <div class="col-sm-6">
+                                                                <input type="text" id="txtWebServiceHttpUnixSocket" class="form-control" spellcheck="false" placeholder="/path/to/socket.sock">
+                                                            </div>
+                                                            <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Specify the Unix socket file path for Web Service. Ensure that the DNS Server has read+write permissions to the parent directory to be able to create the Unix Socket file.</div>
                                                         </div>
 
                                                         <div class="form-group">
@@ -1515,6 +1519,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                             <p><b>Note!</b> When using a reverse proxy with the Web Service, you need to add <code id="lblWebServiceRealIpHeader">X-Real-IP</code> header to the proxy request with the IP address of the client to allow the Web Service to know the real IP address of the client originating the request. For example, if you are using nginx as the reverse proxy, you can add <code id="lblWebServiceRealIpNginx">proxy_set_header X-Real-IP $remote_addr;</code> to make it work.</p>
                                                             <p><b>Note!</b> The Web Service uses Kestrel web server which supports both HTTP/2 and HTTP/3 protocols when TLS certificate is configured. HTTP/3 protocol support is not available on all platforms. On Windows, it is available only on Windows 11 (build 22000 and later) and Windows Server 2022 (and later). On Linux, it requires <code>libmsquic</code> to be installed. It also requires IPv6 support on the system to work.</p>
                                                             <p><b>Note!</b> The Web Service will always bind to <code>[::]</code> local address for HTTP/3 protocol since this is how the <code>libmsquic</code> library is designed to work.</p>
+                                                            <p><b>Note!</b> Unix Sockets are supported only on Linux, Windows 10 (build 17063 and later), and Windows Server 2019 (update 1809 and later).</p>
                                                             <p>Use the following openssl command to convert your TLS certificate that is in PEM format to PKCS #12 certificate (.pfx) format:</p>
                                                             <pre>openssl pkcs12 -export -out "example.com.pfx" -inkey "privkey.pem" -in "cert.pem" -certfile "chain.pem"</pre>
                                                         </div>
@@ -1555,6 +1560,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                                     </label>
                                                                 </div>
                                                                 <div style="padding-top: 5px; padding-left: 20px;">Enable this option to accept DNS-over-HTTP requests. It must be used with a TLS terminating reverse proxy like nginx. It is mandatory to configure <b>Reverse Proxy Network ACL</b> below to allow requests coming from your reverse proxy server. Enabling this option also allows automatic TLS certificate renewal with HTTP challenge (webroot) for DNS-over-HTTPS service when DNS-over-HTTP port is set to 80.</div>
+
+                                                                <div class="checkbox">
+                                                                    <label>
+                                                                        <input id="chkEnableDnsOverHttpUnixSocket" type="checkbox"> Enable DNS-over-HTTP Unix Socket
+                                                                    </label>
+                                                                </div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">Enable this option to accept DNS-over-HTTP requests over Unix socket. It must be used with a TLS terminating reverse proxy like nginx.</div>
 
                                                                 <div class="checkbox">
                                                                     <label>
@@ -1613,12 +1625,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                             <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Specify the TCP port number for DNS-over-HTTP protocol.</div>
                                                         </div>
 
-                                                        <div class="form-group unix-socket-option">
+                                                        <div class="form-group">
                                                             <label for="txtDnsOverHttpUnixSocket" class="col-sm-3 control-label">DNS-over-HTTP Unix Socket</label>
                                                             <div class="col-sm-6">
                                                                 <input type="text" id="txtDnsOverHttpUnixSocket" class="form-control" spellcheck="false" placeholder="/path/to/socket.sock">
                                                             </div>
-                                                            <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Optional Unix domain socket path you want the DNS server to listen on for DNS-over-HTTP protocol requests.</div>
+                                                            <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Specify the Unix socket file path for DNS-over-HTTP protocol service. Ensure that the DNS Server has read+write permissions to the parent directory to be able to create the Unix Socket file.</div>
                                                         </div>
 
                                                         <div class="form-group">
@@ -1637,14 +1649,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                                 <span>(default 443)</span>
                                                             </div>
                                                             <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Specify the TCP port number for DNS-over-HTTPS protocol.</div>
-                                                        </div>
-
-                                                        <div class="form-group unix-socket-option">
-                                                            <label for="txtDnsOverHttpsUnixSocket" class="col-sm-3 control-label">DNS-over-HTTPS Unix Socket</label>
-                                                            <div class="col-sm-6">
-                                                                <input type="text" id="txtDnsOverHttpsUnixSocket" class="form-control" spellcheck="false" placeholder="/path/to/socket.sock">
-                                                            </div>
-                                                            <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">Optional Unix domain socket path you want the DNS server to listen on for DNS-over-HTTPS protocol requests.</div>
                                                         </div>
 
                                                         <div class="form-group">
@@ -1690,11 +1694,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                                                         <div>
                                                             <p><b>Note!</b> These optional DNS Server protocol changes will be automatically applied and so you do not need to manually restart the main service. The TLS certificate too will be automatically reloaded when the certificate file's date modified property on disk changes. The DNS-over-TLS, DNS-over-QUIC, and DNS-over-HTTPS protocols will be enabled only when a TLS certificate is configured.</p>
-                                                            <p>These optional DNS Server protocols are used to host these as a service. You do not need to enable these optional protocols to use them with Forwarders or Conditional Forwarder Zones.</p>
-                                                            <p>For DNS-over-HTTP, use <code>http://<span id="lblDoHHost">localhost:8053</span>/dns-query</code> with a TLS terminating reverse proxy like nginx. For DNS-over-TLS, use <code id="lblDoTHost">tls-certificate-domain:853</code>, for DNS-over-QUIC, use <code id="lblDoQHost">tls-certificate-domain:853</code>, and for DNS-over-HTTPS use <code>https://<span id="lblDoHsHost">tls-certificate-domain</span>/dns-query</code> to configure supported DNS clients.</p>
-                                                            <p>When using a reverse proxy with the DNS-over-HTTP service, you need to add <code id="lblDnsOverHttpRealIpHeader">X-Real-IP</code> header to the proxy request with the IP address of the client to allow the DNS Server to know the real IP address of the client originating the request. For example, if you are using nginx as the reverse proxy, you can add <code id="lblDnsOverHttpRealIpNginx">proxy_set_header X-Real-IP $remote_addr;</code> to make it work.</p>
-                                                            <p>DNS-over-QUIC protocol support is not available on all platforms. On Windows, it is available only on Windows 11 (build 22000 and later) and Windows Server 2022 (and later). On Linux, it requires <code>libmsquic</code> to be installed. It also requires IPv6 support on the system to work.</p>
+                                                            <p><b>Note!</b> These optional DNS Server protocols are used to host these as a service. You do not need to enable these optional protocols to use them with Forwarders or Conditional Forwarder Zones.</p>
+                                                            <p><b>Note!</b> For DNS-over-HTTP, use <code>http://<span id="lblDoHHost">localhost:8053</span>/dns-query</code> with a TLS terminating reverse proxy like nginx. For DNS-over-TLS, use <code id="lblDoTHost">tls-certificate-domain:853</code>, for DNS-over-QUIC, use <code id="lblDoQHost">tls-certificate-domain:853</code>, and for DNS-over-HTTPS use <code>https://<span id="lblDoHsHost">tls-certificate-domain</span>/dns-query</code> to configure supported DNS clients.</p>
+                                                            <p><b>Note!</b> When using a reverse proxy with the DNS-over-HTTP service, you need to add <code id="lblDnsOverHttpRealIpHeader">X-Real-IP</code> header to the proxy request with the IP address of the client to allow the DNS Server to know the real IP address of the client originating the request. For example, if you are using nginx as the reverse proxy, you can add <code id="lblDnsOverHttpRealIpNginx">proxy_set_header X-Real-IP $remote_addr;</code> to make it work.</p>
+                                                            <p><b>Note!</b> DNS-over-QUIC protocol support is not available on all platforms. On Windows, it is available only on Windows 11 (build 22000 and later) and Windows Server 2022 (and later). On Linux, it requires <code>libmsquic</code> to be installed. It also requires IPv6 support on the system to work.</p>
                                                             <p><b>Note!</b> The DNS-over-HTTP/3 protocol will always bind to <code>[::]</code> local address since this is how the <code>libmsquic</code> library is designed to work.</p>
+                                                            <p><b>Note!</b> Unix Sockets are supported only on Linux, Windows 10 (build 17063 and later), and Windows Server 2019 (update 1809 and later).</p>
                                                             <p>Use the following openssl command to convert your TLS certificate that is in PEM format to PKCS #12 certificate (.pfx) format:</p>
                                                             <pre>openssl pkcs12 -export -out "example.com.pfx" -inkey "privkey.pem" -in "cert.pem" -certfile "chain.pem"</pre>
                                                         </div>
