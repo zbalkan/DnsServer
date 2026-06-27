@@ -96,6 +96,7 @@ namespace DnsServerCore
                 jsonWriter.WriteStringArray("zoneTransferAllowedNetworks", _dnsWebService._dnsServer.ZoneTransferAllowedNetworks);
                 jsonWriter.WriteStringArray("notifyAllowedNetworks", _dnsWebService._dnsServer.NotifyAllowedNetworks);
 
+                jsonWriter.WriteBoolean("dnsServerEnableCheckForUpdate", _dnsWebService._dnsServer.EnableCheckForUpdate);
                 jsonWriter.WriteBoolean("dnsAppsEnableAutomaticUpdate", _dnsWebService._dnsServer.DnsApplicationManager.EnableAutomaticUpdate);
 
                 jsonWriter.WriteString("ipv6Mode", _dnsWebService._dnsServer.IPv6Mode.ToString());
@@ -212,6 +213,7 @@ namespace DnsServerCore
                 }
 
                 jsonWriter.WriteString("webServiceRealIpHeader", _dnsWebService._webServiceRealIpHeader);
+                jsonWriter.WriteString("webServiceCspFrameAncestorsHeader", _dnsWebService._webServiceCspFrameAncestorsHeader);
                 jsonWriter.WriteString("webServiceTlsCertificatePath", _dnsWebService._webServiceTlsCertificatePath);
                 jsonWriter.WriteString("webServiceTlsCertificatePassword", string.IsNullOrEmpty(_dnsWebService._webServiceTlsCertificatePath) ? null : "************");
 
@@ -224,6 +226,9 @@ namespace DnsServerCore
                 jsonWriter.WriteBoolean("enableDnsOverHttps", _dnsWebService._dnsServer.EnableDnsOverHttps);
                 jsonWriter.WriteBoolean("enableDnsOverHttp3", _dnsWebService._dnsServer.EnableDnsOverHttp3);
                 jsonWriter.WriteBoolean("enableDnsOverQuic", _dnsWebService._dnsServer.EnableDnsOverQuic);
+
+                jsonWriter.WriteBoolean("enableDnsOverHttpHelpRedirect", _dnsWebService._dnsServer.EnableDnsOverHttpHelpRedirect);
+
                 jsonWriter.WriteNumber("dnsOverUdpProxyPort", _dnsWebService._dnsServer.DnsOverUdpProxyPort);
                 jsonWriter.WriteNumber("dnsOverTcpProxyPort", _dnsWebService._dnsServer.DnsOverTcpProxyPort);
                 jsonWriter.WriteNumber("dnsOverHttpPort", _dnsWebService._dnsServer.DnsOverHttpPort);
@@ -608,6 +613,13 @@ namespace DnsServerCore
                             clusterParameters.Add("notifyAllowedNetworks", notifyAllowedNetworks.Join());
                         }
 
+                        if (request.TryGetQueryOrForm("dnsServerEnableCheckForUpdate", bool.Parse, out bool dnsServerEnableCheckForUpdate))
+                        {
+                            _dnsWebService._dnsServer.EnableCheckForUpdate = dnsServerEnableCheckForUpdate;
+
+                            clusterParameters.Add("dnsServerEnableCheckForUpdate", dnsServerEnableCheckForUpdate.ToString());
+                        }
+
                         if (request.TryGetQueryOrForm("dnsAppsEnableAutomaticUpdate", bool.Parse, out bool dnsAppsEnableAutomaticUpdate))
                         {
                             _dnsWebService._dnsServer.DnsApplicationManager.EnableAutomaticUpdate = dnsAppsEnableAutomaticUpdate;
@@ -953,15 +965,26 @@ namespace DnsServerCore
                                 _dnsWebService._webServiceReverseProxyAddresses = webServiceReverseProxyAddresses;
                         }
 
-                        if (request.TryGetQueryOrForm("webServiceRealIpHeader", out string webServiceRealIpHeader))
+                        if (request.TryQueryOrForm("webServiceRealIpHeader", out string webServiceRealIpHeader))
                         {
-                            if (webServiceRealIpHeader.Length > 255)
+                            if (string.IsNullOrWhiteSpace(webServiceRealIpHeader))
+                                webServiceRealIpHeader = "X-Real-IP";
+                            else if (webServiceRealIpHeader.Length > 255)
                                 throw new ArgumentException("Web Service Real IP header name cannot exceed 255 characters.", nameof(webServiceRealIpHeader));
-
-                            if (webServiceRealIpHeader.Contains(' '))
+                            else if (webServiceRealIpHeader.Contains(' '))
                                 throw new ArgumentException("Web Service Real IP header name cannot contain invalid characters.", nameof(webServiceRealIpHeader));
 
                             _dnsWebService._webServiceRealIpHeader = webServiceRealIpHeader;
+                        }
+
+                        if (request.TryQueryOrForm("webServiceCspFrameAncestorsHeader", out string webServiceCspFrameAncestorsHeader))
+                        {
+                            if (string.IsNullOrWhiteSpace(webServiceCspFrameAncestorsHeader))
+                                webServiceCspFrameAncestorsHeader = "'none'";
+                            else if (webServiceCspFrameAncestorsHeader.Length > 255)
+                                throw new ArgumentException("Web Service Content Security Policy (CSP) Frame Ancestors header value cannot exceed 255 characters.", nameof(webServiceCspFrameAncestorsHeader));
+
+                            _dnsWebService._webServiceCspFrameAncestorsHeader = webServiceCspFrameAncestorsHeader;
                         }
 
                         string webServiceTlsCertificatePath = request.QueryOrForm("webServiceTlsCertificatePath");
@@ -1065,6 +1088,9 @@ namespace DnsServerCore
                                 restartDnsService = true;
                             }
                         }
+
+                        if (request.TryGetQueryOrForm("enableDnsOverHttpHelpRedirect", bool.Parse, out bool enableDnsOverHttpHelpRedirect))
+                            _dnsWebService._dnsServer.EnableDnsOverHttpHelpRedirect = enableDnsOverHttpHelpRedirect;
 
                         if (request.TryGetQueryOrForm("dnsOverUdpProxyPort", int.Parse, out int dnsOverUdpProxyPort))
                         {
