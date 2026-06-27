@@ -599,21 +599,21 @@ namespace DnsServerCore.Dns.ZoneManagers
                             if (File.Exists(listFilePath))
                                 http.DefaultRequestHeaders.IfModifiedSince = File.GetLastWriteTimeUtc(listFilePath);
 
-                            http.Timeout = TimeSpan.FromMinutes(5);
                             http.DefaultRequestHeaders.UserAgent.TryParseAdd("Technitium DNS Server");
 
-                            HttpResponseMessage httpResponse = await http.GetAsync(listUrl);
+                            HttpResponseMessage httpResponse = await http.GetAsync(listUrl, HttpCompletionOption.ResponseHeadersRead);
                             switch (httpResponse.StatusCode)
                             {
                                 case HttpStatusCode.OK:
                                     {
                                         string listDownloadFilePath = listFilePath + ".downloading";
 
-                                        using (FileStream fS = new FileStream(listDownloadFilePath, FileMode.Create, FileAccess.Write))
+                                        await using (FileStream fS = new FileStream(listDownloadFilePath, FileMode.Create, FileAccess.Write))
                                         {
-                                            using (Stream httpStream = await httpResponse.Content.ReadAsStreamAsync())
+                                            await using (Stream httpStream = await httpResponse.Content.ReadAsStreamAsync())
                                             {
-                                                await httpStream.CopyToAsync(fS);
+                                                //copy stream with idle timeout
+                                                await httpStream.CopyToAsync(fS, TimeSpan.FromSeconds(60));
                                             }
                                         }
 
