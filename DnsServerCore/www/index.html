@@ -69,8 +69,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <li><a href="#" onclick="showCreateMyApiTokenModal(); return false;">Create API Token</a></li>
                 <li role="separator" class="divider"></li>
                 <li><a href="#" onclick="showChangeThemeModal(); return false;">Change Theme</a></li>
-                <li><a id="mnuDisableCheckForUpdate" href="#" onclick="disableCheckForUpdate(); return false;" style="display: none;">Disable Update Check</a></li>
-                <li><a id="mnuEnableCheckForUpdate" href="#" onclick="enableCheckForUpdate(); return false;" style="display: none;">Enable Update Check</a></li>
+                <li><a id="mnuDisableCheckForUpdateNotification" href="#" onclick="disableUpdateNotification(); return false;" style="display: none;">Disable Update Notification</a></li>
+                <li><a id="mnuEnableCheckForUpdateNotification" href="#" onclick="enableUpdateNotification(); return false;" style="display: none;">Enable Update Notification</a></li>
+                <li><a href="#" onclick="checkForUpdate(true); return false;">Check For Update</a></li>
                 <li role="separator" class="divider"></li>
                 <li><a href="#" onclick="logout(); return false;">Logout</a></li>
             </ul>
@@ -1098,16 +1099,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                         </div>
                                                     </div>
 
-                                                    <div id="divSettingsGeneralDnsApps" class="well well-sm form-horizontal">
+                                                    <div id="divSettingsGeneralSoftwareUpdate" class="well well-sm form-horizontal">
                                                         <div class="form-group">
-                                                            <label for="txtDefaultRecordTtl" class="col-sm-3 control-label">DNS Apps</label>
+                                                            <label class="col-sm-3 control-label">Software Update</label>
                                                             <div class="col-sm-8">
+                                                                <div class="checkbox">
+                                                                    <label>
+                                                                        <input id="chkDnsServerEnableCheckForUpdate" type="checkbox"> Enable Check For Update
+                                                                    </label>
+                                                                </div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">Enables the DNS Server to check if an update is available when the Check For Update API is called which usually occurs after a user logs into the Web Console.</div>
+
                                                                 <div class="checkbox">
                                                                     <label>
                                                                         <input id="chkDnsAppsEnableAutomaticUpdate" type="checkbox"> Enable Automatic Update
                                                                     </label>
                                                                 </div>
-                                                                <div style="padding-top: 5px; padding-left: 20px;">The DNS Server will check for DNS Apps update every day and will automatically download and install the updates.</div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">The DNS Server will check for DNS Apps update once every day and will automatically download and install the updates.</div>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -1479,6 +1487,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                         </div>
 
                                                         <div class="form-group">
+                                                            <label for="txtWebServiceCspFrameAncestorsHeader" class="col-sm-3 control-label">CSP Frame Ancestors Header</label>
+                                                            <div class="col-sm-6">
+                                                                <input type="text" class="form-control" id="txtWebServiceCspFrameAncestorsHeader" placeholder="'none'" maxlength="255">
+                                                            </div>
+                                                            <div class="col-sm-offset-3 col-sm-8" style="padding-top: 5px;">The Content Security Policy (CSP) Frame Ancestors header value that must be used when serving the Web Console.</div>
+                                                        </div>
+
+                                                        <div class="form-group">
                                                             <label for="txtWebServiceTlsCertificatePath" class="col-sm-3 control-label">TLS Certificate File Path</label>
                                                             <div class="col-sm-6">
                                                                 <input type="text" class="form-control" id="txtWebServiceTlsCertificatePath" placeholder="Web Service TLS Certificate File Path On Server" maxlength="255">
@@ -1567,6 +1583,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                                     </label>
                                                                 </div>
                                                                 <div style="padding-top: 5px; padding-left: 20px;">Enable this option to accept DNS-over-QUIC requests.</div>
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="form-group">
+                                                            <label class="col-sm-3 control-label">DNS-over-HTTP(s) Option</label>
+                                                            <div class="col-sm-8">
+                                                                <div class="checkbox">
+                                                                    <label>
+                                                                        <input id="chkEnableDnsOverHttpHelpRedirect" type="checkbox"> Enable Redirect To Help Page
+                                                                    </label>
+                                                                </div>
+                                                                <div style="padding-top: 5px; padding-left: 20px;">When this option is enabled, if a user visits the <code>/dns-query</code> DNS-over-HTTP(s) URL path using a web browser, the web browser will be redirected to <code>/</code> URL path to display the help page for the DNS-over-HTTP(s) service.</div>
                                                             </div>
                                                         </div>
 
@@ -3080,6 +3108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                                         <p><b>Note!</b> When Group Map is configured, the Single Sign-On (SSO) user's group membership cannot be managed locally and any group membership changes must be configured at the SSO provider itself. SSO users need to relogin so that any group membership changes made at SSO provider are applied to their user accounts. The Group Map thus allows managing user access centrally via the SSO provider. Keep the Group Map empty if group membership management for SSO users is required to be managed via the DNS Server itself.</p>
                                                         <p><b>Note!</b> The Web Service will be automatically restarted to apply these changes thus there is no need to restart the DNS Server manually.</p>
                                                         <p><b>Note!</b> When using a reverse proxy with the Web Service, you need to add <code>X-Forwarded-Proto</code> and <code>X-Forwarded-Host</code> headers to proxy request to allow the Web Service to correctly form the SSO Redirect URI. If the reverse proxy is setup to use a path prefix then make sure to add the <code>X-Forwarded-Prefix</code> header to proxy request too. These headers will be read only if the reverse proxy IP address is configured to be allowed in the <b>Reverse Proxy Addresses</b> option in Settings > Web Service section. For example, if you are using nginx as the reverse proxy with a path prefix of <code>/dns</code>, then you should add the following headers: <code>proxy_set_header X-Forwarded-Proto $scheme;</code>, <code>proxy_set_header X-Forwarded-Host $host;</code>, <code>proxy_set_header X-Forwarded-Prefix /dns;</code>, and <code>proxy_redirect / /dns/;</code></p>
+                                                        <p><b>Note!</b> Domain names in all of the URLs configured above will be resolved by the DNS Server internally only. Thus, make sure that the DNS Server is able to resolve the domain name in the URL. Adding <code>hosts</code> file entries in the host OS will not work.</p>
                                                         <p><b>Warning!</b> All URLs configured above must use <code>https</code> URL scheme for production environments. Using <code>http</code> URL scheme is not secure and should be used only for testing purposes.</p>
                                                         <p><b>Warning!</b> Any DNS related failure may cause Single Sign-On (SSO) to fail to work making it impossible for SSO users to log in to fix the DNS issue due to circular dependency. Thus, it is recommended to maintain a local administrator user account for such scenarios.</p>
                                                     </div>
