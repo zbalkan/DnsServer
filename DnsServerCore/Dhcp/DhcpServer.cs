@@ -848,17 +848,21 @@ namespace DnsServerCore.Dhcp
                     }
                 }
 
-                DnsResourceRecord aRecord = new DnsResourceRecord(domain, DnsResourceRecordType.A, DnsClass.IN, scope.DnsTtl, new DnsARecordData(address));
+                IReadOnlyList<DnsResourceRecord> existingARecords = _dnsServer.AuthZoneManager.GetRecords(zoneName, domain, DnsResourceRecordType.A);
+                if ((existingARecords.Count != 1) || (existingARecords[0].TTL != scope.DnsTtl) || (existingARecords[0].RDATA is not DnsARecordData a) || !a.Address.Equals(address))
+                {
+                    DnsResourceRecord aRecord = new DnsResourceRecord(domain, DnsResourceRecordType.A, DnsClass.IN, scope.DnsTtl, new DnsARecordData(address));
 
-                GenericRecordInfo aRecordInfo = aRecord.GetAuthGenericRecordInfo();
-                aRecordInfo.LastModified = DateTime.UtcNow;
-                aRecordInfo.Comments = $"Via '{scope.Name}' DHCP scope";
+                    GenericRecordInfo aRecordInfo = aRecord.GetAuthGenericRecordInfo();
+                    aRecordInfo.LastModified = DateTime.UtcNow;
+                    aRecordInfo.Comments = $"Via '{scope.Name}' DHCP scope";
 
-                if (!hasReservedLeaseHostname)
-                    aRecordInfo.ExpiryTtl = scope.GetLeaseTime();
+                    if (!hasReservedLeaseHostname)
+                        aRecordInfo.ExpiryTtl = scope.GetLeaseTime();
 
-                _dnsServer.AuthZoneManager.SetRecord(zoneName, aRecord);
-                _log.Write("DHCP Server updated DNS A record '" + domain + "' with IP address [" + address.ToString() + "].");
+                    _dnsServer.AuthZoneManager.SetRecord(zoneName, aRecord);
+                    _log.Write("DHCP Server updated DNS A record '" + domain + "' with IP address [" + address.ToString() + "].");
+                }
 
                 //update reverse zone
                 AuthZoneInfo reverseZoneInfo = _dnsServer.AuthZoneManager.FindAuthZoneInfo(reverseDomain);
@@ -908,18 +912,21 @@ namespace DnsServerCore.Dhcp
 
                 reverseZoneName = reverseZoneInfo.Name;
 
-                DnsResourceRecord ptrRecord = new DnsResourceRecord(reverseDomain, DnsResourceRecordType.PTR, DnsClass.IN, scope.DnsTtl, new DnsPTRRecordData(domain));
+                IReadOnlyList<DnsResourceRecord> existingPtrRecords = _dnsServer.AuthZoneManager.GetRecords(reverseZoneName, reverseDomain, DnsResourceRecordType.PTR);
+                if ((existingPtrRecords.Count != 1) || (existingPtrRecords[0].TTL != scope.DnsTtl) || (existingPtrRecords[0].RDATA is not DnsPTRRecordData ptr) || !ptr.Domain.Equals(domain))
+                {
+                    DnsResourceRecord ptrRecord = new DnsResourceRecord(reverseDomain, DnsResourceRecordType.PTR, DnsClass.IN, scope.DnsTtl, new DnsPTRRecordData(domain));
 
-                GenericRecordInfo ptrRecordInfo = ptrRecord.GetAuthGenericRecordInfo();
-                ptrRecordInfo.LastModified = DateTime.UtcNow;
-                ptrRecordInfo.Comments = $"Via '{scope.Name}' DHCP scope";
+                    GenericRecordInfo ptrRecordInfo = ptrRecord.GetAuthGenericRecordInfo();
+                    ptrRecordInfo.LastModified = DateTime.UtcNow;
+                    ptrRecordInfo.Comments = $"Via '{scope.Name}' DHCP scope";
 
-                if (!hasReservedLeaseHostname)
-                    ptrRecordInfo.ExpiryTtl = scope.GetLeaseTime();
+                    if (!hasReservedLeaseHostname)
+                        ptrRecordInfo.ExpiryTtl = scope.GetLeaseTime();
 
-                _dnsServer.AuthZoneManager.SetRecord(reverseZoneName, ptrRecord);
-
-                _log.Write("DHCP Server updated DNS PTR record '" + reverseDomain + "' with domain name '" + domain + "'.");
+                    _dnsServer.AuthZoneManager.SetRecord(reverseZoneName, ptrRecord);
+                    _log.Write("DHCP Server updated DNS PTR record '" + reverseDomain + "' with domain name '" + domain + "'.");
+                }
 
                 //save auth zone file
                 if (zoneName is not null)
@@ -1167,7 +1174,7 @@ namespace DnsServerCore.Dhcp
             return false;
         }
 
-        private bool DeactivateScope(Scope scope, bool throwException = false)
+        private bool DeactivateScope(Scope scope, bool removeDnsEntries, bool throwException)
         {
             IPEndPoint dhcpEP = null;
 
@@ -1181,7 +1188,7 @@ namespace DnsServerCore.Dhcp
 
                 UnbindUdpListener(_dhcpDefaultEP);
 
-                if (_dnsServer is not null)
+                if (removeDnsEntries && (_dnsServer is not null))
                 {
                     //remove all leases from dns
                     foreach (KeyValuePair<ClientIdentifierOption, Lease> lease in scope.Leases)
@@ -1225,10 +1232,10 @@ namespace DnsServerCore.Dhcp
             _log.Write("DHCP Server successfully loaded scope: " + scope.Name);
         }
 
-        private void UnloadScope(Scope scope)
+        private void UnloadScope(Scope scope, bool removeDnsEntries)
         {
             if (scope.Enabled)
-                DeactivateScope(scope);
+                DeactivateScope(scope, removeDnsEntries, false);
 
             if (_scopes.TryRemove(scope.Name, out Scope removedScope))
             {
@@ -1404,7 +1411,7 @@ namespace DnsServerCore.Dhcp
             SaveModifiedScopes();
 
             foreach (KeyValuePair<string, Scope> scope in _scopes)
-                UnloadScope(scope.Value);
+                UnloadScope(scope.Value, false);
 
             _udpListeners.Clear();
 
@@ -1446,7 +1453,7 @@ namespace DnsServerCore.Dhcp
         {
             if (_scopes.TryGetValue(name, out Scope scope))
             {
-                UnloadScope(scope);
+                UnloadScope(scope, true);
                 DeleteScopeFile(scope.Name);
             }
         }
@@ -1471,7 +1478,7 @@ namespace DnsServerCore.Dhcp
         {
             if (_scopes.TryGetValue(name, out Scope scope))
             {
-                if (scope.Enabled && DeactivateScope(scope, throwException))
+                if (scope.Enabled && DeactivateScope(scope, true, throwException))
                 {
                     scope.SetEnabled(false);
                     SaveScopeFile(scope);
