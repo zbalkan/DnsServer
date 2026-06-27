@@ -1,10 +1,19 @@
 #!/sbin/openrc-run
 
-name=$RC_SVCNAME
 description="Technitium DNS Server"
-supervisor="supervise-daemon"
+
+directory=/opt/technitium/dns
+
 command="/usr/bin/dotnet"
 command_args="/opt/technitium/dns/DnsServerApp.dll /etc/dns"
-supervise_daemon_args=" -d /opt/technitium/dns"
-command_user=serviceUser:serviceUser
+command_user=dns-server:dns-server
+
 capabilities="^cap_net_bind_service"
+
+supervisor="supervise-daemon"
+respawn_delay=10
+respawn_max=0
+
+depend() {
+    need net
+}
