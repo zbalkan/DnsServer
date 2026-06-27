@@ -31,6 +31,7 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using TechnitiumLibrary;
+using TechnitiumLibrary.IO;
 using TechnitiumLibrary.Net;
 using TechnitiumLibrary.Net.Dns;
 using TechnitiumLibrary.Net.Dns.EDnsOptions;
@@ -1203,17 +1204,20 @@ namespace AdvancedBlocking
                             if (File.Exists(_listFilePath))
                                 http.DefaultRequestHeaders.IfModifiedSince = File.GetLastWriteTimeUtc(_listFilePath);
 
-                            HttpResponseMessage httpResponse = await http.GetAsync(_listUrl);
+                            http.DefaultRequestHeaders.UserAgent.TryParseAdd("Technitium DNS Server");
+
+                            HttpResponseMessage httpResponse = await http.GetAsync(_listUrl, HttpCompletionOption.ResponseHeadersRead);
                             switch (httpResponse.StatusCode)
                             {
                                 case HttpStatusCode.OK:
                                     string listDownloadFilePath = _listFilePath + ".downloading";
 
-                                    using (FileStream fS = new FileStream(listDownloadFilePath, FileMode.Create, FileAccess.Write))
+                                    await using (FileStream fS = new FileStream(listDownloadFilePath, FileMode.Create, FileAccess.Write))
                                     {
-                                        using (Stream httpStream = await httpResponse.Content.ReadAsStreamAsync())
+                                        await using (Stream httpStream = await httpResponse.Content.ReadAsStreamAsync())
                                         {
-                                            await httpStream.CopyToAsync(fS);
+                                            //copy stream with idle timeout
+                                            await httpStream.CopyToAsync(fS, TimeSpan.FromSeconds(60));
                                         }
                                     }
 
