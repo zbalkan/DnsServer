@@ -635,16 +635,25 @@ namespace DnsServerCore
             }
         }
 
-        private static string GetIpInfo(IPEndPoint ep)
+        private static string GetIpInfo(EndPoint ep)
         {
             string ipInfo;
 
             if (ep is null)
+            {
                 ipInfo = "";
-            else if (ep.Address.IsIPv4MappedToIPv6)
-                ipInfo = "[" + ep.Address.MapToIPv4().ToString() + ":" + ep.Port + "] ";
+            }
+            else if (ep is IPEndPoint ipep)
+            {
+                if (ipep.Address.IsIPv4MappedToIPv6)
+                    ipInfo = "[" + ipep.Address.MapToIPv4().ToString() + ":" + ipep.Port + "] ";
+                else
+                    ipInfo = "[" + ipep.ToString() + "] ";
+            }
             else
+            {
                 ipInfo = "[" + ep.ToString() + "] ";
+            }
 
             return ipInfo;
         }
@@ -749,27 +758,27 @@ namespace DnsServerCore
             Write(message + "\r\n" + (_noStackTrace ? ex.Message : ex.ToString()));
         }
 
-        public void Write(IPEndPoint ep, Exception ex)
+        public void Write(EndPoint ep, Exception ex)
         {
             Write(ep, _noStackTrace ? ex.Message : ex.ToString());
         }
 
-        public void Write(IPEndPoint ep, string message)
+        public void Write(EndPoint ep, string message)
         {
             Write(GetIpInfo(ep) + message);
         }
 
-        public void Write(IPEndPoint ep, string message, Exception ex)
+        public void Write(EndPoint ep, string message, Exception ex)
         {
             Write(GetIpInfo(ep) + message + "\r\n" + (_noStackTrace ? ex.Message : ex.ToString()));
         }
 
-        public void Write(IPEndPoint ep, DnsTransportProtocol protocol, Exception ex)
+        public void Write(EndPoint ep, DnsTransportProtocol protocol, Exception ex)
         {
             Write(ep, protocol, _noStackTrace ? ex.Message : ex.ToString());
         }
 
-        public void Write(IPEndPoint ep, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response)
+        public void Write(EndPoint ep, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response)
         {
             DnsQuestionRecord q = null;
 
@@ -869,22 +878,22 @@ namespace DnsServerCore
             Write(ep, protocol, requestInfo + responseInfo);
         }
 
-        public void Write(IPEndPoint ep, DnsTransportProtocol protocol, string message)
+        public void Write(EndPoint ep, DnsTransportProtocol protocol, string message)
         {
             Write(ep, protocol.ToString(), message);
         }
 
-        public void Write(IPEndPoint ep, DnsTransportProtocol protocol, string message, Exception ex)
+        public void Write(EndPoint ep, DnsTransportProtocol protocol, string message, Exception ex)
         {
             Write(ep, protocol.ToString(), message, ex);
         }
 
-        public void Write(IPEndPoint ep, string protocol, string message)
+        public void Write(EndPoint ep, string protocol, string message)
         {
             Write(GetIpInfo(ep) + "[" + protocol.ToUpper() + "] " + message);
         }
 
-        public void Write(IPEndPoint ep, string protocol, string message, Exception ex)
+        public void Write(EndPoint ep, string protocol, string message, Exception ex)
         {
             Write(GetIpInfo(ep) + "[" + protocol.ToUpper() + "] " + message + "\r\n" + (_noStackTrace ? ex.Message : ex.ToString()));
         }
