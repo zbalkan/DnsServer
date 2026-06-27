@@ -191,14 +191,16 @@ namespace DnsServerCore
 
                 jsonWriter.WriteEndArray();
 
-                jsonWriter.WriteString("webServiceHttpUnixSocket", _dnsWebService._webServiceHttpUnixSocket);
-                jsonWriter.WriteString("webServiceTlsUnixSocket", _dnsWebService._webServiceTlsUnixSocket);
-
                 jsonWriter.WriteNumber("webServiceHttpPort", _dnsWebService._webServiceHttpPort);
+
+                jsonWriter.WriteBoolean("webServiceEnableHttpUnixSocket", _dnsWebService._webServiceEnableHttpUnixSocket);
+                jsonWriter.WriteString("webServiceHttpUnixSocket", _dnsWebService._webServiceHttpUnixSocket);
+
                 jsonWriter.WriteBoolean("webServiceEnableTls", _dnsWebService._webServiceEnableTls);
                 jsonWriter.WriteBoolean("webServiceEnableHttp3", _dnsWebService._webServiceEnableHttp3);
                 jsonWriter.WriteBoolean("webServiceHttpToTlsRedirect", _dnsWebService._webServiceHttpToTlsRedirect);
                 jsonWriter.WriteBoolean("webServiceUseSelfSignedTlsCertificate", _dnsWebService._webServiceUseSelfSignedTlsCertificate);
+
                 jsonWriter.WriteNumber("webServiceTlsPort", _dnsWebService._webServiceTlsPort);
 
                 jsonWriter.WritePropertyName("webServiceReverseProxyAddresses");
@@ -223,19 +225,19 @@ namespace DnsServerCore
                 jsonWriter.WriteBoolean("enableDnsOverUdpProxy", _dnsWebService._dnsServer.EnableDnsOverUdpProxy);
                 jsonWriter.WriteBoolean("enableDnsOverTcpProxy", _dnsWebService._dnsServer.EnableDnsOverTcpProxy);
                 jsonWriter.WriteBoolean("enableDnsOverHttp", _dnsWebService._dnsServer.EnableDnsOverHttp);
+                jsonWriter.WriteBoolean("enableDnsOverHttpUnixSocket", _dnsWebService._dnsServer.EnableDnsOverHttpUnixSocket);
                 jsonWriter.WriteBoolean("enableDnsOverTls", _dnsWebService._dnsServer.EnableDnsOverTls);
                 jsonWriter.WriteBoolean("enableDnsOverHttps", _dnsWebService._dnsServer.EnableDnsOverHttps);
                 jsonWriter.WriteBoolean("enableDnsOverHttp3", _dnsWebService._dnsServer.EnableDnsOverHttp3);
                 jsonWriter.WriteBoolean("enableDnsOverQuic", _dnsWebService._dnsServer.EnableDnsOverQuic);
+
                 jsonWriter.WriteNumber("dnsOverUdpProxyPort", _dnsWebService._dnsServer.DnsOverUdpProxyPort);
                 jsonWriter.WriteNumber("dnsOverTcpProxyPort", _dnsWebService._dnsServer.DnsOverTcpProxyPort);
                 jsonWriter.WriteNumber("dnsOverHttpPort", _dnsWebService._dnsServer.DnsOverHttpPort);
+                jsonWriter.WriteString("dnsOverHttpUnixSocket", _dnsWebService._dnsServer.DnsOverHttpUnixSocket);
                 jsonWriter.WriteNumber("dnsOverTlsPort", _dnsWebService._dnsServer.DnsOverTlsPort);
                 jsonWriter.WriteNumber("dnsOverHttpsPort", _dnsWebService._dnsServer.DnsOverHttpsPort);
                 jsonWriter.WriteNumber("dnsOverQuicPort", _dnsWebService._dnsServer.DnsOverQuicPort);
-
-                jsonWriter.WriteString("dnsOverHttpUnixSocket", _dnsWebService._dnsServer.DnsOverHttpUnixSocket);
-                jsonWriter.WriteString("dnsOverHttpsUnixSocket", _dnsWebService._dnsServer.DnsOverHttpsUnixSocket);
 
                 jsonWriter.WritePropertyName("dnsReverseProxyNetworkACL");
                 {
@@ -690,20 +692,20 @@ namespace DnsServerCore
                         }
 
                         if (request.TryQueryOrFormArray("qpmPrefixLimitsIPv4", delegate (JsonElement jsonObject)
-                            {
-                                int prefix = jsonObject.GetProperty("prefix").GetInt32();
-                                int udpLimit = jsonObject.GetProperty("udpLimit").GetInt32();
-                                int tcpLimit = jsonObject.GetProperty("tcpLimit").GetInt32();
+                        {
+                            int prefix = jsonObject.GetProperty("prefix").GetInt32();
+                            int udpLimit = jsonObject.GetProperty("udpLimit").GetInt32();
+                            int tcpLimit = jsonObject.GetProperty("tcpLimit").GetInt32();
 
-                                return new KeyValuePair<int, (int, int)>(prefix, (udpLimit, tcpLimit));
-                            }, delegate (ArraySegment<string> tableRow)
-                            {
-                                int prefix = int.Parse(tableRow[0]);
-                                int udpLimit = int.Parse(tableRow[1]);
-                                int tcpLimit = int.Parse(tableRow[2]);
+                            return new KeyValuePair<int, (int, int)>(prefix, (udpLimit, tcpLimit));
+                        }, delegate (ArraySegment<string> tableRow)
+                        {
+                            int prefix = int.Parse(tableRow[0]);
+                            int udpLimit = int.Parse(tableRow[1]);
+                            int tcpLimit = int.Parse(tableRow[2]);
 
-                                return new KeyValuePair<int, (int, int)>(prefix, (udpLimit, tcpLimit));
-                            },
+                            return new KeyValuePair<int, (int, int)>(prefix, (udpLimit, tcpLimit));
+                        },
                             3, out KeyValuePair<int, (int, int)>[] qpmPrefixLimitsIPv4, '|'))
                         {
                             string strQpmPrefixLimitsIPv4 = "";
@@ -897,29 +899,35 @@ namespace DnsServerCore
                             _dnsWebService._webServiceLocalAddresses = WebUtilities.GetValidKestrelLocalAddresses(webServiceLocalAddresses);
                         }
 
-                        if (request.TryGetQueryOrForm("webServiceHttpUnixSocket", out string webServiceHttpUnixSocket))
-                        {
-                            if (_dnsWebService._webServiceHttpUnixSocket != webServiceHttpUnixSocket)
-                            {
-                                restartWebService = true;
-                            }
-                            _dnsWebService._webServiceHttpUnixSocket = webServiceHttpUnixSocket;
-                        }
-
-                        if (request.TryGetQueryOrForm("webServiceTlsUnixSocket", out string webServiceTlsUnixSocket))
-                        {
-                            if (_dnsWebService._webServiceTlsUnixSocket != webServiceTlsUnixSocket)
-                            {
-                                restartWebService = true;
-                            }
-                            _dnsWebService._webServiceTlsUnixSocket = webServiceTlsUnixSocket;
-                        }
-
                         if (request.TryGetQueryOrForm("webServiceHttpPort", int.Parse, out int webServiceHttpPort))
                         {
                             if (_dnsWebService._webServiceHttpPort != webServiceHttpPort)
                             {
                                 _dnsWebService._webServiceHttpPort = webServiceHttpPort;
+                                restartWebService = true;
+                            }
+                        }
+
+                        if (request.TryGetQueryOrForm("webServiceEnableHttpUnixSocket", bool.Parse, out bool webServiceEnableHttpUnixSocket))
+                        {
+                            if (_dnsWebService._webServiceEnableHttpUnixSocket != webServiceEnableHttpUnixSocket)
+                            {
+                                if (webServiceEnableHttpUnixSocket)
+                                {
+                                    if (!DnsServer.IsUnixSocketSupported())
+                                        throw new ArgumentException("Unix Sockets are supported only on Linux, Windows 10 (build 17063 and later), and Windows Server 2019 (update 1809 and later).", "webServiceEnableHttpUnixSocket");
+                                }
+
+                                _dnsWebService._webServiceEnableHttpUnixSocket = webServiceEnableHttpUnixSocket;
+                                restartWebService = true;
+                            }
+                        }
+
+                        if (request.TryGetQueryOrForm("webServiceHttpUnixSocket", out string webServiceHttpUnixSocket))
+                        {
+                            if (_dnsWebService._webServiceHttpUnixSocket != webServiceHttpUnixSocket)
+                            {
+                                _dnsWebService._webServiceHttpUnixSocket = webServiceHttpUnixSocket;
                                 restartWebService = true;
                             }
                         }
@@ -939,7 +947,7 @@ namespace DnsServerCore
                             if (_dnsWebService._webServiceEnableHttp3 != webServiceEnableHttp3)
                             {
                                 if (webServiceEnableHttp3)
-                                    DnsWebService.ValidateQuicSupport("HTTP/3");
+                                    DnsServer.ValidateQuicSupport("HTTP/3");
 
                                 _dnsWebService._webServiceEnableHttp3 = webServiceEnableHttp3;
                                 restartWebService = true;
@@ -1048,6 +1056,15 @@ namespace DnsServerCore
                             }
                         }
 
+                        if (request.TryGetQueryOrForm("enableDnsOverHttpUnixSocket", bool.Parse, out bool enableDnsOverHttpUnixSocket))
+                        {
+                            if (_dnsWebService._dnsServer.EnableDnsOverHttpUnixSocket != enableDnsOverHttpUnixSocket)
+                            {
+                                _dnsWebService._dnsServer.EnableDnsOverHttpUnixSocket = enableDnsOverHttpUnixSocket;
+                                restartDnsService = true;
+                            }
+                        }
+
                         if (request.TryGetQueryOrForm("enableDnsOverTls", bool.Parse, out bool enableDnsOverTls))
                         {
                             if (_dnsWebService._dnsServer.EnableDnsOverTls != enableDnsOverTls)
@@ -1070,9 +1087,6 @@ namespace DnsServerCore
                         {
                             if (_dnsWebService._dnsServer.EnableDnsOverHttp3 != enableDnsOverHttp3)
                             {
-                                if (enableDnsOverHttp3)
-                                    DnsWebService.ValidateQuicSupport("DNS-over-HTTP/3");
-
                                 _dnsWebService._dnsServer.EnableDnsOverHttp3 = enableDnsOverHttp3;
                                 restartDnsService = true;
                             }
@@ -1082,9 +1096,6 @@ namespace DnsServerCore
                         {
                             if (_dnsWebService._dnsServer.EnableDnsOverQuic != enableDnsOverQuic)
                             {
-                                if (enableDnsOverQuic)
-                                    DnsWebService.ValidateQuicSupport();
-
                                 _dnsWebService._dnsServer.EnableDnsOverQuic = enableDnsOverQuic;
                                 restartDnsService = true;
                             }
@@ -1113,6 +1124,15 @@ namespace DnsServerCore
                             if (_dnsWebService._dnsServer.DnsOverHttpPort != dnsOverHttpPort)
                             {
                                 _dnsWebService._dnsServer.DnsOverHttpPort = dnsOverHttpPort;
+                                restartDnsService = true;
+                            }
+                        }
+
+                        if (request.TryQueryOrForm("dnsOverHttpUnixSocket", out string dnsOverHttpUnixSocket))
+                        {
+                            if (_dnsWebService._dnsServer.DnsOverHttpUnixSocket != dnsOverHttpUnixSocket)
+                            {
+                                _dnsWebService._dnsServer.DnsOverHttpUnixSocket = dnsOverHttpUnixSocket;
                                 restartDnsService = true;
                             }
                         }
@@ -1149,24 +1169,6 @@ namespace DnsServerCore
                         else if (request.TryQueryOrFormArray("reverseProxyNetworkACL", NetworkAccessControl.Parse, out dnsReverseProxyNetworkACL))
                             _dnsWebService._dnsServer.DnsReverseProxyNetworkACL = dnsReverseProxyNetworkACL;
 
-                        if (request.TryQueryOrForm("dnsOverHttpUnixSocket", out string dnsOverHttpUnixSocket))
-                        {
-                            if (_dnsWebService._dnsServer.DnsOverHttpUnixSocket != dnsOverHttpUnixSocket)
-                            {
-                                restartDnsService = true;
-                            }
-                            _dnsWebService._dnsServer.DnsOverHttpUnixSocket = dnsOverHttpUnixSocket;
-                        }
-
-                        if (request.TryQueryOrForm("dnsOverHttpsUnixSocket", out string dnsOverHttpsUnixSocket))
-                        {
-                            if (_dnsWebService._dnsServer.DnsOverHttpsUnixSocket != dnsOverHttpsUnixSocket)
-                            {
-                                restartDnsService = true;
-                            }
-                            _dnsWebService._dnsServer.DnsOverHttpsUnixSocket = dnsOverHttpsUnixSocket;
-                        }
-
                         if (request.TryQueryOrForm("dnsOverHttpRealIpHeader", out string dnsOverHttpRealIpHeader))
                             _dnsWebService._dnsServer.DnsOverHttpRealIpHeader = dnsOverHttpRealIpHeader;
 
@@ -1202,21 +1204,21 @@ namespace DnsServerCore
                         #region tsig
 
                         if (request.TryQueryOrFormArray("tsigKeys", delegate (JsonElement jsonObject)
-                            {
-                                string keyName = jsonObject.GetProperty("keyName").GetString().TrimEnd('.').ToLowerInvariant();
-                                string sharedSecret = jsonObject.GetProperty("sharedSecret").GetString();
-                                string algorithmName = jsonObject.GetProperty("algorithmName").GetString();
+                        {
+                            string keyName = jsonObject.GetProperty("keyName").GetString().TrimEnd('.').ToLowerInvariant();
+                            string sharedSecret = jsonObject.GetProperty("sharedSecret").GetString();
+                            string algorithmName = jsonObject.GetProperty("algorithmName").GetString();
 
-                                if (DnsClient.IsDomainNameUnicode(keyName))
-                                    keyName = DnsClient.ConvertDomainNameToAscii(keyName);
+                            if (DnsClient.IsDomainNameUnicode(keyName))
+                                keyName = DnsClient.ConvertDomainNameToAscii(keyName);
 
-                                DnsClient.IsDomainNameValid(keyName, true);
+                            DnsClient.IsDomainNameValid(keyName, true);
 
-                                if (sharedSecret.Length == 0)
-                                    return new TsigKey(keyName, algorithmName);
+                            if (sharedSecret.Length == 0)
+                                return new TsigKey(keyName, algorithmName);
 
-                                return new TsigKey(keyName, sharedSecret, algorithmName);
-                            },
+                            return new TsigKey(keyName, sharedSecret, algorithmName);
+                        },
                             delegate (ArraySegment<string> tableRow)
                             {
                                 string keyName = tableRow[0].TrimEnd('.').ToLowerInvariant();
@@ -1551,7 +1553,7 @@ namespace DnsServerCore
                                         break;
 
                                     case DnsTransportProtocol.Quic:
-                                        DnsWebService.ValidateQuicSupport();
+                                        DnsServer.ValidateQuicSupport();
 
                                         if (proxyType == NetProxyType.Http)
                                             throw new DnsWebServiceException("HTTP proxy server can transport only DNS-over-TCP, DNS-over-TLS, or DNS-over-HTTPS forwarder protocols. Use SOCKS5 proxy server for DNS-over-UDP or DNS-over-QUIC forwarder protocols.");
