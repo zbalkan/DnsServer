@@ -661,8 +661,13 @@ namespace DnsServerCore
         public async Task DownloadLogFileAsync(HttpContext context, string logName, long limit)
         {
             string logFileName = logName + ".log";
+            string logFolder = ConvertToAbsolutePath(_logFolder);
 
-            using (FileStream fS = new FileStream(Path.Combine(ConvertToAbsolutePath(_logFolder), logFileName), FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 64 * 1024, true))
+            string logFilePath = Path.GetFullPath(Path.Combine(logFolder, logFileName));
+            if (!logFilePath.StartsWith(logFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar))
+                throw new ArgumentException("Invalid log file name.", nameof(logName));
+
+            using (FileStream fS = new FileStream(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 64 * 1024, true))
             {
                 HttpResponse response = context.Response;
 
