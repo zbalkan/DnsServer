@@ -85,7 +85,6 @@ namespace DnsServerCore
                     jsonWriter.WriteStartObject("info");
 
                     jsonWriter.WriteString("version", _dnsWebService.GetServerVersion());
-                    jsonWriter.WriteBoolean("supportsUnixSockets", Environment.OSVersion.Platform == PlatformID.Unix || Environment.OSVersion.Platform == PlatformID.MacOSX);
                     jsonWriter.WriteString("uptimestamp", _dnsWebService._uptimestamp);
                     jsonWriter.WriteString("dnsServerDomain", _dnsWebService._dnsServer.ServerDomain);
                     jsonWriter.WriteNumber("defaultRecordTtl", _dnsWebService._dnsServer.AuthZoneManager.DefaultRecordTtl);
@@ -1772,9 +1771,9 @@ namespace DnsServerCore
                     _dnsWebService._authManager.SsoAllowSignupOnlyForMappedUsers = ssoAllowSignupOnlyForMappedUsers;
 
                 if (request.TryQueryOrFormArray("ssoGroupMap", delegate (ArraySegment<string> tableRow)
-                    {
-                        return new KeyValuePair<string, string>(tableRow[0], tableRow[1]);
-                    }, 2, out KeyValuePair<string, string>[] ssoGroupMapEntries, '|'))
+                {
+                    return new KeyValuePair<string, string>(tableRow[0], tableRow[1]);
+                }, 2, out KeyValuePair<string, string>[] ssoGroupMapEntries, '|'))
                 {
                     _dnsWebService._authManager.SsoGroupMap = new Dictionary<string, string>(ssoGroupMapEntries);
                 }
