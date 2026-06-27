@@ -6993,22 +6993,19 @@ namespace DnsServerCore.Dns
 
         public Task<DnsDatagram> DirectQueryAsync(DnsQuestionRecord question, int timeout = 4000, bool skipDnsAppAuthoritativeRequestHandlers = false, CancellationToken cancellationToken = default)
         {
-            return DirectQueryAsync(new DnsDatagram(0, false, DnsOpcode.StandardQuery, false, false, true, false, false, false, DnsResponseCode.NoError, [question]), timeout, skipDnsAppAuthoritativeRequestHandlers, cancellationToken);
+            return DirectQueryAsync(new DnsDatagram(0, false, DnsOpcode.StandardQuery, false, false, true, false, false, false, DnsResponseCode.NoError, [question]), IPENDPOINT_ANY_0, timeout, skipDnsAppAuthoritativeRequestHandlers, cancellationToken);
         }
 
         public Task<DnsDatagram> DirectQueryAsync(DnsDatagram request, int timeout = 4000, bool skipDnsAppAuthoritativeRequestHandlers = false, CancellationToken cancellationToken = default)
         {
-            return TechnitiumLibrary.TaskExtensions.TimeoutAsync(delegate (CancellationToken cancellationToken1)
-            {
-                return ProcessQueryAsync(request, IPENDPOINT_ANY_0, DnsTransportProtocol.Tcp, true, skipDnsAppAuthoritativeRequestHandlers, timeout, null);
-            }, timeout, cancellationToken);
+            return DirectQueryAsync(request, IPENDPOINT_ANY_0, timeout, skipDnsAppAuthoritativeRequestHandlers, cancellationToken);
         }
 
-        public Task<DnsDatagram> DirectQueryAsync(DnsDatagram request, IPEndPoint remoteEndPoint, int timeout = 4000, bool skipDnsAppAuthoritativeRequestHandlers = false, CancellationToken cancellationToken = default)
+        public Task<DnsDatagram> DirectQueryAsync(DnsDatagram request, IPEndPoint remoteEP, int timeout = 4000, bool skipDnsAppAuthoritativeRequestHandlers = false, CancellationToken cancellationToken = default)
         {
             return TechnitiumLibrary.TaskExtensions.TimeoutAsync(delegate (CancellationToken cancellationToken1)
             {
-                return ProcessQueryAsync(request, remoteEndPoint, DnsTransportProtocol.Tcp, true, skipDnsAppAuthoritativeRequestHandlers, timeout, null);
+                return ProcessQueryAsync(request, remoteEP, DnsTransportProtocol.Tcp, true, skipDnsAppAuthoritativeRequestHandlers, timeout, null);
             }, timeout, cancellationToken);
         }
 

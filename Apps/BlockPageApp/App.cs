@@ -585,8 +585,31 @@ namespace BlockPage
                         if (host is not null)
                         {
                             DnsDatagram dnsRequest = new DnsDatagram(0, false, DnsOpcode.StandardQuery, false, false, true, false, false, false, DnsResponseCode.NoError, [new DnsQuestionRecord(host, DnsResourceRecordType.A, DnsClass.IN)], udpPayloadSize: DnsDatagram.EDNS_DEFAULT_UDP_PAYLOAD_SIZE);
-                            System.Net.IPEndPoint clientEndPoint = context.Connection.RemoteIpAddress is null ? new System.Net.IPEndPoint(System.Net.IPAddress.Any, 0) : new System.Net.IPEndPoint(context.Connection.RemoteIpAddress, context.Connection.RemotePort);
-                            DnsDatagram dnsResponse = await _dnsServer.DirectQueryAsync(dnsRequest, clientEndPoint, 500);
+
+                            IPEndPoint clientEP;
+                            {
+                                try
+                                {
+                                    IPAddress? remoteIP = context.Connection.RemoteIpAddress;
+                                    if (remoteIP is not null)
+                                    {
+                                        if (remoteIP.IsIPv4MappedToIPv6)
+                                            remoteIP = remoteIP.MapToIPv4();
+
+                                        clientEP = new IPEndPoint(remoteIP, context.Connection.RemotePort);
+                                    }
+                                    else
+                                    {
+                                        clientEP = new IPEndPoint(IPAddress.Any, 0);
+                                    }
+                                }
+                                catch
+                                {
+                                    clientEP = new IPEndPoint(IPAddress.Any, 0);
+                                }
+                            }
+
+                            DnsDatagram dnsResponse = await _dnsServer.DirectQueryAsync(dnsRequest, clientEP, 500);
 
                             List<EDnsExtendedDnsErrorOptionData> options = new List<EDnsExtendedDnsErrorOptionData>();
 

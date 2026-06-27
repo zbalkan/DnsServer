@@ -63,9 +63,9 @@ namespace DnsServerCore.Dns.Applications
             return _dnsServer.DirectQueryAsync(request, timeout, true, cancellationToken);
         }
 
-        public Task<DnsDatagram> DirectQueryAsync(DnsDatagram request, IPEndPoint remoteEndPoint, int timeout = 4000, CancellationToken cancellationToken = default)
+        public Task<DnsDatagram> DirectQueryAsync(DnsDatagram request, IPEndPoint remoteEP, int timeout = 4000, CancellationToken cancellationToken = default)
         {
-            return _dnsServer.DirectQueryAsync(request, remoteEndPoint, timeout, true, cancellationToken);
+            return _dnsServer.DirectQueryAsync(request, remoteEP, timeout, true, cancellationToken);
         }
 
         public Task<DnsDatagram> ResolveAsync(DnsQuestionRecord question, CancellationToken cancellationToken = default)
