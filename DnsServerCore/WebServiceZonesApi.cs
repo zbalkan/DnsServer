@@ -1687,7 +1687,7 @@ namespace DnsServerCore
                             bool validateZone = request.GetQueryOrForm("validateZone", bool.Parse, false);
 
                             if (primaryZoneTransferProtocol == DnsTransportProtocol.Quic)
-                                DnsWebService.ValidateQuicSupport();
+                                DnsServer.ValidateQuicSupport();
 
                             AuthZoneInfo catalogZoneInfo = null;
 
@@ -1797,7 +1797,7 @@ namespace DnsServerCore
                                 }
 
                                 if (forwarderProtocol == DnsTransportProtocol.Quic)
-                                    DnsWebService.ValidateQuicSupport();
+                                    DnsServer.ValidateQuicSupport();
 
                                 zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.CreateForwarderZone(zoneName, forwarderProtocol, forwarder, dnssecValidation, proxyType, proxyAddress, proxyPort, proxyUsername, proxyPassword, null);
                                 if (zoneInfo is null)
@@ -1831,7 +1831,7 @@ namespace DnsServerCore
                             string primaryZoneTransferTsigKeyName = request.GetQueryOrForm("tsigKeyName", null);
 
                             if (primaryZoneTransferProtocol == DnsTransportProtocol.Quic)
-                                DnsWebService.ValidateQuicSupport();
+                                DnsServer.ValidateQuicSupport();
 
                             zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.CreateSecondaryForwarderZone(zoneName, primaryNameServerAddresses, primaryZoneTransferProtocol, primaryZoneTransferTsigKeyName);
                             if (zoneInfo is null)
@@ -1870,7 +1870,7 @@ namespace DnsServerCore
                             string primaryZoneTransferTsigKeyName = request.GetQueryOrForm("tsigKeyName", null);
 
                             if (primaryZoneTransferProtocol == DnsTransportProtocol.Quic)
-                                DnsWebService.ValidateQuicSupport();
+                                DnsServer.ValidateQuicSupport();
 
                             zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.CreateSecondaryCatalogZone(zoneName, primaryNameServerAddresses, primaryZoneTransferProtocol, primaryZoneTransferTsigKeyName);
                             if (zoneInfo is null)
@@ -3402,7 +3402,7 @@ namespace DnsServerCore
                             if (request.TryGetQueryOrFormEnum("primaryZoneTransferProtocol", out DnsTransportProtocol primaryZoneTransferProtocol))
                             {
                                 if (primaryZoneTransferProtocol == DnsTransportProtocol.Quic)
-                                    DnsWebService.ValidateQuicSupport();
+                                    DnsServer.ValidateQuicSupport();
 
                                 zoneInfo.PrimaryZoneTransferProtocol = primaryZoneTransferProtocol;
                             }
@@ -4122,7 +4122,7 @@ namespace DnsServerCore
                             byte priority = request.GetQueryOrForm("forwarderPriority", byte.Parse, byte.MinValue);
 
                             if (protocol == DnsTransportProtocol.Quic)
-                                DnsWebService.ValidateQuicSupport();
+                                DnsServer.ValidateQuicSupport();
 
                             newRecord = new DnsResourceRecord(domain, type, DnsClass.IN, 0, new DnsForwarderRecordData(protocol, forwarder, dnssecValidation, proxyType, proxyAddress, proxyPort, proxyUsername, proxyPassword, priority));
                         }
@@ -5093,7 +5093,7 @@ namespace DnsServerCore
                             byte priority = request.GetQueryOrForm("forwarderPriority", byte.Parse, byte.MinValue);
 
                             if (newProtocol == DnsTransportProtocol.Quic)
-                                DnsWebService.ValidateQuicSupport();
+                                DnsServer.ValidateQuicSupport();
 
                             oldRecord = new DnsResourceRecord(domain, type, DnsClass.IN, 0, DnsForwarderRecordData.CreatePartialRecordData(protocol, forwarder));
                             newRecord = new DnsResourceRecord(newDomain, type, DnsClass.IN, 0, new DnsForwarderRecordData(newProtocol, newForwarder, dnssecValidation, proxyType, proxyAddress, proxyPort, proxyUsername, proxyPassword, priority));
