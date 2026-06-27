@@ -69,6 +69,12 @@ $(function () {
         }
     }
 
+    $("#txt2FATOTP").on("input", function () {
+        var totp = $("#txt2FATOTP").val();
+        if (totp.length == 6)
+            login();
+    });
+
     $("#optGroupDetailsUserList").on("change", function () {
         var selectedUser = $("#optGroupDetailsUserList").val();
 
