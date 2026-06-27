@@ -48,7 +48,6 @@ using System.IO;
 using System.IO.Compression;
 using System.Net;
 using System.Net.Http;
-using System.Net.Quic;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Reflection;
@@ -73,6 +72,7 @@ namespace DnsServerCore
         #region variables
 
         readonly static char[] commaSeparator = new char[] { ',' };
+        static readonly IPEndPoint IPENDPOINT_ANY_0 = new IPEndPoint(IPAddress.Any, 0);
 
         readonly Version _currentVersion;
         readonly DateTime _uptimestamp = DateTime.UtcNow;
@@ -102,11 +102,14 @@ namespace DnsServerCore
         DhcpServer _dhcpServer;
 
         //web service
-        IReadOnlyList<IPAddress> _webServiceLocalAddresses = [IPAddress.Any, IPAddress.IPv6Any];
-        string _webServiceHttpUnixSocket;
-        string _webServiceTlsUnixSocket;
         int _webServiceHttpPort = 5380;
         int _webServiceTlsPort = 53443;
+
+        IReadOnlyList<IPAddress> _webServiceLocalAddresses = [IPAddress.Any, IPAddress.IPv6Any];
+
+        bool _webServiceEnableHttpUnixSocket;
+        string _webServiceHttpUnixSocket;
+
         bool _webServiceEnableTls;
         bool _webServiceEnableHttp3;
         bool _webServiceHttpToTlsRedirect;
@@ -469,7 +472,7 @@ namespace DnsServerCore
             BinaryReader bR = new BinaryReader(s);
 
             int version = bR.ReadByte();
-            if (version > 2)
+            if (version > 3)
                 throw new InvalidDataException("Web Service config version not supported.");
 
             _webServiceHttpPort = bR.ReadInt32();
@@ -494,6 +497,20 @@ namespace DnsServerCore
                 }
 
                 _webServiceLocalAddresses = webServiceLocalAddresses;
+            }
+
+            if (version >= 3)
+            {
+                _webServiceEnableHttpUnixSocket = bR.ReadBoolean();
+
+                _webServiceHttpUnixSocket = s.ReadShortString();
+                if (_webServiceHttpUnixSocket.Length == 0)
+                    _webServiceHttpUnixSocket = null;
+            }
+            else
+            {
+                _webServiceEnableHttpUnixSocket = false;
+                _webServiceHttpUnixSocket = null;
             }
 
             _webServiceEnableTls = bR.ReadBoolean();
@@ -549,19 +566,6 @@ namespace DnsServerCore
             CheckAndLoadSelfSignedCertificate(false, false);
 
             _webServiceRealIpHeader = s.ReadShortString();
-
-            if (version >= 2)
-            {
-                if (bR.ReadByte() > 0)
-                {
-                    _webServiceHttpUnixSocket = s.ReadShortString();
-                }
-
-                if (bR.ReadByte() > 0)
-                {
-                    _webServiceTlsUnixSocket = s.ReadShortString();
-                }
-            }
         }
 
         private void WriteConfigTo(Stream s)
@@ -569,7 +573,7 @@ namespace DnsServerCore
             BinaryWriter bW = new BinaryWriter(s);
 
             bW.Write(Encoding.ASCII.GetBytes("WC")); //format
-            bW.Write((byte)2); //version
+            bW.Write((byte)3); //version
 
             bW.Write(_webServiceHttpPort);
             bW.Write(_webServiceTlsPort);
@@ -580,6 +584,9 @@ namespace DnsServerCore
                 foreach (IPAddress localAddress in _webServiceLocalAddresses)
                     localAddress.WriteTo(bW);
             }
+
+            bW.Write(_webServiceEnableHttpUnixSocket);
+            s.WriteShortString(_webServiceHttpUnixSocket ?? "");
 
             bW.Write(_webServiceEnableTls);
             bW.Write(_webServiceEnableHttp3);
@@ -599,26 +606,6 @@ namespace DnsServerCore
                 s.WriteShortString(_webServiceTlsCertificatePassword);
 
             s.WriteShortString(_webServiceRealIpHeader);
-
-            if (string.IsNullOrWhiteSpace(_webServiceHttpUnixSocket))
-            {
-                bW.Write((byte)0);
-            }
-            else
-            {
-                bW.Write((byte)1);
-                s.WriteShortString(_webServiceHttpUnixSocket);
-            }
-
-            if (string.IsNullOrWhiteSpace(_webServiceTlsUnixSocket))
-            {
-                bW.Write((byte)0);
-            }
-            else
-            {
-                bW.Write((byte)1);
-                s.WriteShortString(_webServiceTlsUnixSocket);
-            }
         }
 
         #endregion
@@ -1676,7 +1663,7 @@ namespace DnsServerCore
 
             try
             {
-                _webServiceLocalAddresses = new IPAddress[] { IPAddress.Any };
+                _webServiceLocalAddresses = [IPAddress.Any];
 
                 await StartWebServiceAsync(true);
                 return;
@@ -1688,7 +1675,7 @@ namespace DnsServerCore
 
             _log.Write("Attempting to start Web Service on loopback (127.0.0.1) fallback address...");
 
-            _webServiceLocalAddresses = new IPAddress[] { IPAddress.Loopback };
+            _webServiceLocalAddresses = [IPAddress.Loopback];
 
             await StartWebServiceAsync(true);
         }
@@ -1816,7 +1803,8 @@ namespace DnsServerCore
                 foreach (IPAddress webServiceLocalAddress in _webServiceLocalAddresses)
                     serverOptions.Listen(webServiceLocalAddress, _webServiceHttpPort);
 
-                if (!string.IsNullOrWhiteSpace(_webServiceHttpUnixSocket))
+                //unix socket
+                if (!httpOnlyMode && _webServiceEnableHttpUnixSocket && (_webServiceHttpUnixSocket is not null))
                     serverOptions.ListenUnixSocket(_webServiceHttpUnixSocket);
 
                 //https
@@ -1829,22 +1817,6 @@ namespace DnsServerCore
                             if (_webServiceEnableHttp3)
                                 listenOptions.Protocols = HttpProtocols.Http1AndHttp2AndHttp3;
                             else if (IsHttp2Supported())
-                                listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
-                            else
-                                listenOptions.Protocols = HttpProtocols.Http1;
-
-                            listenOptions.UseHttps(delegate (SslStream stream, SslClientHelloInfo clientHelloInfo, object state, CancellationToken cancellationToken)
-                            {
-                                return ValueTask.FromResult(_webServiceSslServerAuthenticationOptions);
-                            }, null);
-                        });
-                    }
-
-                    if (!string.IsNullOrWhiteSpace(_webServiceTlsUnixSocket))
-                    {
-                        serverOptions.ListenUnixSocket(_webServiceTlsUnixSocket, delegate (ListenOptions listenOptions)
-                        {
-                            if (IsHttp2Supported())
                                 listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
                             else
                                 listenOptions.Protocols = HttpProtocols.Http1;
@@ -1900,7 +1872,7 @@ namespace DnsServerCore
 
             _webService.UseResponseCompression();
 
-            if (_webServiceHttpToTlsRedirect && !httpOnlyMode && _webServiceEnableTls && (_webServiceSslServerAuthenticationOptions is not null))
+            if (!httpOnlyMode && _webServiceHttpToTlsRedirect && _webServiceEnableTls && (_webServiceSslServerAuthenticationOptions is not null))
                 _webService.Use(WebServiceHttpsRedirectionMiddleware);
 
             _webService.UseDefaultFiles();
@@ -1937,14 +1909,8 @@ namespace DnsServerCore
                         _log.Write(new IPEndPoint(webServiceLocalAddress, _webServiceTlsPort), "Https", "Web Service was bound successfully.");
                 }
 
-                if (!string.IsNullOrWhiteSpace(_webServiceHttpUnixSocket))
-                    _log.Write(new IPEndPoint(IPAddress.None, 0), "Http", $"Web Service was bound successfully on unix socket: {_webServiceHttpUnixSocket}");
-
-                if (!httpOnlyMode && _webServiceEnableTls && (_webServiceSslServerAuthenticationOptions is not null))
-                {
-                    if (!string.IsNullOrWhiteSpace(_webServiceTlsUnixSocket))
-                        _log.Write(new IPEndPoint(IPAddress.None, 0), "Https", $"Web Service was bound successfully on unix socket: {_webServiceTlsUnixSocket}");
-                }
+                if (!httpOnlyMode && _webServiceEnableHttpUnixSocket && (_webServiceHttpUnixSocket is not null))
+                    _log.Write(new UnixDomainSocketEndPoint(_webServiceHttpUnixSocket), "Unix", "Web Service was bound successfully.");
             }
             catch
             {
@@ -1958,14 +1924,8 @@ namespace DnsServerCore
                         _log.Write(new IPEndPoint(webServiceLocalAddress, _webServiceTlsPort), "Https", "Web Service failed to bind.");
                 }
 
-                if (!string.IsNullOrWhiteSpace(_webServiceHttpUnixSocket))
-                    _log.Write(new IPEndPoint(IPAddress.None, 0), "Http", $"Web Service failed to bind on unix socket: {_webServiceHttpUnixSocket}");
-
-                if (!httpOnlyMode && _webServiceEnableTls && (_webServiceSslServerAuthenticationOptions is not null))
-                {
-                    if (!string.IsNullOrWhiteSpace(_webServiceTlsUnixSocket))
-                        _log.Write(new IPEndPoint(IPAddress.None, 0), "Https", $"Web Service failed to bind on unix socket: {_webServiceTlsUnixSocket}");
-                }
+                if (!httpOnlyMode && _webServiceEnableHttpUnixSocket && (_webServiceHttpUnixSocket is not null))
+                    _log.Write(new UnixDomainSocketEndPoint(_webServiceHttpUnixSocket), "Unix", "Web Service failed to bind.");
 
                 throw;
             }
@@ -2007,14 +1967,11 @@ namespace DnsServerCore
         {
             try
             {
-                IPAddress remoteIP = context.Connection.RemoteIpAddress;
-                if (remoteIP is null)
-                    return new IPEndPoint(IPAddress.Any, 0);
-
-                if (remoteIP.IsIPv4MappedToIPv6)
+                IPAddress remoteIP = context.Connection.RemoteIpAddress; //will be null for unix socket
+                if ((remoteIP is not null) && remoteIP.IsIPv4MappedToIPv6)
                     remoteIP = remoteIP.MapToIPv4();
 
-                if (!string.IsNullOrEmpty(_webServiceRealIpHeader) && NetworkAccessControl.IsAddressAllowed(remoteIP, _webServiceReverseProxyAddresses))
+                if (!string.IsNullOrEmpty(_webServiceRealIpHeader) && ((remoteIP is null) || NetworkAccessControl.IsAddressAllowed(remoteIP, _webServiceReverseProxyAddresses)))
                 {
                     //get the real IP address of the requesting client from X-Real-IP header set in nginx proxy_pass block
                     string xRealIp = context.Request.Headers[_webServiceRealIpHeader];
@@ -2022,12 +1979,13 @@ namespace DnsServerCore
                         return new IPEndPoint(address, 0);
                 }
 
-                return new IPEndPoint(remoteIP, context.Connection.RemotePort);
+                if (remoteIP is not null)
+                    return new IPEndPoint(remoteIP, context.Connection.RemotePort);
             }
             catch
-            {
-                return new IPEndPoint(IPAddress.Any, 0);
-            }
+            { }
+
+            return IPENDPOINT_ANY_0;
         }
 
         private void ConfigureWebServiceRoutes()
@@ -2787,26 +2745,6 @@ namespace DnsServerCore
             {
                 File.Delete(selfSignedCertificateFilePath);
             }
-        }
-
-        #endregion
-
-        #region quic
-
-        private static void ValidateQuicSupport(string protocolName = "DNS-over-QUIC")
-        {
-            if (!QuicConnection.IsSupported)
-            {
-                if (!Socket.OSSupportsIPv6)
-                    throw new DnsWebServiceException(protocolName + " requires IPv6 support on the system to work.");
-
-                throw new DnsWebServiceException(protocolName + " is supported only on Windows 11 (build 22000 and later), Windows Server 2022 (and later), and Linux. On Linux, you must install 'libmsquic' manually.");
-            }
-        }
-
-        private static bool IsQuicSupported()
-        {
-            return QuicConnection.IsSupported;
         }
 
         #endregion
