@@ -8,7 +8,7 @@ The environment variables are described below:
 
 | Environment Variable                              | Type    | Description                                                                                                                              |
 | ------------------------------------------------- | ------- | -----------------------------------------------------------------------------------------------------------------------------------------|
-| DNS_SERVER_DOMAIN                                 | String  | The primary domain name used by this DNS Server to identify itself.                                                                      |
+| DNS_SERVER_DOMAIN                                 | String  | The primary fully qualified domain name used by this DNS Server to identify itself.                                                      |
 | DNS_SERVER_ADMIN_PASSWORD                         | String  | The DNS web console admin user password.                                                                                                 |
 | DNS_SERVER_ADMIN_PASSWORD_FILE                    | String  | The path to a file that contains a plain text password for the DNS web console admin user.                                               |
 | DNS_SERVER_PREFER_IPV6                            | Boolean | DNS Server will use IPv6 for querying whenever possible with this option enabled.                                                        |
