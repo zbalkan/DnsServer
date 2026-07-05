@@ -2883,43 +2883,89 @@ namespace DnsServerCore
                 if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, sessionUser, PermissionFlag.Delete))
                     throw new DnsWebServiceException("Access was denied.");
 
-                string zoneName = context.Request.GetQueryOrFormAlt("zone", "domain").Trim('.');
-
-                if (DnsClient.IsDomainNameUnicode(zoneName))
-                    zoneName = DnsClient.ConvertDomainNameToAscii(zoneName);
-
-                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.GetAuthZoneInfo(zoneName);
-                if (zoneInfo is null)
-                    throw new DnsWebServiceException("No such zone was found: " + zoneName);
-
-                if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Delete))
-                    throw new DnsWebServiceException("Access was denied.");
-
-                switch (zoneInfo.Type)
+                if (context.Request.TryGetQueryOrForm("zones", out string strZoneNames))
                 {
-                    case AuthZoneType.Primary:
-                        if (_dnsWebService._clusterManager.ClusterInitialized && _dnsWebService._clusterManager.IsClusterPrimaryZone(zoneInfo.Name))
-                            throw new DnsWebServiceException("Cannot delete the Cluster Primary zone '" + zoneInfo.DisplayName + "'.");
+                    string[] zoneNames = strZoneNames.Split(",", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                    List<string> deleted = new List<string>(zoneNames.Length);
+                    Dictionary<string, string> failed = new Dictionary<string, string>(zoneNames.Length);
 
-                        break;
+                    foreach (string strZoneName in zoneNames)
+                    {
+                        string zoneName = strZoneName.Trim('.').ToLowerInvariant();
 
-                    case AuthZoneType.Catalog:
-                        if (_dnsWebService._clusterManager.ClusterInitialized && _dnsWebService._clusterManager.IsClusterCatalogZone(zoneInfo.Name))
-                            throw new DnsWebServiceException("Cannot delete the Cluster Catalog zone '" + zoneInfo.DisplayName + "'.");
+                        try
+                        {
+                            DeleteZone(zoneName);
+                            deleted.Add(zoneName);
+                        }
+                        catch (Exception ex)
+                        {
+                            failed.Add(zoneName, ex.Message);
+                            _dnsWebService._log.Write(_dnsWebService.GetRemoteEndPoint(context), "[" + sessionUser.Username + "] Failed to deleted zone: " + zoneName, ex);
+                        }
+                    }
 
-                        break;
+                    Utf8JsonWriter jsonWriter = context.GetCurrentJsonWriter();
+
+                    jsonWriter.WriteStartArray("deleted");
+
+                    foreach (string zoneName in deleted)
+                        jsonWriter.WriteStringValue(zoneName);
+
+                    jsonWriter.WriteEndArray();
+
+                    jsonWriter.WriteStartObject("failed");
+
+                    foreach (KeyValuePair<string, string> entry in failed)
+                        jsonWriter.WriteString(entry.Key, entry.Value);
+
+                    jsonWriter.WriteEndObject();
+                }
+                else
+                {
+                    string zoneName = context.Request.GetQueryOrFormAlt("zone", "domain").Trim('.');
+
+                    DeleteZone(zoneName);
                 }
 
-                if (!_dnsWebService._dnsServer.AuthZoneManager.DeleteZone(zoneInfo, true))
-                    throw new DnsWebServiceException("Failed to delete the zone '" + zoneInfo.DisplayName + "': no such zone exists.");
+                void DeleteZone(string zoneName)
+                {
+                    if (DnsClient.IsDomainNameUnicode(zoneName))
+                        zoneName = DnsClient.ConvertDomainNameToAscii(zoneName);
 
-                _dnsWebService._authManager.RemoveAllPermissions(PermissionSection.Zones, zoneInfo.Name);
-                _dnsWebService._authManager.SaveConfigFile();
+                    AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.GetAuthZoneInfo(zoneName);
+                    if (zoneInfo is null)
+                        throw new DnsWebServiceException("No such zone was found: " + zoneName);
 
-                _dnsWebService._log.Write(_dnsWebService.GetRemoteEndPoint(context), "[" + sessionUser.Username + "] " + zoneInfo.TypeName + " zone was deleted: " + zoneInfo.DisplayName);
+                    if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, zoneInfo.Name, sessionUser, PermissionFlag.Delete))
+                        throw new DnsWebServiceException("Access was denied.");
 
-                //delete cache for this zone to allow rebuilding cache data without using the current zone
-                _dnsWebService._dnsServer.CacheZoneManager.DeleteZone(zoneInfo.Name);
+                    switch (zoneInfo.Type)
+                    {
+                        case AuthZoneType.Primary:
+                            if (_dnsWebService._clusterManager.ClusterInitialized && _dnsWebService._clusterManager.IsClusterPrimaryZone(zoneInfo.Name))
+                                throw new DnsWebServiceException("Cannot delete the Cluster Primary zone '" + zoneInfo.DisplayName + "'.");
+
+                            break;
+
+                        case AuthZoneType.Catalog:
+                            if (_dnsWebService._clusterManager.ClusterInitialized && _dnsWebService._clusterManager.IsClusterCatalogZone(zoneInfo.Name))
+                                throw new DnsWebServiceException("Cannot delete the Cluster Catalog zone '" + zoneInfo.DisplayName + "'.");
+
+                            break;
+                    }
+
+                    if (!_dnsWebService._dnsServer.AuthZoneManager.DeleteZone(zoneInfo, true))
+                        throw new DnsWebServiceException("Failed to delete the zone '" + zoneInfo.DisplayName + "': no such zone exists.");
+
+                    _dnsWebService._authManager.RemoveAllPermissions(PermissionSection.Zones, zoneInfo.Name);
+                    _dnsWebService._authManager.SaveConfigFile();
+
+                    _dnsWebService._log.Write(_dnsWebService.GetRemoteEndPoint(context), "[" + sessionUser.Username + "] " + zoneInfo.TypeName + " zone was deleted: " + zoneInfo.DisplayName);
+
+                    //delete cache for this zone to allow rebuilding cache data without using the current zone
+                    _dnsWebService._dnsServer.CacheZoneManager.DeleteZone(zoneInfo.Name);
+                }
             }
 
             public void EnableZone(HttpContext context)
@@ -3809,7 +3855,7 @@ namespace DnsServerCore
                             string strIPAddress = request.GetQueryOrFormAlt("ipAddress", "value");
                             IPAddress ipAddress;
 
-                            if (strIPAddress.Equals("request-ip-address"))
+                            if (strIPAddress.Equals("request-ip-address", StringComparison.Ordinal))
                                 ipAddress = _dnsWebService.GetRemoteEndPoint(context).Address;
                             else
                                 ipAddress = IPAddress.Parse(strIPAddress);
@@ -4104,7 +4150,7 @@ namespace DnsServerCore
                             string proxyUsername = null;
                             string proxyPassword = null;
 
-                            if (!forwarder.Equals("this-server"))
+                            if (!forwarder.Equals("this-server", StringComparison.Ordinal))
                             {
                                 proxyType = request.GetQueryOrFormEnum("proxyType", DnsForwarderRecordProxyType.DefaultProxy);
                                 switch (proxyType)
@@ -5075,7 +5121,7 @@ namespace DnsServerCore
                             string proxyUsername = null;
                             string proxyPassword = null;
 
-                            if (!newForwarder.Equals("this-server"))
+                            if (!newForwarder.Equals("this-server", StringComparison.Ordinal))
                             {
                                 proxyType = request.GetQueryOrFormEnum("proxyType", DnsForwarderRecordProxyType.DefaultProxy);
                                 switch (proxyType)
