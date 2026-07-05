@@ -371,7 +371,7 @@ namespace AdvancedBlocking
 
                     return new Tuple<EndPoint, string>(ep, jsonGroup.GetString() ?? "");
                 },
-                out Dictionary<EndPoint, string> localEndPointGroupMap))
+                out Dictionary<EndPoint, string>? localEndPointGroupMap))
             {
                 _localEndPointGroupMap = localEndPointGroupMap;
             }
@@ -453,7 +453,7 @@ namespace AdvancedBlocking
                     }
 
                     return new Tuple<string, Group>(group.Name, group);
-                });
+                }) ?? [];
 
                 _allAllowListZones = allAllowListZones;
                 _allBlockListZones = allBlockListZones;
@@ -927,17 +927,17 @@ namespace AdvancedBlocking
                     _aaaaRecords = [];
                 }
 
-                _allowed = jsonGroup.ReadArrayAsSet("allowed");
-                _blocked = jsonGroup.ReadArrayAsSet("blocked");
-                _allowListUrls = jsonGroup.ReadArray("allowListUrls", GetUriEntry);
-                _blockListUrls = jsonGroup.ReadArray("blockListUrls", GetUrlEntry);
+                _allowed = jsonGroup.ReadArrayAsSet("allowed") ?? [];
+                _blocked = jsonGroup.ReadArrayAsSet("blocked") ?? [];
+                _allowListUrls = jsonGroup.ReadArray("allowListUrls", GetUriEntry) ?? [];
+                _blockListUrls = jsonGroup.ReadArray("blockListUrls", GetUrlEntry) ?? [];
 
-                _allowedRegex = jsonGroup.ReadArray("allowedRegex", GetRegexEntry);
-                _blockedRegex = jsonGroup.ReadArray("blockedRegex", GetRegexEntry);
-                _regexAllowListUrls = jsonGroup.ReadArray("regexAllowListUrls", GetUriEntry);
-                _regexBlockListUrls = jsonGroup.ReadArray("regexBlockListUrls", GetUrlEntry);
+                _allowedRegex = jsonGroup.ReadArray("allowedRegex", GetRegexEntry) ?? [];
+                _blockedRegex = jsonGroup.ReadArray("blockedRegex", GetRegexEntry) ?? [];
+                _regexAllowListUrls = jsonGroup.ReadArray("regexAllowListUrls", GetUriEntry) ?? [];
+                _regexBlockListUrls = jsonGroup.ReadArray("regexBlockListUrls", GetUrlEntry) ?? [];
 
-                _adblockListUrls = jsonGroup.ReadArray("adblockListUrls", GetUrlEntry);
+                _adblockListUrls = jsonGroup.ReadArray("adblockListUrls", GetUrlEntry) ?? [];
             }
 
             #endregion
