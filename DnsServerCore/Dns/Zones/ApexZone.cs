@@ -772,7 +772,7 @@ namespace DnsServerCore.Dns.Zones
                     //transitioning to date scheme
                     return uint.Parse(strSerialDate + counter.ToString().PadLeft(2, '0'));
                 }
-                else if (strSerialDate.Equals(strOldSerialDate))
+                else if (strSerialDate.Equals(strOldSerialDate, StringComparison.Ordinal))
                 {
                     //same date
                     if (counter < 99)

@@ -226,7 +226,7 @@ namespace DnsServerCore.Dns.Applications
                             foreach (JsonElement jsonStoreApp in jsonStoreAppsArray.EnumerateArray())
                             {
                                 string name = jsonStoreApp.GetProperty("name").GetString();
-                                if (name.Equals(application.Name))
+                                if (name.Equals(application.Name, StringComparison.Ordinal))
                                 {
                                     string url = null;
                                     Version storeAppVersion = null;
