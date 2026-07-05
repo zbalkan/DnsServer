@@ -60,6 +60,7 @@ The following is a list of RFCs that Technitium DNS Server implements.
 | RFC 7871 | Client Subnet in DNS Queries
 | RFC 7858 | Specification for DNS over Transport Layer Security (TLS)
 | RFC 8080 | Edwards-Curve Digital Security Algorithm (EdDSA) for DNSSEC
+| RFC 8109 | Initializing a DNS Resolver with Priming Queries
 | RFC 8375 | Special-Use Domain 'home.arpa.'
 | RFC 8484 | DNS Queries over HTTPS (DoH)
 | RFC 8709 | Ed25519 and Ed448 Public Key Algorithms for the Secure Shell (SSH) Protocol
@@ -75,6 +76,7 @@ The following is a list of RFCs that Technitium DNS Server implements.
 | RFC 9432 | DNS Catalog Zones
 | RFC 9520 | Negative Caching of DNS Resolution Failures
 | RFC 9460 | Service Binding and Parameter Specification via the DNS (SVCB and HTTPS Resource Records) 
+| RFC 9609 | Initializing a DNS Resolver with Priming Queries
 | draft-vixie-dnsext-dns0x20 | Use of Bit 0x20 in DNS Labels to Improve Transaction Identity
 
 The following is a list that the DHCP Server included with the Technitium DNS Server implements.
