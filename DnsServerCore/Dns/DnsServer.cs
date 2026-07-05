@@ -3851,6 +3851,29 @@ namespace DnsServerCore.Dns
             else
                 authResponse = await _authZoneManager.QueryAsync(request, remoteEP.Address, isRecursionAllowed);
 
+            if (isRecursionAllowed && _locallyServedDnsZones)
+            {
+                DnsDatagram splResponse = _specialZoneManager.Query(request);
+                if (splResponse is not null)
+                {
+                    if (authResponse is null)
+                    {
+                        splResponse.Tag = DnsServerResponseType.Authoritative;
+                        return splResponse;
+                    }
+                    else if (request.Question.Count > 0)
+                    {
+                        ApexZone apexZone = _authZoneManager.FindApexZone(request.Question[0].Name);
+                        if ((apexZone is null) || apexZone.Disabled || (apexZone.Name.Length == 0))
+                        {
+                            //zone does not exist or is disabled or is a root zone
+                            splResponse.Tag = DnsServerResponseType.Authoritative;
+                            return splResponse;
+                        }
+                    }
+                }
+            }
+
             if (authResponse is not null)
             {
                 if ((authResponse.RCODE != DnsResponseCode.NoError) || (authResponse.Answer.Count > 0) || (authResponse.Authority.Count == 0) || authResponse.IsFirstAuthoritySOAOrFWDOrAPP())
@@ -4754,20 +4777,6 @@ namespace DnsServerCore.Dns
 
         private async Task<DnsDatagram> RecursiveResolveAsync(DnsDatagram request, IPEndPoint remoteEP, IReadOnlyList<DnsResourceRecord> conditionalForwarders, bool dnssecValidation, bool cachePrefetchOperation, bool cacheRefreshOperation, bool skipDnsAppAuthoritativeRequestHandlers, int clientTimeout)
         {
-            if (_locallyServedDnsZones)
-            {
-                //query special zone when conditional forwarders are undefined OR when it is a root conditional forwarder
-                if ((conditionalForwarders is null) || (conditionalForwarders.Count > 0) && (conditionalForwarders[0].Name.Length == 0))
-                {
-                    DnsDatagram response = _specialZoneManager.Query(request);
-                    if (response is not null)
-                    {
-                        response.Tag = DnsServerResponseType.Authoritative;
-                        return response;
-                    }
-                }
-            }
-
             DnsQuestionRecord question = request.Question[0];
             NetworkAddress eDnsClientSubnet = null;
             bool advancedForwardingClientSubnet = false; //this feature is used by Advanced Forwarding app to cache response per network group
@@ -7023,7 +7032,7 @@ namespace DnsServerCore.Dns
             get { return _serverDomain; }
             set
             {
-                if (!_serverDomain.Equals(value))
+                if (!_serverDomain.Equals(value, StringComparison.Ordinal))
                 {
                     if (DnsClient.IsDomainNameUnicode(value))
                         value = DnsClient.ConvertDomainNameToAscii(value);
