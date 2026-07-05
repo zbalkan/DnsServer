@@ -789,6 +789,12 @@ namespace DnsServerCore.Dns.ZoneManagers
             return new AuthZoneInfo(apexZone, loadHistory);
         }
 
+        internal ApexZone FindApexZone(string domain)
+        {
+            _ = _root.FindZone(domain, out _, out _, out ApexZone apexZone, out _);
+            return apexZone;
+        }
+
         internal AuthZone GetAuthZone(string zoneName, string domain)
         {
             return _root.GetAuthZone(zoneName, domain);
