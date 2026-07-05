@@ -22,7 +22,7 @@ var reverseProxyDetected = false;
 var quickBlockLists = null;
 var quickForwardersList = null;
 
-function showPageLogin() {
+function showPageLogin(autoLogin) {
     hideAlert();
 
     localStorage.removeItem("token");
@@ -46,12 +46,15 @@ function showPageLogin() {
     }
 
     HTTPRequest({
-        url: "api/sso/status",
+        url: "api/status",
         success: function (responseJSON) {
             if (responseJSON.ssoEnabled)
                 $("#divLoginSso").show();
             else
                 $("#divLoginSso").hide();
+
+            if (autoLogin && responseJSON.hasDefaultCredentials)
+                login("admin", "admin");
         }
     });
 }
@@ -89,6 +92,9 @@ function showPageMain() {
     $("#logsTabListLogViewer").addClass("active");
     $("#logsTabPaneLogViewer").addClass("active");
 
+    $("#txtZonesFilterName").val("");
+    $("#optZonesFilterType").val("");
+    $("#tableZonesBody").html("");
     $("#divViewZones").show();
     $("#divEditZone").hide();
 
@@ -260,6 +266,7 @@ function showPageMain() {
 
 $(function () {
     initTheme();
+    initUpdateNotificationMenu();
 
     var headerHtml = $("#header").html();
 
@@ -320,6 +327,11 @@ $(function () {
         }
     });
 
+    $("#chkWebServiceEnableHttpUnixSocket").on("click", function () {
+        var webServiceEnableHttpUnixSocket = $("#chkWebServiceEnableHttpUnixSocket").prop("checked");
+        $("#txtWebServiceHttpUnixSocket").prop("disabled", !webServiceEnableHttpUnixSocket);
+    });
+
     $("#chkWebServiceEnableTls").on("click", function () {
         var webServiceEnableTls = $("#chkWebServiceEnableTls").prop("checked");
         $("#chkWebServiceEnableHttp3").prop("disabled", !webServiceEnableTls);
@@ -375,6 +387,11 @@ $(function () {
         $("#txtDnsOverHttpRealIpHeader").prop("disabled", !enableDnsOverHttp && !enableDnsOverHttps);
     });
 
+    $("#chkEnableDnsOverHttpUnixSocket").on("click", function () {
+        var enableDnsOverHttpUnixSocket = $("#chkEnableDnsOverHttpUnixSocket").prop("checked");
+        $("#txtDnsOverHttpUnixSocket").prop("disabled", !enableDnsOverHttpUnixSocket);
+    });
+
     $("#chkEnableDnsOverTls").on("click", function () {
         var enableDnsOverTls = $("#chkEnableDnsOverTls").prop("checked");
         var enableDnsOverHttps = $("#chkEnableDnsOverHttps").prop("checked");
@@ -422,6 +439,7 @@ $(function () {
         var enableLogging = rdLoggingType.toLowerCase() != "none";
 
         $("#chkIgnoreResolverLogs").prop("disabled", !enableLogging);
+        $("#chkNoStackTrace").prop("disabled", !enableLogging);
         $("#chkLogQueries").prop("disabled", !enableLogging);
         $("#chkUseLocalTime").prop("disabled", !enableLogging);
         $("#txtLogFolderPath").prop("disabled", !enableLogging);
@@ -644,7 +662,45 @@ function showAbout() {
     }
 }
 
-function checkForUpdate() {
+function initUpdateNotificationMenu() {
+    var disableUpdateNotification = localStorage.getItem("disableUpdateNotification");
+    if (disableUpdateNotification === "true") {
+        $("#mnuDisableCheckForUpdateNotification").hide();
+        $("#mnuEnableCheckForUpdateNotification").show();
+    }
+    else {
+        $("#mnuEnableCheckForUpdateNotification").hide();
+        $("#mnuDisableCheckForUpdateNotification").show();
+    }
+}
+
+function disableUpdateNotification() {
+    if (!confirm("Disabling update notification will prevent the Web Console from showing new update notification when you login. You will have to manually find out if a new update is available.\r\n\r\nAre you sure you want to disable update notification?"))
+        return;
+
+    localStorage.setItem("disableUpdateNotification", true);
+    $("#mnuDisableCheckForUpdateNotification").hide();
+    $("#mnuEnableCheckForUpdateNotification").show();
+    $("#lnkUpdateAvailable").hide();
+
+    showAlert("success", "Notification Disabled!", "Update notification was disabled successfully.");
+}
+
+function enableUpdateNotification() {
+    localStorage.setItem("disableUpdateNotification", false);
+    $("#mnuEnableCheckForUpdateNotification").hide();
+    $("#mnuDisableCheckForUpdateNotification").show();
+
+    showAlert("success", "Notification Enabled!", "Update notification was enabled successfully.");
+}
+
+function checkForUpdate(force) {
+    if (!force) {
+        var disableUpdateNotification = localStorage.getItem("disableUpdateNotification");
+        if (disableUpdateNotification === "true")
+            return;
+    }
+
     HTTPRequest({
         url: "api/user/checkForUpdate",
         token: sessionData.token,
@@ -702,6 +758,13 @@ function checkForUpdate() {
             }
             else {
                 lnkUpdateAvailable.hide();
+
+                if (force) {
+                    if (responseJSON.response.dnsServerEnableCheckForUpdate)
+                        showAlert("success", "No Update Available!", "Check for update was done and no new update was found to be available.");
+                    else
+                        showAlert("danger", "Update Check Disabled!", "Failed to check for update due to Check For Update option being disabled on the DNS Server.");
+                }
             }
         },
         invalidToken: function () {
@@ -808,12 +871,33 @@ function refreshDnsSettings() {
             loadDnsSettings(responseJSON);
             checkForReverseProxy(responseJSON);
 
+            if (sessionData.info.permissions.Settings.canModify) {
+                $("#btnSaveSettings").show();
+            } else {
+                $("#btnSaveSettings").hide();
+            }
+
+            if (sessionData.info.permissions.Cache.canDelete) {
+                $("#btnSettingsFlushCache").show();
+            } else {
+                $("#btnSettingsFlushCache").hide();
+            }
+
+            if (sessionData.info.permissions.Settings.canDelete) {
+                $("#btnShowBackupSettingsModal").show();
+                $("#btnShowRestoreSettingsModal").show();
+            }
+            else {
+                $("#btnShowBackupSettingsModal").hide();
+                $("#btnShowRestoreSettingsModal").hide();
+            }
+
             if (node == "cluster") {
                 //cluster view
                 //general
                 $("#divSettingsGeneralLocalParameters").hide();
                 $("#divSettingsGeneralDefaultParameters").show();
-                $("#divSettingsGeneralDnsApps").show();
+                $("#divSettingsGeneralSoftwareUpdate").show();
                 $("#divSettingsGeneralIpv6").hide();
                 $("#divSettingsGeneralUdpSocketPool").hide();
                 $("#divSettingsGeneralEDns").show();
@@ -888,7 +972,7 @@ function refreshDnsSettings() {
                 //general
                 $("#divSettingsGeneralLocalParameters").show();
                 $("#divSettingsGeneralDefaultParameters").hide();
-                $("#divSettingsGeneralDnsApps").hide();
+                $("#divSettingsGeneralSoftwareUpdate").hide();
                 $("#divSettingsGeneralIpv6").show();
                 $("#divSettingsGeneralUdpSocketPool").show();
                 $("#divSettingsGeneralEDns").hide();
@@ -963,7 +1047,7 @@ function refreshDnsSettings() {
                 //general
                 $("#divSettingsGeneralLocalParameters").show();
                 $("#divSettingsGeneralDefaultParameters").show();
-                $("#divSettingsGeneralDnsApps").show();
+                $("#divSettingsGeneralSoftwareUpdate").show();
                 $("#divSettingsGeneralIpv6").show();
                 $("#divSettingsGeneralUdpSocketPool").show();
                 $("#divSettingsGeneralEDns").show();
@@ -1073,6 +1157,7 @@ function loadDnsSettings(responseJSON) {
     $("#txtZoneTransferAllowedNetworks").val(getArrayAsString(responseJSON.response.zoneTransferAllowedNetworks));
     $("#txtNotifyAllowedNetworks").val(getArrayAsString(responseJSON.response.notifyAllowedNetworks));
 
+    $("#chkDnsServerEnableCheckForUpdate").prop("checked", responseJSON.response.dnsServerEnableCheckForUpdate);
     $("#chkDnsAppsEnableAutomaticUpdate").prop("checked", responseJSON.response.dnsAppsEnableAutomaticUpdate);
 
     switch (responseJSON.response.ipv6Mode) {
@@ -1146,6 +1231,10 @@ function loadDnsSettings(responseJSON) {
 
     $("#txtWebServiceHttpPort").val(responseJSON.response.webServiceHttpPort);
 
+    $("#chkWebServiceEnableHttpUnixSocket").prop("checked", responseJSON.response.webServiceEnableHttpUnixSocket);
+    $("#txtWebServiceHttpUnixSocket").prop("disabled", !responseJSON.response.webServiceEnableHttpUnixSocket);
+    $("#txtWebServiceHttpUnixSocket").val(responseJSON.response.webServiceHttpUnixSocket);
+
     $("#chkWebServiceEnableTls").prop("checked", responseJSON.response.webServiceEnableTls);
 
     $("#chkWebServiceEnableHttp3").prop("disabled", !responseJSON.response.webServiceEnableTls);
@@ -1164,6 +1253,8 @@ function loadDnsSettings(responseJSON) {
     $("#lblWebServiceRealIpHeader").text(responseJSON.response.webServiceRealIpHeader);
     $("#lblWebServiceRealIpNginx").text("proxy_set_header " + responseJSON.response.webServiceRealIpHeader + " $remote_addr;");
 
+    $("#txtWebServiceCspFrameAncestorsHeader").val(responseJSON.response.webServiceCspFrameAncestorsHeader);
+
     $("#txtWebServiceTlsCertificatePath").prop("disabled", !responseJSON.response.webServiceEnableTls);
     $("#txtWebServiceTlsCertificatePassword").prop("disabled", !responseJSON.response.webServiceEnableTls);
 
@@ -1179,6 +1270,7 @@ function loadDnsSettings(responseJSON) {
     $("#chkEnableDnsOverUdpProxy").prop("checked", responseJSON.response.enableDnsOverUdpProxy);
     $("#chkEnableDnsOverTcpProxy").prop("checked", responseJSON.response.enableDnsOverTcpProxy);
     $("#chkEnableDnsOverHttp").prop("checked", responseJSON.response.enableDnsOverHttp);
+    $("#chkEnableDnsOverHttpUnixSocket").prop("checked", responseJSON.response.enableDnsOverHttpUnixSocket);
     $("#chkEnableDnsOverTls").prop("checked", responseJSON.response.enableDnsOverTls);
     $("#chkEnableDnsOverHttps").prop("checked", responseJSON.response.enableDnsOverHttps);
     $("#chkEnableDnsOverHttp3").prop("disabled", !responseJSON.response.enableDnsOverHttps);
@@ -1186,9 +1278,12 @@ function loadDnsSettings(responseJSON) {
     $("#chkEnableDnsOverQuic").prop("checked", responseJSON.response.enableDnsOverQuic);
     $("#chkUseDnsCookies").prop("checked", responseJSON.response.useDnsCookies);
 
+    $("#chkEnableDnsOverHttpHelpRedirect").prop("checked", responseJSON.response.enableDnsOverHttpHelpRedirect);
+
     $("#txtDnsOverUdpProxyPort").prop("disabled", !responseJSON.response.enableDnsOverUdpProxy);
     $("#txtDnsOverTcpProxyPort").prop("disabled", !responseJSON.response.enableDnsOverTcpProxy);
     $("#txtDnsOverHttpPort").prop("disabled", !responseJSON.response.enableDnsOverHttp);
+    $("#txtDnsOverHttpUnixSocket").prop("disabled", !responseJSON.response.enableDnsOverHttpUnixSocket);
     $("#txtDnsOverTlsPort").prop("disabled", !responseJSON.response.enableDnsOverTls);
     $("#txtDnsOverHttpsPort").prop("disabled", !responseJSON.response.enableDnsOverHttps);
     $("#txtDnsOverQuicPort").prop("disabled", !responseJSON.response.enableDnsOverQuic);
@@ -1196,6 +1291,7 @@ function loadDnsSettings(responseJSON) {
     $("#txtDnsOverUdpProxyPort").val(responseJSON.response.dnsOverUdpProxyPort);
     $("#txtDnsOverTcpProxyPort").val(responseJSON.response.dnsOverTcpProxyPort);
     $("#txtDnsOverHttpPort").val(responseJSON.response.dnsOverHttpPort);
+    $("#txtDnsOverHttpUnixSocket").val(responseJSON.response.dnsOverHttpUnixSocket);
     $("#txtDnsOverTlsPort").val(responseJSON.response.dnsOverTlsPort);
     $("#txtDnsOverHttpsPort").val(responseJSON.response.dnsOverHttpsPort);
     $("#txtDnsOverQuicPort").val(responseJSON.response.dnsOverQuicPort);
@@ -1259,6 +1355,7 @@ function loadDnsSettings(responseJSON) {
 
     $("#chkRandomizeName").prop("checked", responseJSON.response.randomizeName);
     $("#chkQnameMinimization").prop("checked", responseJSON.response.qnameMinimization);
+    $("#chkLocallyServedDnsZones").prop("checked", responseJSON.response.locallyServedDnsZones);
 
     $("#txtResolverRetries").val(responseJSON.response.resolverRetries);
     $("#txtResolverTimeout").val(responseJSON.response.resolverTimeout);
@@ -1472,11 +1569,13 @@ function loadDnsSettings(responseJSON) {
     }
 
     $("#chkIgnoreResolverLogs").prop("disabled", !enableLogging);
+    $("#chkNoStackTrace").prop("disabled", !enableLogging);
     $("#chkLogQueries").prop("disabled", !enableLogging);
     $("#chkUseLocalTime").prop("disabled", !enableLogging);
     $("#txtLogFolderPath").prop("disabled", !enableLogging);
 
     $("#chkIgnoreResolverLogs").prop("checked", responseJSON.response.ignoreResolverLogs);
+    $("#chkNoStackTrace").prop("checked", responseJSON.response.noStackTrace);
     $("#chkLogQueries").prop("checked", responseJSON.response.logQueries);
     $("#chkUseLocalTime").prop("checked", responseJSON.response.useLocalTime);
     $("#txtLogFolderPath").val(responseJSON.response.logFolder);
@@ -1543,9 +1642,10 @@ function saveDnsSettings(objBtn) {
         else
             $("#txtNotifyAllowedNetworks").val(notifyAllowedNetworks.replace(/,/g, "\n") + "\n");
 
+        var dnsServerEnableCheckForUpdate = $("#chkDnsServerEnableCheckForUpdate").prop("checked");
         var dnsAppsEnableAutomaticUpdate = $("#chkDnsAppsEnableAutomaticUpdate").prop("checked");
 
-        formData += "&defaultRecordTtl=" + encodeURIComponent(defaultRecordTtl) + "&defaultNsRecordTtl=" + encodeURIComponent(defaultNsRecordTtl) + "&defaultSoaRecordTtl=" + encodeURIComponent(defaultSoaRecordTtl) + "&defaultResponsiblePerson=" + encodeURIComponent(defaultResponsiblePerson) + "&useSoaSerialDateScheme=" + useSoaSerialDateScheme + "&minSoaRefresh=" + encodeURIComponent(minSoaRefresh) + "&minSoaRetry=" + encodeURIComponent(minSoaRetry) + "&zoneTransferAllowedNetworks=" + encodeURIComponent(zoneTransferAllowedNetworks) + "&notifyAllowedNetworks=" + encodeURIComponent(notifyAllowedNetworks) + "&dnsAppsEnableAutomaticUpdate=" + dnsAppsEnableAutomaticUpdate;
+        formData += "&defaultRecordTtl=" + encodeURIComponent(defaultRecordTtl) + "&defaultNsRecordTtl=" + encodeURIComponent(defaultNsRecordTtl) + "&defaultSoaRecordTtl=" + encodeURIComponent(defaultSoaRecordTtl) + "&defaultResponsiblePerson=" + encodeURIComponent(defaultResponsiblePerson) + "&useSoaSerialDateScheme=" + useSoaSerialDateScheme + "&minSoaRefresh=" + encodeURIComponent(minSoaRefresh) + "&minSoaRetry=" + encodeURIComponent(minSoaRetry) + "&zoneTransferAllowedNetworks=" + encodeURIComponent(zoneTransferAllowedNetworks) + "&notifyAllowedNetworks=" + encodeURIComponent(notifyAllowedNetworks) + "&dnsServerEnableCheckForUpdate=" + dnsServerEnableCheckForUpdate + "&dnsAppsEnableAutomaticUpdate=" + dnsAppsEnableAutomaticUpdate;
     }
 
     if (includeNodeParameters) {
@@ -1701,6 +1801,9 @@ function saveDnsSettings(objBtn) {
         if ((webServiceHttpPort === null) || (webServiceHttpPort === ""))
             webServiceHttpPort = 5380;
 
+        var webServiceEnableHttpUnixSocket = $("#chkWebServiceEnableHttpUnixSocket").prop("checked");
+        var webServiceHttpUnixSocket = $("#txtWebServiceHttpUnixSocket").val();
+
         var webServiceEnableTls = $("#chkWebServiceEnableTls").prop("checked");
         var webServiceEnableHttp3 = $("#chkWebServiceEnableHttp3").prop("checked");
         var webServiceHttpToTlsRedirect = $("#chkWebServiceHttpToTlsRedirect").prop("checked");
@@ -1715,11 +1818,12 @@ function saveDnsSettings(objBtn) {
             $("#txtWebServiceReverseProxyAddresses").val(webServiceReverseProxyAddresses.replace(/,/g, "\n"));
 
         var webServiceRealIpHeader = $("#txtWebServiceRealIpHeader").val();
+        var webServiceCspFrameAncestorsHeader = $("#txtWebServiceCspFrameAncestorsHeader").val();
 
         var webServiceTlsCertificatePath = $("#txtWebServiceTlsCertificatePath").val();
         var webServiceTlsCertificatePassword = $("#txtWebServiceTlsCertificatePassword").val();
 
-        formData += "&webServiceLocalAddresses=" + encodeURIComponent(webServiceLocalAddresses) + "&webServiceHttpPort=" + webServiceHttpPort + "&webServiceEnableTls=" + webServiceEnableTls + "&webServiceEnableHttp3=" + webServiceEnableHttp3 + "&webServiceHttpToTlsRedirect=" + webServiceHttpToTlsRedirect + "&webServiceUseSelfSignedTlsCertificate=" + webServiceUseSelfSignedTlsCertificate + "&webServiceTlsPort=" + webServiceTlsPort + "&webServiceReverseProxyAddresses=" + encodeURIComponent(webServiceReverseProxyAddresses) + "&webServiceRealIpHeader=" + encodeURIComponent(webServiceRealIpHeader) + "&webServiceTlsCertificatePath=" + encodeURIComponent(webServiceTlsCertificatePath) + "&webServiceTlsCertificatePassword=" + encodeURIComponent(webServiceTlsCertificatePassword);
+        formData += "&webServiceLocalAddresses=" + encodeURIComponent(webServiceLocalAddresses) + "&webServiceHttpPort=" + webServiceHttpPort + "&webServiceEnableHttpUnixSocket=" + webServiceEnableHttpUnixSocket + "&webServiceHttpUnixSocket=" + encodeURIComponent(webServiceHttpUnixSocket) + "&webServiceEnableTls=" + webServiceEnableTls + "&webServiceEnableHttp3=" + webServiceEnableHttp3 + "&webServiceHttpToTlsRedirect=" + webServiceHttpToTlsRedirect + "&webServiceUseSelfSignedTlsCertificate=" + webServiceUseSelfSignedTlsCertificate + "&webServiceTlsPort=" + webServiceTlsPort + "&webServiceReverseProxyAddresses=" + encodeURIComponent(webServiceReverseProxyAddresses) + "&webServiceRealIpHeader=" + encodeURIComponent(webServiceRealIpHeader) + "&webServiceCspFrameAncestorsHeader=" + encodeURIComponent(webServiceCspFrameAncestorsHeader) + "&webServiceTlsCertificatePath=" + encodeURIComponent(webServiceTlsCertificatePath) + "&webServiceTlsCertificatePassword=" + encodeURIComponent(webServiceTlsCertificatePassword);
     }
 
     //optional protocols
@@ -1728,11 +1832,14 @@ function saveDnsSettings(objBtn) {
         var enableDnsOverUdpProxy = $("#chkEnableDnsOverUdpProxy").prop("checked");
         var enableDnsOverTcpProxy = $("#chkEnableDnsOverTcpProxy").prop("checked");
         var enableDnsOverHttp = $("#chkEnableDnsOverHttp").prop("checked");
+        var enableDnsOverHttpUnixSocket = $("#chkEnableDnsOverHttpUnixSocket").prop("checked");
         var enableDnsOverTls = $("#chkEnableDnsOverTls").prop("checked");
         var enableDnsOverHttps = $("#chkEnableDnsOverHttps").prop("checked");
         var enableDnsOverHttp3 = $("#chkEnableDnsOverHttp3").prop("checked");
         var enableDnsOverQuic = $("#chkEnableDnsOverQuic").prop("checked");
         var useDnsCookies = $("#chkUseDnsCookies").prop("checked");
+
+        var enableDnsOverHttpHelpRedirect = $("#chkEnableDnsOverHttpHelpRedirect").prop("checked");
 
         var dnsOverUdpProxyPort = $("#txtDnsOverUdpProxyPort").val();
         if ((dnsOverUdpProxyPort == null) || (dnsOverUdpProxyPort === "")) {
@@ -1754,6 +1861,8 @@ function saveDnsSettings(objBtn) {
             $("#txtDnsOverHttpPort").trigger("focus");
             return;
         }
+
+        var dnsOverHttpUnixSocket = $("#txtDnsOverHttpUnixSocket").val();
 
         var dnsOverTlsPort = $("#txtDnsOverTlsPort").val();
         if ((dnsOverTlsPort == null) || (dnsOverTlsPort === "")) {
@@ -1792,14 +1901,17 @@ function saveDnsSettings(objBtn) {
             "&enableDnsOverUdpProxy=" + enableDnsOverUdpProxy +
             "&enableDnsOverTcpProxy=" + enableDnsOverTcpProxy +
             "&enableDnsOverHttp=" + enableDnsOverHttp +
+            "&enableDnsOverHttpUnixSocket=" + enableDnsOverHttpUnixSocket +
             "&enableDnsOverTls=" + enableDnsOverTls +
             "&enableDnsOverHttps=" + enableDnsOverHttps +
             "&enableDnsOverHttp3=" + enableDnsOverHttp3 +
             "&enableDnsOverQuic=" + enableDnsOverQuic +
+            "&enableDnsOverHttpHelpRedirect=" + enableDnsOverHttpHelpRedirect +
             "&useDnsCookies=" + useDnsCookies +
             "&dnsOverUdpProxyPort=" + dnsOverUdpProxyPort +
             "&dnsOverTcpProxyPort=" + dnsOverTcpProxyPort +
             "&dnsOverHttpPort=" + dnsOverHttpPort +
+            "&dnsOverHttpUnixSocket=" + encodeURIComponent(dnsOverHttpUnixSocket) +
             "&dnsOverTlsPort=" + dnsOverTlsPort +
             "&dnsOverHttpsPort=" + dnsOverHttpsPort +
             "&dnsOverQuicPort=" + dnsOverQuicPort +
@@ -1834,6 +1946,7 @@ function saveDnsSettings(objBtn) {
 
         var randomizeName = $("#chkRandomizeName").prop("checked");
         var qnameMinimization = $("#chkQnameMinimization").prop("checked");
+        var locallyServedDnsZones = $("#chkLocallyServedDnsZones").prop("checked");
 
         var resolverRetries = $("#txtResolverRetries").val();
         if ((resolverRetries == null) || (resolverRetries === "")) {
@@ -1863,7 +1976,7 @@ function saveDnsSettings(objBtn) {
             return;
         }
 
-        formData += "&recursion=" + recursion + "&recursionNetworkACL=" + encodeURIComponent(recursionNetworkACL) + "&randomizeName=" + randomizeName + "&qnameMinimization=" + qnameMinimization + "&resolverRetries=" + resolverRetries + "&resolverTimeout=" + resolverTimeout + "&resolverConcurrency=" + resolverConcurrency + "&resolverMaxStackCount=" + resolverMaxStackCount;
+        formData += "&recursion=" + recursion + "&recursionNetworkACL=" + encodeURIComponent(recursionNetworkACL) + "&randomizeName=" + randomizeName + "&qnameMinimization=" + qnameMinimization + "&locallyServedDnsZones=" + locallyServedDnsZones + "&resolverRetries=" + resolverRetries + "&resolverTimeout=" + resolverTimeout + "&resolverConcurrency=" + resolverConcurrency + "&resolverMaxStackCount=" + resolverMaxStackCount;
     }
 
     //cache
@@ -2049,6 +2162,7 @@ function saveDnsSettings(objBtn) {
     if (includeNodeParameters) {
         var loggingType = $("input[name=rdLoggingType]:checked").val();
         var ignoreResolverLogs = $("#chkIgnoreResolverLogs").prop("checked");
+        var noStackTrace = $("#chkNoStackTrace").prop("checked");
         var logQueries = $("#chkLogQueries").prop("checked");
         var useLocalTime = $("#chkUseLocalTime").prop("checked");
         var logFolder = $("#txtLogFolderPath").val();
@@ -2057,7 +2171,7 @@ function saveDnsSettings(objBtn) {
         var enableInMemoryStats = $("#chkEnableInMemoryStats").prop("checked");
         var maxStatFileDays = $("#txtMaxStatFileDays").val();
 
-        formData += "&loggingType=" + loggingType + "&ignoreResolverLogs=" + ignoreResolverLogs + "&logQueries=" + logQueries + "&useLocalTime=" + useLocalTime + "&logFolder=" + encodeURIComponent(logFolder) + "&maxLogFileDays=" + maxLogFileDays + "&enableInMemoryStats=" + enableInMemoryStats + "&maxStatFileDays=" + maxStatFileDays;
+        formData += "&loggingType=" + loggingType + "&ignoreResolverLogs=" + ignoreResolverLogs + "&noStackTrace=" + noStackTrace + "&logQueries=" + logQueries + "&useLocalTime=" + useLocalTime + "&logFolder=" + encodeURIComponent(logFolder) + "&maxLogFileDays=" + maxLogFileDays + "&enableInMemoryStats=" + enableInMemoryStats + "&maxStatFileDays=" + maxStatFileDays;
     }
 
     //send request
