@@ -572,7 +572,7 @@ namespace DnsServerCore
             if (Path.IsPathRooted(path))
                 return path;
 
-            return Path.Combine(_configFolder, path);
+            return Path.GetFullPath(Path.Combine(_configFolder, path));
         }
 
         private void StartNewLogFile()
