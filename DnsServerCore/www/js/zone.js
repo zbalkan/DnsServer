@@ -1095,7 +1095,7 @@ function disableZone(objBtn) {
 
 function deleteSelectedZones(objBtn) {
     var checkboxes = $("#tableZonesBody").find("input:checkbox");
-    var zones = [];
+    var zones;
     var zonesList;
 
     for (var i = 0; i < checkboxes.length; i++) {
@@ -1105,7 +1105,10 @@ function deleteSelectedZones(objBtn) {
             var zone = checkbox.attr("data-zone");
             var zoneIdn = checkbox.attr("data-zone-idn");
 
-            zones.push(zone);
+            if (zones == null)
+                zones = zone;
+            else
+                zones += "," + zone;
 
             var zoneName;
 
@@ -1121,7 +1124,7 @@ function deleteSelectedZones(objBtn) {
         }
     }
 
-    if (zones.length == 0) {
+    if (zones == null) {
         alert("Please select one or more zones to delete.");
         return;
     }
@@ -1134,48 +1137,27 @@ function deleteSelectedZones(objBtn) {
     var btn = $(objBtn);
     btn.button("loading");
 
-    var count = 0;
-    var failCount = 0;
+    HTTPRequest({
+        url: "api/zones/delete?zones=" + encodeURIComponent(zones) + "&node=" + encodeURIComponent(node),
+        token: sessionData.token,
+        success: function (responseJSON) {
+            btn.button("reset");
+            refreshZones();
 
-    for (var i = 0; i < zones.length; i++) {
-        var zone = zones[i];
-
-        HTTPRequest({
-            url: "api/zones/delete?zone=" + encodeURIComponent(zone) + "&node=" + encodeURIComponent(node),
-            token: sessionData.token,
-            success: function (responseJSON) {
-                count++;
-
-                if (count == zones.length) {
-                    btn.button("reset");
-                    refreshZones();
-
-                    if (failCount == 0)
-                        showAlert("success", "Zones Deleted!", "All selected zones were deleted successfully.");
-                    else
-                        showAlert("warning", "Failed To Deleted!", "A total of " + failCount + " zone(s) of the selected " + count + " zone(s) failed to delete. Please check error logs for more details.");
-                }
-            },
-            error: function () {
-                count++;
-                failCount++;
-
-                if (count == zones.length) {
-                    btn.button("reset");
-                    refreshZones();
-
-                    if (failCount == 0)
-                        showAlert("success", "Zones Deleted!", "All selected zones were deleted successfully.");
-                    else
-                        showAlert("warning", "Failed To Deleted!", "A total of " + failCount + " zone(s) of the selected " + count + " zone(s) failed to delete. Please check error logs for more details.");
-                }
-            },
-            invalidToken: function () {
-                btn.button("reset");
-                showPageLogin();
-            }
-        });
-    }
+            var failCount = Object.keys(responseJSON.response.failed).length;
+            if (failCount == 0)
+                showAlert("success", "Zones Deleted!", "All selected zones were deleted successfully.");
+            else
+                showAlert("warning", "Failed To Deleted!", "A total of " + failCount + " zone(s) of the selected " + (responseJSON.response.deleted.length + failCount) + " zone(s) failed to delete. Please check error logs for more details.");
+        },
+        error: function () {
+            btn.button("reset");
+        },
+        invalidToken: function () {
+            btn.button("reset");
+            showPageLogin();
+        }
+    });
 }
 
 function deleteZoneMenu(objMenuItem) {
