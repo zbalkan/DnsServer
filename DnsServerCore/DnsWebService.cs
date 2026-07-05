@@ -1003,6 +1003,8 @@ namespace DnsServerCore
                         }
                     }
 
+                    bool updateCertInClusterPrimaryZone = false;
+
                     if (webServiceSettings && !isConfigTransfer)
                     {
                         ZipArchiveEntry entry = backupZip.GetEntry("webservice.config");
@@ -1014,18 +1016,8 @@ namespace DnsServerCore
                                 LoadConfig(stream);
                             }
 
-                            //cert may have changed so update cluster certs when restoring
-                            if (_clusterManager.ClusterInitialized)
-                            {
-                                try
-                                {
-                                    _clusterManager.UpdateSelfNodeUrlAndCertificate();
-                                }
-                                catch (Exception ex)
-                                {
-                                    _log.Write(ex);
-                                }
-                            }
+                            //cert may have changed so update cert in cluster primary zone when restoring
+                            updateCertInClusterPrimaryZone = true;
                         }
                     }
 
@@ -1158,6 +1150,22 @@ namespace DnsServerCore
                             //reload zones
                             _dnsServer.AuthZoneManager.LoadAllZoneFiles();
                             InspectAndFixZonePermissions();
+                        }
+                    }
+
+                    if (updateCertInClusterPrimaryZone)
+                    {
+                        //cert may have changed so update cert in cluster primary zone when restoring
+                        if (_clusterManager.ClusterInitialized)
+                        {
+                            try
+                            {
+                                _clusterManager.UpdateSelfNodeUrlAndCertificate();
+                            }
+                            catch (Exception ex)
+                            {
+                                _log.Write(ex);
+                            }
                         }
                     }
 
@@ -1551,7 +1559,7 @@ namespace DnsServerCore
             if (Path.IsPathRooted(path))
                 return path;
 
-            return Path.Combine(_configFolder, path);
+            return Path.GetFullPath(Path.Combine(_configFolder, path));
         }
 
         private void RestartService(bool restartDnsService, bool restartWebService)
