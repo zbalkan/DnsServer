@@ -39,11 +39,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Mail;
-using System.Net.NetworkInformation;
 using System.Net.Quic;
 using System.Net.Security;
 using System.Net.Sockets;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Security.Authentication;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
@@ -191,6 +191,7 @@ namespace DnsServerCore.Dns
         bool _enableDnsOverTcpProxy;
         bool _enableDnsOverHttp;
         bool _enableDnsOverHttpUnixSocket;
+        bool _enableDnsOverHttpsUnixSocket;
         bool _enableDnsOverTls;
         bool _enableDnsOverHttps;
         bool _enableDnsOverHttp3;
@@ -200,6 +201,7 @@ namespace DnsServerCore.Dns
         int _dnsOverTcpProxyPort = 538;
         int _dnsOverHttpPort = 80;
         string _dnsOverHttpUnixSocket;
+        string _dnsOverHttpsUnixSocket;
         int _dnsOverTlsPort = 853;
         int _dnsOverHttpsPort = 443;
         int _dnsOverQuicPort = 853;
@@ -674,7 +676,7 @@ namespace DnsServerCore.Dns
             BinaryReader bR = new BinaryReader(s);
 
             int version = bR.ReadByte();
-            if ((version < 1) || (version > 4))
+            if ((version < 1) || (version > 5))
                 throw new InvalidDataException("DNS Server config version not supported.");
 
             //general
@@ -880,6 +882,17 @@ namespace DnsServerCore.Dns
                 _enableDnsOverHttpUnixSocket = false;
             }
 
+            if (version >= 5)
+            {
+                bool enableDnsOverHttpsUnixSocket = bR.ReadBoolean();
+                if (!isConfigTransfer)
+                    _enableDnsOverHttpsUnixSocket = enableDnsOverHttpsUnixSocket;
+            }
+            else
+            {
+                _enableDnsOverHttpsUnixSocket = false;
+            }
+
             bool enableDnsOverTls = bR.ReadBoolean();
             if (!isConfigTransfer)
                 _enableDnsOverTls = enableDnsOverTls;
@@ -930,6 +943,18 @@ namespace DnsServerCore.Dns
             {
                 if (!isConfigTransfer)
                     _dnsOverHttpUnixSocket = null;
+            }
+
+            if (version >= 5)
+            {
+                string unixSocket = s.ReadShortString();
+                if (!isConfigTransfer)
+                    _dnsOverHttpsUnixSocket = unixSocket.Length == 0 ? null : unixSocket;
+            }
+            else
+            {
+                if (!isConfigTransfer)
+                    _dnsOverHttpsUnixSocket = null;
             }
 
             int dnsOverTlsPort = bR.ReadInt32();
@@ -1204,7 +1229,7 @@ namespace DnsServerCore.Dns
             BinaryWriter bW = new BinaryWriter(s);
 
             bW.Write(Encoding.ASCII.GetBytes("DC")); //format
-            bW.Write((byte)4); //version
+            bW.Write((byte)5); //version
 
             //general
             s.WriteShortString(_serverDomain);
@@ -1334,6 +1359,7 @@ namespace DnsServerCore.Dns
             bW.Write(_enableDnsOverTcpProxy);
             bW.Write(_enableDnsOverHttp);
             bW.Write(_enableDnsOverHttpUnixSocket);
+            bW.Write(_enableDnsOverHttpsUnixSocket);
             bW.Write(_enableDnsOverTls);
             bW.Write(_enableDnsOverHttps);
             bW.Write(_enableDnsOverHttp3);
@@ -1345,6 +1371,7 @@ namespace DnsServerCore.Dns
             bW.Write(_dnsOverTcpProxyPort);
             bW.Write(_dnsOverHttpPort);
             s.WriteShortString(_dnsOverHttpUnixSocket ?? "");
+            s.WriteShortString(_dnsOverHttpsUnixSocket ?? "");
             bW.Write(_dnsOverTlsPort);
             bW.Write(_dnsOverHttpsPort);
             bW.Write(_dnsOverQuicPort);
@@ -1607,7 +1634,7 @@ namespace DnsServerCore.Dns
             StopTlsCertificateUpdateTimer();
         }
 
-        public void SetDnsTlsCertificate(string dnsTlsCertificatePath, string dnsTlsCertificatePassword = null)
+        public void SetDnsTlsCertificate(string dnsTlsCertificatePath, string dnsTlsCertificatePassword = null, bool throwException = false)
         {
             if (string.IsNullOrEmpty(dnsTlsCertificatePath))
                 throw new ArgumentNullException(nameof(dnsTlsCertificatePath), "DNS optional protocols TLS certificate path cannot be null or empty.");
@@ -1620,13 +1647,20 @@ namespace DnsServerCore.Dns
 
             dnsTlsCertificatePath = ConvertToAbsolutePath(dnsTlsCertificatePath);
 
-            try
+            if (throwException)
             {
                 LoadDnsTlsCertificate(dnsTlsCertificatePath, dnsTlsCertificatePassword);
             }
-            catch (Exception ex)
+            else
             {
-                _log.Write("DNS Server encountered an error while loading DNS Server TLS certificate: " + dnsTlsCertificatePath, ex);
+                try
+                {
+                    LoadDnsTlsCertificate(dnsTlsCertificatePath, dnsTlsCertificatePassword);
+                }
+                catch (Exception ex)
+                {
+                    _log.Write("DNS Server encountered an error while loading DNS Server TLS certificate: " + dnsTlsCertificatePath, ex);
+                }
             }
 
             _dnsTlsCertificatePath = ConvertToRelativePath(dnsTlsCertificatePath);
@@ -1682,39 +1716,6 @@ namespace DnsServerCore.Dns
             udpListener.ReceiveBufferSize = _udpReceiveBufferSizeKB * 1024;
 
             return udpListener;
-        }
-
-        private bool TryBindToDevice(Socket socket, IPAddress interfaceIpAddress, out string interfaceName)
-        {
-            if (!IPAddress.Any.Equals(interfaceIpAddress) && !IPAddress.IPv6Any.Equals(interfaceIpAddress))
-            {
-                try
-                {
-                    foreach (NetworkInterface nic in NetworkInterface.GetAllNetworkInterfaces())
-                    {
-                        if (nic.OperationalStatus != OperationalStatus.Up)
-                            continue;
-
-                        foreach (UnicastIPAddressInformation ip in nic.GetIPProperties().UnicastAddresses)
-                        {
-                            if (interfaceIpAddress.Equals(ip.Address))
-                            {
-                                //found interface
-                                interfaceName = nic.Name;
-                                socket.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.ASCII.GetBytes(interfaceName));
-                                return true;
-                            }
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    _log.Write(ex);
-                }
-            }
-
-            interfaceName = null;
-            return false;
         }
 
         private async Task ReadUdpRequestAsync(Socket udpListener, DnsTransportProtocol protocol)
@@ -1894,9 +1895,6 @@ namespace DnsServerCore.Dns
                                         {
                                             //create new socket and bind socket to source EP
                                             newUdpListener = GetUdpListenerSocket(sourceEP.AddressFamily);
-
-                                            if ((Environment.OSVersion.Platform == PlatformID.Unix) && TryBindToDevice(newUdpListener, sourceEP.Address, out string interfaceName))
-                                                _log.Write(sourceEP, protocol, $"Socket was bound to device '{interfaceName}' successfully.");
 
                                             newUdpListener.Bind(sourceEP);
 
@@ -5688,6 +5686,9 @@ namespace DnsServerCore.Dns
             {
                 List<DnsResourceRecord> RemoveOPTFromAdditional()
                 {
+                    if ((additional.Count == 1) && (additional[0].Type == DnsResourceRecordType.OPT))
+                        return [];
+
                     //keep records other than OPT, RRSIG, & DNSKEY
                     List<DnsResourceRecord> newAdditional = new List<DnsResourceRecord>(additional.Count);
 
@@ -5756,10 +5757,7 @@ namespace DnsServerCore.Dns
                     {
                         //remove OPT from additional
                         //this is optimization step to avoid request object cloning at PostProcessQueryAsync()
-                        if ((additional.Count == 1) && (additional[0].Type == DnsResourceRecordType.OPT))
-                            additional = [];
-                        else
-                            additional = RemoveOPTFromAdditional();
+                        additional = RemoveOPTFromAdditional();
                     }
                 }
                 else
@@ -5768,6 +5766,8 @@ namespace DnsServerCore.Dns
                     if (response.EDNS is null)
                     {
                         //add OPT to additional
+                        additional = RemoveOPTFromAdditional(); //remove any invalid OPT
+
                         //this is optimization step to avoid request object cloning at PostProcessQueryAsync()
                         DnsResourceRecord optRecord = DnsDatagramEdns.GetOPTFor(_udpPayloadSize, rCode, 0, dnssecOk ? EDnsHeaderFlags.DNSSEC_OK : EDnsHeaderFlags.None, null);
 
@@ -6422,9 +6422,48 @@ namespace DnsServerCore.Dns
                             serverOptions.Listen(localAddress, _dnsOverHttpPort);
                     }
 
-                    //bind to unix socket
+                    //bind to http unix socket
                     if (_enableDnsOverHttpUnixSocket && (_dnsOverHttpUnixSocket is not null))
+                    {
+                        try
+                        {
+                            if (File.Exists(_dnsOverHttpUnixSocket))
+                                File.Delete(_dnsOverHttpUnixSocket);
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.Write(ex);
+                        }
+
                         serverOptions.ListenUnixSocket(_dnsOverHttpUnixSocket);
+                    }
+
+                    //bind to https unix socket
+                    if (_enableDnsOverHttpsUnixSocket && (_dnsOverHttpsUnixSocket is not null) && (_dohSslServerAuthenticationOptions is not null))
+                    {
+                        try
+                        {
+                            if (File.Exists(_dnsOverHttpsUnixSocket))
+                                File.Delete(_dnsOverHttpsUnixSocket);
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.Write(ex);
+                        }
+
+                        serverOptions.ListenUnixSocket(_dnsOverHttpsUnixSocket, delegate (ListenOptions listenOptions)
+                        {
+                            if (IsHttp2Supported())
+                                listenOptions.Protocols = HttpProtocols.Http1AndHttp2;
+                            else
+                                listenOptions.Protocols = HttpProtocols.Http1;
+
+                            listenOptions.UseHttps(delegate (SslStream stream, SslClientHelloInfo clientHelloInfo, object state, CancellationToken cancellationToken)
+                            {
+                                return ValueTask.FromResult(_dohSslServerAuthenticationOptions);
+                            }, null);
+                        });
+                    }
 
                     //bind to https port
                     if (_enableDnsOverHttps && (_dohSslServerAuthenticationOptions is not null))
@@ -6489,7 +6528,10 @@ namespace DnsServerCore.Dns
                 }
 
                 if (_enableDnsOverHttpUnixSocket && (_dnsOverHttpUnixSocket is not null))
-                    _log.Write(new UnixDomainSocketEndPoint(_dnsOverHttpUnixSocket), "Unix", "DNS Server was bound successfully.");
+                    _log.Write(new UnixDomainSocketEndPoint(_dnsOverHttpUnixSocket), "HttpUnix", "DNS Server was bound successfully.");
+
+                if (_enableDnsOverHttpsUnixSocket && (_dnsOverHttpsUnixSocket is not null) && (_dohSslServerAuthenticationOptions is not null))
+                    _log.Write(new UnixDomainSocketEndPoint(_dnsOverHttpsUnixSocket), "HttpsUnix", "DNS Server was bound successfully.");
             }
             catch (Exception ex)
             {
@@ -6505,7 +6547,10 @@ namespace DnsServerCore.Dns
                 }
 
                 if (_enableDnsOverHttpUnixSocket && (_dnsOverHttpUnixSocket is not null))
-                    _log.Write(new UnixDomainSocketEndPoint(_dnsOverHttpUnixSocket), "Unix", "DNS Server failed to bind.");
+                    _log.Write(new UnixDomainSocketEndPoint(_dnsOverHttpUnixSocket), "HttpUnix", "DNS Server failed to bind.");
+
+                if (_enableDnsOverHttpsUnixSocket && (_dnsOverHttpsUnixSocket is not null) && (_dohSslServerAuthenticationOptions is not null))
+                    _log.Write(new UnixDomainSocketEndPoint(_dnsOverHttpsUnixSocket), "HttpsUnix", "DNS Server failed to bind.");
 
                 _log.Write(ex);
 
@@ -6549,7 +6594,7 @@ namespace DnsServerCore.Dns
             }
         }
 
-        internal static bool IsUnixSocketSupported()
+        internal static bool IsUnixDomainSocketSupported()
         {
             switch (Environment.OSVersion.Platform)
             {
@@ -6602,8 +6647,18 @@ namespace DnsServerCore.Dns
                 {
                     udpListener = GetUdpListenerSocket(localEP.AddressFamily);
 
-                    if ((Environment.OSVersion.Platform == PlatformID.Unix) && TryBindToDevice(udpListener, localEP.Address, out string interfaceName))
-                        _log.Write(localEP, DnsTransportProtocol.Udp, $"Socket was bound to device '{interfaceName}' successfully.");
+                    if ((localEP is InterfaceEndPoint intEP) && (intEP.InterfaceName is not null) && RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        try
+                        {
+                            udpListener.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.ASCII.GetBytes(intEP.InterfaceName));
+                            _log.Write(localEP, DnsTransportProtocol.Udp, $"Socket was bound to device '{intEP.InterfaceName}' successfully.");
+                        }
+                        catch (Exception ex)
+                        {
+                            _log.Write(ex);
+                        }
+                    }
 
                     try
                     {
@@ -6646,8 +6701,18 @@ namespace DnsServerCore.Dns
                     {
                         udpProxyListener = GetUdpListenerSocket(udpProxyEP.AddressFamily);
 
-                        if ((Environment.OSVersion.Platform == PlatformID.Unix) && TryBindToDevice(udpProxyListener, udpProxyEP.Address, out string interfaceName))
-                            _log.Write(udpProxyEP, DnsTransportProtocol.UdpProxy, $"Socket was bound to device '{interfaceName}' successfully.");
+                        if ((localEP is InterfaceEndPoint intEP) && (intEP.InterfaceName is not null) && RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                        {
+                            try
+                            {
+                                udpProxyListener.SetRawSocketOption(SOL_SOCKET, SO_BINDTODEVICE, Encoding.ASCII.GetBytes(intEP.InterfaceName));
+                                _log.Write(udpProxyEP, DnsTransportProtocol.UdpProxy, $"Socket was bound to device '{intEP.InterfaceName}' successfully.");
+                            }
+                            catch (Exception ex)
+                            {
+                                _log.Write(ex);
+                            }
+                        }
 
                         udpProxyListener.Bind(udpProxyEP);
 
@@ -6868,7 +6933,7 @@ namespace DnsServerCore.Dns
                 }
             }
 
-            if (_enableDnsOverHttp || _enableDnsOverHttpUnixSocket || (_enableDnsOverHttps && (_dohSslServerAuthenticationOptions is not null)))
+            if (_enableDnsOverHttp || _enableDnsOverHttpUnixSocket || ((_enableDnsOverHttps || _enableDnsOverHttpsUnixSocket) && (_dohSslServerAuthenticationOptions is not null)))
                 await StartDoHAsync(throwIfBindFails);
 
             _cachePrefetchSamplingTimer = new Timer(CachePrefetchSamplingTimerCallback, null, Timeout.Infinite, Timeout.Infinite);
@@ -7566,11 +7631,26 @@ namespace DnsServerCore.Dns
             {
                 if (value)
                 {
-                    if (!IsUnixSocketSupported())
-                        throw new ArgumentException("Unix Sockets are supported only on Linux, Windows 10 (build 17063 and later), and Windows Server 2019 (update 1809 and later).", nameof(EnableDnsOverHttpUnixSocket));
+                    if (!IsUnixDomainSocketSupported())
+                        throw new ArgumentException("Unix Domain Sockets (UDS) are supported only on Linux, Windows 10 (build 17063 and later), and Windows Server 2019 (update 1809 and later).", nameof(EnableDnsOverHttpUnixSocket));
                 }
 
                 _enableDnsOverHttpUnixSocket = value;
+            }
+        }
+
+        public bool EnableDnsOverHttpsUnixSocket
+        {
+            get { return _enableDnsOverHttpsUnixSocket; }
+            set
+            {
+                if (value)
+                {
+                    if (!IsUnixDomainSocketSupported())
+                        throw new ArgumentException("Unix Domain Sockets (UDS) are supported only on Linux, Windows 10 (build 17063 and later), and Windows Server 2019 (update 1809 and later).", nameof(EnableDnsOverHttpsUnixSocket));
+                }
+
+                _enableDnsOverHttpsUnixSocket = value;
             }
         }
 
@@ -7667,6 +7747,18 @@ namespace DnsServerCore.Dns
                     value = null;
 
                 _dnsOverHttpUnixSocket = value;
+            }
+        }
+
+        public string DnsOverHttpsUnixSocket
+        {
+            get { return _dnsOverHttpsUnixSocket; }
+            set
+            {
+                if (string.IsNullOrWhiteSpace(value))
+                    value = null;
+
+                _dnsOverHttpsUnixSocket = value;
             }
         }
 
