@@ -725,7 +725,7 @@ namespace AdvancedBlocking
                     }
                 }
 
-                return Task.FromResult<DnsDatagram?>(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, rcode, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer!.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = responseMetadata });
+                return Task.FromResult<DnsDatagram?>(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !group.AllowTxtBlockingReport, false, false, rcode, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer!.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = responseMetadata });
             }
         }
 
@@ -1437,9 +1437,16 @@ namespace AdvancedBlocking
                                 secondWord = PopWord(ref line);
 
                                 if ((secondWord.Length == 0) || secondWord.StartsWith('#'))
+                                {
                                     hostname = firstWord;
+                                }
                                 else
+                                {
+                                    if (!IPAddress.TryParse(firstWord, out _))
+                                        continue; //first word must be an IP address for using second word as hostname as per hosts file format
+
                                     hostname = secondWord;
+                                }
                             }
 
                             hostname = hostname.Trim('.').ToLowerInvariant();
@@ -1654,7 +1661,7 @@ namespace AdvancedBlocking
                             if (line.StartsWith('!'))
                                 continue; //skip comment line
 
-                            if (line.StartsWith("||"))
+                            if (line.StartsWith("||", StringComparison.Ordinal))
                             {
                                 int i = line.IndexOf('^');
                                 if (i > -1)
@@ -1673,7 +1680,7 @@ namespace AdvancedBlocking
                                         blockedDomains.Enqueue(domain);
                                 }
                             }
-                            else if (line.StartsWith("@@||"))
+                            else if (line.StartsWith("@@||", StringComparison.Ordinal))
                             {
                                 int i = line.IndexOf('^');
                                 if (i > -1)

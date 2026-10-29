@@ -37,15 +37,24 @@ namespace DnsServerCore.Auth
         PBKDF2_SHA256 = 2
     }
 
+    enum UserType : byte
+    {
+        Local = 0,
+        RemoteSSO = 1,
+        RemoteLDAP = 2
+    }
+
     class User : IComparable<User>
     {
         #region variables
 
-        public const int DEFAULT_ITERATIONS = 100000;
+        const int MIN_ITERATIONS = 100000;
+        const int MAX_ITERATIONS = 1000000;
+        public const int DEFAULT_ITERATIONS = MIN_ITERATIONS;
 
         string _displayName;
         string _username;
-        bool _isSsoUser;
+        UserType _type;
         string _ssoIdentifier;
         UserPasswordHashType _passwordHashType;
         int _iterations;
@@ -62,6 +71,8 @@ namespace DnsServerCore.Auth
         IPAddress _recentSessionRemoteAddress;
 
         readonly ConcurrentDictionary<string, Group> _memberOfGroups;
+
+        bool? _hasDefaultCredentials; //only used for 'admin' user to cache hashing result
 
         #endregion
 
@@ -83,31 +94,51 @@ namespace DnsServerCore.Auth
                 case 1:
                 case 2:
                 case 3:
+                case 4:
                     _displayName = bR.BaseStream.ReadShortString();
                     _username = bR.BaseStream.ReadShortString();
 
-                    if (version >= 3)
-                        _isSsoUser = bR.ReadBoolean();
-
-                    if (_isSsoUser)
+                    if (version >= 4)
                     {
-                        _ssoIdentifier = bR.BaseStream.ReadShortString();
+                        _type = (UserType)bR.ReadByte();
+                    }
+                    else if (version >= 3)
+                    {
+                        bool isSsoUser = bR.ReadBoolean();
+                        _type = isSsoUser ? UserType.RemoteSSO : UserType.Local;
                     }
                     else
                     {
-                        _passwordHashType = (UserPasswordHashType)bR.ReadByte();
-                        _iterations = bR.ReadInt32();
-                        _salt = bR.ReadBuffer();
-                        _passwordHash = bR.BaseStream.ReadShortString();
+                        _type = UserType.Local;
+                    }
 
-                        if (version >= 2)
-                        {
-                            string otpKeyUri = bR.ReadString();
-                            if (!string.IsNullOrEmpty(otpKeyUri))
-                                _totpKeyUri = AuthenticatorKeyUri.Parse(otpKeyUri);
+                    switch (_type)
+                    {
+                        case UserType.Local:
+                            _passwordHashType = (UserPasswordHashType)bR.ReadByte();
+                            _iterations = bR.ReadInt32();
+                            _salt = bR.ReadBuffer();
+                            _passwordHash = bR.BaseStream.ReadShortString();
+                            break;
 
-                            _totpEnabled = bR.ReadBoolean();
-                        }
+                        case UserType.RemoteSSO:
+                            _ssoIdentifier = bR.BaseStream.ReadShortString();
+                            break;
+                    }
+
+                    switch (_type)
+                    {
+                        case UserType.Local:
+                        case UserType.RemoteLDAP:
+                            if (version >= 2)
+                            {
+                                string otpKeyUri = bR.ReadString();
+                                if (!string.IsNullOrEmpty(otpKeyUri))
+                                    _totpKeyUri = AuthenticatorKeyUri.Parse(otpKeyUri);
+
+                                _totpEnabled = bR.ReadBoolean();
+                            }
+                            break;
                     }
 
                     _disabled = bR.ReadBoolean();
@@ -145,6 +176,7 @@ namespace DnsServerCore.Auth
 
             user.SetUsername(username);
             user.DisplayName = displayName;
+            user._type = UserType.Local;
 
             user.ChangePassword(password, iterations);
 
@@ -157,8 +189,19 @@ namespace DnsServerCore.Auth
 
             user.SetUsername(username);
             user.DisplayName = displayName;
-            user._isSsoUser = true;
+            user._type = UserType.RemoteSSO;
             user._ssoIdentifier = ssoIdentifier;
+
+            return user;
+        }
+
+        public static User CreateLdapUser(string displayName, string username)
+        {
+            User user = new User();
+
+            user.SetUsername(username);
+            user.DisplayName = displayName;
+            user._type = UserType.RemoteLDAP;
 
             return user;
         }
@@ -257,8 +300,17 @@ namespace DnsServerCore.Auth
 
         public void ChangePassword(string newPassword, int iterations = DEFAULT_ITERATIONS)
         {
-            if (_isSsoUser)
-                throw new InvalidOperationException("Cannot change password for SSO users.");
+            switch (_type)
+            {
+                case UserType.RemoteSSO:
+                    throw new InvalidOperationException("Cannot change password for SSO users.");
+
+                case UserType.RemoteLDAP:
+                    throw new InvalidOperationException("Cannot change password for LDAP users.");
+            }
+
+            if ((iterations < MIN_ITERATIONS) || (iterations > MAX_ITERATIONS))
+                throw new ArgumentOutOfRangeException(nameof(iterations), $"The valid range for 'iterations' is {MIN_ITERATIONS}-{MAX_ITERATIONS}.");
 
             _passwordHashType = UserPasswordHashType.PBKDF2_SHA256;
             _iterations = iterations;
@@ -267,12 +319,28 @@ namespace DnsServerCore.Auth
             RandomNumberGenerator.Fill(_salt);
 
             _passwordHash = GetPasswordHashFor(newPassword);
+            _hasDefaultCredentials = null; //reset
+        }
+
+        public bool HasDefaultCredentials()
+        {
+            if (!_username.Equals("admin", StringComparison.OrdinalIgnoreCase))
+                return false; //function is only for 'admin' user to cache hashing result
+
+            if (_hasDefaultCredentials is null)
+                _hasDefaultCredentials = _passwordHash.Equals(GetPasswordHashFor("admin"), StringComparison.Ordinal);
+
+            return _hasDefaultCredentials.Value;
         }
 
         public void LoadOldSchemeCredentials(string passwordHash)
         {
-            if (_isSsoUser)
-                throw new InvalidOperationException();
+            switch (_type)
+            {
+                case UserType.RemoteSSO:
+                case UserType.RemoteLDAP:
+                    throw new InvalidOperationException();
+            }
 
             _passwordHashType = UserPasswordHashType.OldScheme;
             _passwordHash = passwordHash;
@@ -280,46 +348,63 @@ namespace DnsServerCore.Auth
 
         public AuthenticatorKeyUri InitializedTOTP(string issuer)
         {
-            if (_isSsoUser)
-                throw new InvalidOperationException("Time-based one-time password (TOTP) feature is not available for SSO users.");
+            switch (_type)
+            {
+                case UserType.Local:
+                case UserType.RemoteLDAP:
+                    if (_totpEnabled)
+                        throw new InvalidOperationException("Time-based one-time password (TOTP) is already enabled for user: " + _username);
 
-            if (_totpEnabled)
-                throw new InvalidOperationException("Time-based one-time password (TOTP) is already enabled for user: " + _username);
+                    _totpKeyUri = AuthenticatorKeyUri.Generate(issuer, _username);
 
-            _totpKeyUri = AuthenticatorKeyUri.Generate(issuer, _username);
+                    return _totpKeyUri;
 
-            return _totpKeyUri;
+                default:
+                    throw new InvalidOperationException("Time-based one-time password (TOTP) feature is only available for Local and LDAP users.");
+            }
         }
 
         public void EnableTOTP(string totp)
         {
-            if (_isSsoUser)
-                throw new InvalidOperationException("Time-based one-time password (TOTP) feature is not available for SSO users.");
+            switch (_type)
+            {
+                case UserType.Local:
+                case UserType.RemoteLDAP:
+                    if (_totpKeyUri is null)
+                        throw new InvalidOperationException("Time-based one-time password (TOTP) was not initialized for user: " + _username);
 
-            if (_totpKeyUri is null)
-                throw new InvalidOperationException("Time-based one-time password (TOTP) was not initialized for user: " + _username);
+                    if (_totpEnabled)
+                        throw new InvalidOperationException("Time-based one-time password (TOTP) is already enabled for user: " + _username);
 
-            if (_totpEnabled)
-                throw new InvalidOperationException("Time-based one-time password (TOTP) is already enabled for user: " + _username);
+                    Authenticator authenticator = new Authenticator(_totpKeyUri);
 
-            Authenticator authenticator = new Authenticator(_totpKeyUri);
+                    if (!authenticator.IsTOTPValid(totp))
+                        throw new Exception("Invalid time-based one-time password (TOTP) was attempted for user: " + _username);
 
-            if (!authenticator.IsTOTPValid(totp))
-                throw new Exception("Invalid time-based one-time password (TOTP) was attempted for user: " + _username);
+                    _totpEnabled = true;
+                    break;
 
-            _totpEnabled = true;
+                default:
+                    throw new InvalidOperationException("Time-based one-time password (TOTP) feature is only available for Local and LDAP users.");
+            }
         }
 
         public void DisableTOTP()
         {
-            if (_isSsoUser)
-                throw new InvalidOperationException("Time-based one-time password (TOTP) feature is not available for SSO users.");
+            switch (_type)
+            {
+                case UserType.Local:
+                case UserType.RemoteLDAP:
+                    if (!_totpEnabled)
+                        throw new InvalidOperationException("Time-based one-time password (TOTP) is already disabled for user: " + _username);
 
-            if (!_totpEnabled)
-                throw new InvalidOperationException("Time-based one-time password (TOTP) is already disabled for user: " + _username);
+                    _totpKeyUri = null;
+                    _totpEnabled = false;
+                    break;
 
-            _totpKeyUri = null;
-            _totpEnabled = false;
+                default:
+                    throw new InvalidOperationException("Time-based one-time password (TOTP) feature is only available for Local and LDAP users.");
+            }
         }
 
         public void LoggedInFrom(IPAddress remoteAddress)
@@ -371,29 +456,37 @@ namespace DnsServerCore.Auth
 
         public void WriteTo(BinaryWriter bW)
         {
-            bW.Write((byte)3);
+            bW.Write((byte)4);
 
             bW.BaseStream.WriteShortString(_displayName);
             bW.BaseStream.WriteShortString(_username);
-            bW.Write(_isSsoUser);
+            bW.Write((byte)_type);
 
-            if (_isSsoUser)
+            switch (_type)
             {
-                bW.BaseStream.WriteShortString(_ssoIdentifier);
+                case UserType.Local:
+                    bW.Write((byte)_passwordHashType);
+                    bW.Write(_iterations);
+                    bW.WriteBuffer(_salt);
+                    bW.BaseStream.WriteShortString(_passwordHash);
+                    break;
+
+                case UserType.RemoteSSO:
+                    bW.BaseStream.WriteShortString(_ssoIdentifier);
+                    break;
             }
-            else
+
+            switch (_type)
             {
-                bW.Write((byte)_passwordHashType);
-                bW.Write(_iterations);
-                bW.WriteBuffer(_salt);
-                bW.BaseStream.WriteShortString(_passwordHash);
+                case UserType.Local:
+                case UserType.RemoteLDAP:
+                    if (_totpKeyUri is null)
+                        bW.Write("");
+                    else
+                        bW.Write(_totpKeyUri.ToString());
 
-                if (_totpKeyUri is null)
-                    bW.Write("");
-                else
-                    bW.Write(_totpKeyUri.ToString());
-
-                bW.Write(_totpEnabled);
+                    bW.Write(_totpEnabled);
+                    break;
             }
 
             bW.Write(_disabled);
@@ -454,8 +547,8 @@ namespace DnsServerCore.Auth
         public string Username
         { get { return _username; } }
 
-        public bool IsSsoUser
-        { get { return _isSsoUser; } }
+        public UserType Type
+        { get { return _type; } }
 
         public string SsoIdentifier
         { get { return _ssoIdentifier; } }

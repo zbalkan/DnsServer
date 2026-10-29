@@ -167,14 +167,14 @@ namespace DnsServerCore
             if (configFolder is null)
                 _configFolder = Path.Combine(_appFolder, "config");
             else
-                _configFolder = configFolder;
+                _configFolder = Path.GetFullPath(configFolder);
 
             Directory.CreateDirectory(_configFolder);
             Directory.CreateDirectory(Path.Combine(_configFolder, "blocklists"));
             Directory.CreateDirectory(Path.Combine(_configFolder, "zones"));
 
             _log = new LogManager(isPortableApp, _configFolder);
-            _authManager = new AuthManager(_configFolder, _log);
+            _authManager = new AuthManager(this, _configFolder, _log);
 
             _api = new WebServiceApi(this, updateCheckUri);
             _dashboardApi = new WebServiceDashboardApi(this);
@@ -201,9 +201,6 @@ namespace DnsServerCore
                         catch (Exception ex)
                         {
                             _log.Write(ex);
-
-                            //set timer to retry again
-                            _saveTimer.Change(SAVE_TIMER_INITIAL_INTERVAL, Timeout.Infinite);
                         }
                     }
                 }
@@ -311,7 +308,7 @@ namespace DnsServerCore
                     {
                         _webServiceTlsCertificatePath = webServiceTlsCertificatePath;
 
-                        string webServiceTlsCertificateAbsolutePath = ConvertToAbsolutePath(_webServiceTlsCertificatePath);
+                        string webServiceTlsCertificateAbsolutePath = _log.ConvertToAbsolutePath(_webServiceTlsCertificatePath);
 
                         try
                         {
@@ -370,12 +367,7 @@ namespace DnsServerCore
                 ReadConfigFrom(s);
 
                 SaveConfigFileInternal();
-
-                if (_pendingSave)
-                {
-                    _pendingSave = false;
-                    _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                }
+                _pendingSave = false;
             }
         }
 
@@ -383,9 +375,10 @@ namespace DnsServerCore
         {
             if (Environment.OSVersion.Platform == PlatformID.Unix)
             {
-                //adding a conditional forwarder zone for disabling DNSSEC validation for ntp.org so that systems with no real-time clock can sync time
+                //adding Negative Trust Anchor (NTA) for ntp.org so that systems with no real-time clock can sync time
                 string ntpDomain = "ntp.org";
-                string fwdRecordComments = "This forwarder zone was automatically created to disable DNSSEC validation for ntp.org to allow systems with no real-time clock (e.g. Raspberry Pi) to sync time via NTP when booting.";
+                string fwdRecordComments = "Negative Trust Anchor for ntp.org to allow systems with no real-time clock to sync time.";
+
                 if (_dnsServer.AuthZoneManager.CreateForwarderZone(ntpDomain, DnsTransportProtocol.Udp, "this-server", false, DnsForwarderRecordProxyType.DefaultProxy, null, 0, null, null, fwdRecordComments) is not null)
                 {
                     //set permissions
@@ -401,18 +394,9 @@ namespace DnsServerCore
             string tmpConfigFile = Path.Combine(_configFolder, "webservice.tmp");
             string configFile = Path.Combine(_configFolder, "webservice.config");
 
-            using (MemoryStream mS = new MemoryStream())
+            using (FileStream fS = new FileStream(tmpConfigFile, FileMode.Create, FileAccess.Write))
             {
-                //serialize config
-                WriteConfigTo(mS);
-
-                //write config
-                mS.Position = 0;
-
-                using (FileStream fS = new FileStream(tmpConfigFile, FileMode.Create, FileAccess.Write))
-                {
-                    mS.CopyTo(fS);
-                }
+                WriteConfigTo(fS);
             }
 
             File.Move(tmpConfigFile, configFile, true);
@@ -438,6 +422,8 @@ namespace DnsServerCore
             if (permission is null)
                 throw new DnsWebServiceException("Failed to read 'Zones' permissions: auth.config file is probably corrupt.");
 
+            bool saveConfig = false;
+
             IReadOnlyDictionary<string, Permission> subItemPermissions = permission.SubItemPermissions;
 
             //remove ghost permissions
@@ -446,7 +432,10 @@ namespace DnsServerCore
                 string zoneName = subItemPermission.Key;
 
                 if (_dnsServer.AuthZoneManager.GetAuthZoneInfo(zoneName) is null)
+                {
                     permission.RemoveAllSubItemPermissions(zoneName); //no such zone exists; remove permissions
+                    saveConfig = true;
+                }
             }
 
             //add missing admin permissions
@@ -461,11 +450,23 @@ namespace DnsServerCore
 
             foreach (AuthZoneInfo zone in zones)
             {
-                _authManager.SetPermission(PermissionSection.Zones, zone.Name, admins, PermissionFlag.ViewModifyDelete);
-                _authManager.SetPermission(PermissionSection.Zones, zone.Name, dnsAdmins, PermissionFlag.ViewModifyDelete);
+                Permission zonePermission = _authManager.GetPermission(PermissionSection.Zones, zone.Name);
+
+                if ((zonePermission is null) || !zonePermission.GroupPermissions.TryGetValue(admins, out PermissionFlag adminsPermission) || (adminsPermission != PermissionFlag.ViewModifyDelete))
+                {
+                    _authManager.SetPermission(PermissionSection.Zones, zone.Name, admins, PermissionFlag.ViewModifyDelete);
+                    saveConfig = true;
+                }
+
+                if ((zonePermission is null) || !zonePermission.GroupPermissions.TryGetValue(dnsAdmins, out PermissionFlag dnsAdminsPermission) || (dnsAdminsPermission != PermissionFlag.ViewModifyDelete))
+                {
+                    _authManager.SetPermission(PermissionSection.Zones, zone.Name, dnsAdmins, PermissionFlag.ViewModifyDelete);
+                    saveConfig = true;
+                }
             }
 
-            _authManager.SaveConfigFile();
+            if (saveConfig)
+                _authManager.SaveConfigFile();
         }
 
         private void ReadConfigFrom(Stream s)
@@ -567,7 +568,7 @@ namespace DnsServerCore
             }
             else
             {
-                string webServiceTlsCertificateAbsolutePath = ConvertToAbsolutePath(_webServiceTlsCertificatePath);
+                string webServiceTlsCertificateAbsolutePath = _log.ConvertToAbsolutePath(_webServiceTlsCertificatePath);
 
                 try
                 {
@@ -669,11 +670,11 @@ namespace DnsServerCore
                     //backup web service cert
                     if (!isConfigTransfer && !string.IsNullOrEmpty(_webServiceTlsCertificatePath))
                     {
-                        string webServiceTlsCertificatePath = ConvertToAbsolutePath(_webServiceTlsCertificatePath);
+                        string webServiceTlsCertificatePath = _log.ConvertToAbsolutePath(_webServiceTlsCertificatePath);
 
-                        if (File.Exists(webServiceTlsCertificatePath) && webServiceTlsCertificatePath.StartsWith(_configFolder, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                        if (File.Exists(webServiceTlsCertificatePath) && webServiceTlsCertificatePath.StartsWith(_configFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                         {
-                            string entryName = ConvertToRelativePath(webServiceTlsCertificatePath).Replace('\\', '/');
+                            string entryName = _log.ConvertToRelativePath(webServiceTlsCertificatePath).Replace('\\', '/');
                             backupZip.CreateEntryFromFile(webServiceTlsCertificatePath, entryName);
                         }
                     }
@@ -689,11 +690,11 @@ namespace DnsServerCore
                     //backup optional protocols cert
                     if (!isConfigTransfer && !string.IsNullOrEmpty(_dnsServer.DnsTlsCertificatePath))
                     {
-                        string dnsTlsCertificatePath = ConvertToAbsolutePath(_dnsServer.DnsTlsCertificatePath);
+                        string dnsTlsCertificatePath = _log.ConvertToAbsolutePath(_dnsServer.DnsTlsCertificatePath);
 
-                        if (File.Exists(dnsTlsCertificatePath) && dnsTlsCertificatePath.StartsWith(_configFolder, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                        if (File.Exists(dnsTlsCertificatePath) && dnsTlsCertificatePath.StartsWith(_configFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                         {
-                            string entryName = ConvertToRelativePath(dnsTlsCertificatePath).Replace('\\', '/');
+                            string entryName = _log.ConvertToRelativePath(dnsTlsCertificatePath).Replace('\\', '/');
                             backupZip.CreateEntryFromFile(dnsTlsCertificatePath, entryName);
                         }
                     }
@@ -803,10 +804,10 @@ namespace DnsServerCore
                     if (File.Exists(blockListConfigFile) && (File.GetLastWriteTimeUtc(blockListConfigFile) > ifModifiedSince))
                         backupZip.CreateEntryFromFile(blockListConfigFile, "blocklist.config");
 
-                    string[] blockListFiles = Directory.GetFiles(Path.Combine(_configFolder, "blocklists"), "*", SearchOption.TopDirectoryOnly);
-                    foreach (string blockListFile in blockListFiles)
+                    if (!isConfigTransfer)
                     {
-                        if (File.GetLastWriteTimeUtc(blockListFile) > ifModifiedSince)
+                        string[] blockListFiles = Directory.GetFiles(Path.Combine(_configFolder, "blocklists"), "*", SearchOption.TopDirectoryOnly);
+                        foreach (string blockListFile in blockListFiles)
                         {
                             string entryName = "blocklists/" + Path.GetFileName(blockListFile);
                             backupZip.CreateEntryFromFile(blockListFile, entryName);
@@ -954,7 +955,7 @@ namespace DnsServerCore
                             //extract log files from backup
                             foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                if (entry.FullName.StartsWith("logs/"))
+                                if (entry.FullName.StartsWith("logs/", StringComparison.Ordinal))
                                 {
                                     try
                                     {
@@ -1000,7 +1001,7 @@ namespace DnsServerCore
                         //extract any certs
                         foreach (ZipArchiveEntry certEntry in backupZip.Entries)
                         {
-                            if (certEntry.FullName.StartsWith("apps/"))
+                            if (certEntry.FullName.StartsWith("apps/", StringComparison.Ordinal))
                                 continue;
 
                             if (certEntry.FullName.EndsWith(".pfx", StringComparison.OrdinalIgnoreCase) || certEntry.FullName.EndsWith(".p12", StringComparison.OrdinalIgnoreCase))
@@ -1008,7 +1009,7 @@ namespace DnsServerCore
                                 try
                                 {
                                     string certFile = Path.GetFullPath(Path.Combine(_configFolder, certEntry.FullName));
-                                    if (!certFile.StartsWith(_configFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar))
+                                    if (!certFile.StartsWith(_configFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                                         throw new IOException("Extracting Zip entry would have resulted in a file outside the specified destination directory.");
 
                                     Directory.CreateDirectory(Path.GetDirectoryName(certFile));
@@ -1089,7 +1090,7 @@ namespace DnsServerCore
 
                                 foreach (ZipArchiveEntry entry in backupZip.Entries)
                                 {
-                                    if (!entry.FullName.StartsWith("zones/") || !entry.FullName.EndsWith(".keys", StringComparison.Ordinal))
+                                    if (!entry.FullName.StartsWith("zones/", StringComparison.Ordinal) || !entry.FullName.EndsWith(".keys", StringComparison.Ordinal))
                                         continue;
 
                                     string memberZoneName = Path.GetFileNameWithoutExtension(entry.Name);
@@ -1154,7 +1155,7 @@ namespace DnsServerCore
                             //extract zone files from backup
                             foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                if (entry.FullName.StartsWith("zones/"))
+                                if (entry.FullName.StartsWith("zones/", StringComparison.Ordinal))
                                 {
                                     try
                                     {
@@ -1217,40 +1218,43 @@ namespace DnsServerCore
 
                     if (blockLists)
                     {
-                        if (deleteExistingFiles)
+                        if (!isConfigTransfer)
                         {
-                            //delete existing block list files
-                            string[] blockListFiles = Directory.GetFiles(Path.Combine(_configFolder, "blocklists"), "*", SearchOption.TopDirectoryOnly);
-
-                            foreach (string blockListFile in blockListFiles)
+                            if (deleteExistingFiles)
                             {
-                                try
+                                //delete existing block list files
+                                string[] blockListFiles = Directory.GetFiles(Path.Combine(_configFolder, "blocklists"), "*", SearchOption.TopDirectoryOnly);
+
+                                foreach (string blockListFile in blockListFiles)
                                 {
-                                    File.Delete(blockListFile);
-                                }
-                                catch (Exception ex)
-                                {
-                                    _log.Write(ex);
+                                    try
+                                    {
+                                        File.Delete(blockListFile);
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _log.Write(ex);
+                                    }
                                 }
                             }
-                        }
 
-                        //extract block list files from backup
-                        foreach (ZipArchiveEntry entry in backupZip.Entries)
-                        {
-                            if (entry.FullName.StartsWith("blocklists/"))
+                            //extract block list files from backup
+                            foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                try
+                                if (entry.FullName.StartsWith("blocklists/", StringComparison.Ordinal))
                                 {
-                                    await entry.ExtractToFileAsync(Path.Combine(_configFolder, "blocklists", entry.Name), true);
-                                }
-                                catch (IOException)
-                                {
-                                    //ignore since file may be loading in another thread
-                                }
-                                catch (Exception ex)
-                                {
-                                    _log.Write(ex);
+                                    try
+                                    {
+                                        await entry.ExtractToFileAsync(Path.Combine(_configFolder, "blocklists", entry.Name), true);
+                                    }
+                                    catch (IOException)
+                                    {
+                                        //ignore since file may be loading in another thread
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        _log.Write(ex);
+                                    }
                                 }
                             }
                         }
@@ -1273,7 +1277,7 @@ namespace DnsServerCore
                             //install or update app from zip
                             foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                if (!entry.FullName.StartsWith("apps/"))
+                                if (!entry.FullName.StartsWith("apps/", StringComparison.Ordinal))
                                     continue;
 
                                 string[] fullNameParts = entry.FullName.Split('/');
@@ -1307,7 +1311,7 @@ namespace DnsServerCore
                             //update app config
                             foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                if (!entry.FullName.StartsWith("apps/"))
+                                if (!entry.FullName.StartsWith("apps/", StringComparison.Ordinal))
                                     continue;
 
                                 string[] fullNameParts = entry.FullName.Split('/');
@@ -1348,7 +1352,7 @@ namespace DnsServerCore
 
                             foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                if (!entry.FullName.StartsWith("apps/"))
+                                if (!entry.FullName.StartsWith("apps/", StringComparison.Ordinal))
                                     continue;
 
                                 string[] fullNameParts = entry.FullName.Split('/');
@@ -1363,13 +1367,13 @@ namespace DnsServerCore
                             foreach (KeyValuePair<string, DnsApplication> application in _dnsServer.DnsApplicationManager.Applications)
                             {
                                 if (!existingApplications.Contains(application.Key))
-                                    _dnsServer.DnsApplicationManager.UninstallApplication(application.Key);
+                                    await _dnsServer.DnsApplicationManager.UninstallApplicationAsync(application.Key);
                             }
                         }
                         else
                         {
                             //unload apps
-                            _dnsServer.DnsApplicationManager.UnloadAllApplications();
+                            await _dnsServer.DnsApplicationManager.UnloadAllApplicationsAsync();
 
                             if (deleteExistingFiles)
                             {
@@ -1394,10 +1398,10 @@ namespace DnsServerCore
                             //extract apps files from backup
                             foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                if (entry.FullName.StartsWith("apps/"))
+                                if (entry.FullName.StartsWith("apps/", StringComparison.Ordinal))
                                 {
                                     string filePath = Path.GetFullPath(Path.Combine(_configFolder, entry.FullName));
-                                    if (!filePath.StartsWith(_configFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar))
+                                    if (!filePath.StartsWith(_configFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                                         throw new IOException("Extracting Zip entry would have resulted in a file outside the specified destination directory.");
 
                                     if ((entry.Length == 0) && (entry.Name.Length == 0) && entry.FullName.EndsWith('/'))
@@ -1455,7 +1459,7 @@ namespace DnsServerCore
                             //extract scope files from backup
                             foreach (ZipArchiveEntry entry in backupZip.Entries)
                             {
-                                if (entry.FullName.StartsWith("scopes/"))
+                                if (entry.FullName.StartsWith("scopes/", StringComparison.Ordinal))
                                 {
                                     try
                                     {
@@ -1512,7 +1516,7 @@ namespace DnsServerCore
                         //extract stats files from backup
                         foreach (ZipArchiveEntry entry in backupZip.Entries)
                         {
-                            if (entry.FullName.StartsWith("stats/"))
+                            if (entry.FullName.StartsWith("stats/", StringComparison.Ordinal))
                             {
                                 try
                                 {
@@ -1562,25 +1566,6 @@ namespace DnsServerCore
         #endregion
 
         #region private
-
-        private string ConvertToRelativePath(string path)
-        {
-            if (path.StartsWith(_configFolder, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
-                path = path.Substring(_configFolder.Length).TrimStart(Path.DirectorySeparatorChar);
-
-            return path;
-        }
-
-        private string ConvertToAbsolutePath(string path)
-        {
-            if (path is null)
-                return null;
-
-            if (Path.IsPathRooted(path))
-                return path;
-
-            return Path.GetFullPath(Path.Combine(_configFolder, path));
-        }
 
         private void RestartService(bool restartDnsService, bool restartWebService)
         {
@@ -1829,7 +1814,18 @@ namespace DnsServerCore
                 UsePollingFileWatcher = true
             };
 
-            builder.Environment.WebRootFileProvider = new PhysicalFileProvider(Path.Combine(_appFolder, "www"))
+            string wwwFolderPath = Environment.GetEnvironmentVariable("DNS_SERVER_WEB_SERVICE_WWW_FOLDER_PATH");
+            if (string.IsNullOrEmpty(wwwFolderPath))
+            {
+                wwwFolderPath = Path.Combine(_appFolder, "www");
+            }
+            else if (!Directory.Exists(wwwFolderPath))
+            {
+                _log.Write("Web Service is falling back to the default web root folder since the folder configured by the DNS_SERVER_WEB_SERVICE_WWW_FOLDER_PATH environment variable does not exist: " + wwwFolderPath);
+                wwwFolderPath = Path.Combine(_appFolder, "www");
+            }
+
+            builder.Environment.WebRootFileProvider = new PhysicalFileProvider(wwwFolderPath)
             {
                 UseActivePolling = true,
                 UsePollingFileWatcher = true
@@ -2182,7 +2178,7 @@ namespace DnsServerCore
             _webService.MapGetAndPost("/api/apps/downloadAndUpdate", _appsApi.DownloadAndUpdateAppAsync);
             _webService.MapPost("/api/apps/install", _appsApi.InstallAppAsync);
             _webService.MapPost("/api/apps/update", _appsApi.UpdateAppAsync);
-            _webService.MapGetAndPost("/api/apps/uninstall", _appsApi.UninstallApp);
+            _webService.MapGetAndPost("/api/apps/uninstall", _appsApi.UninstallAppAsync);
             _webService.MapGetAndPost("/api/apps/config/get", _appsApi.GetAppConfigAsync);
             _webService.MapGetAndPost("/api/apps/config/set", _appsApi.SetAppConfigAsync);
 
@@ -2234,6 +2230,9 @@ namespace DnsServerCore
             _webService.MapGetAndPost("/api/admin/sso/set", _authApi.SetSsoConfig);
             _webService.MapGetAndPost("/api/admin/sso/users/create", _authApi.CreateSsoUser);
             _webService.MapGetAndPost("/api/admin/sso/users/set", _authApi.SetSsoUser);
+            _webService.MapGetAndPost("/api/admin/ldap/get", _authApi.GetLdapConfig);
+            _webService.MapGetAndPost("/api/admin/ldap/set", _authApi.SetLdapConfig);
+            _webService.MapGetAndPost("/api/admin/ldap/test", _authApi.TestLdapConnectionAsync);
             _webService.MapGetAndPost("/api/admin/cluster/state", _clusterApi.GetClusterState);
             _webService.MapGetAndPost("/api/admin/cluster/init", _clusterApi.InitializeCluster);
             _webService.MapGetAndPost("/api/admin/cluster/primary/delete", _clusterApi.DeleteCluster);
@@ -2305,6 +2304,7 @@ namespace DnsServerCore
                 case "/api/admin/sso/set":
                 case "/api/admin/sso/users/create":
                 case "/api/admin/sso/users/set":
+                case "/api/admin/ldap/set":
                     return ClusterNodeType.Primary; //this api can be called only on primary node
 
                 case "/sso/login":
@@ -2423,6 +2423,22 @@ namespace DnsServerCore
                     }
                     return;
 
+                case "/api/dnsClient/healthCheck":
+                    {
+                        if (!TryValidateSession(context, out UserSession _))
+                        {
+                            IPAddress remoteAddress = GetRemoteEndPoint(context).Address;
+
+                            if (!remoteAddress.Equals(IPAddress.Loopback) && !remoteAddress.Equals(IPAddress.IPv6Loopback))
+                                throw new InvalidTokenWebServiceException("Invalid token or session expired.");
+
+                            //allow unauthenticated call from localhost
+                        }
+
+                        needsJsonResponseObject = false;
+                    }
+                    break;
+
                 default:
                     if (request.Path.Value.StartsWith("/api/", StringComparison.OrdinalIgnoreCase))
                     {
@@ -2507,7 +2523,7 @@ namespace DnsServerCore
             exceptionHandlerApp.Run(async delegate (HttpContext context)
             {
                 IExceptionHandlerPathFeature exceptionHandlerPathFeature = context.Features.Get<IExceptionHandlerPathFeature>();
-                if (exceptionHandlerPathFeature.Path.StartsWith("/api/"))
+                if (exceptionHandlerPathFeature.Path.StartsWith("/api/", StringComparison.Ordinal))
                 {
                     Exception ex = exceptionHandlerPathFeature.Error;
 
@@ -2600,6 +2616,7 @@ namespace DnsServerCore
                 IPEndPoint remoteEP = GetRemoteEndPoint(context);
 
                 session.UpdateLastSeen(remoteEP.Address, request.Headers.UserAgent);
+                _authManager.LazySaveConfigFile(); //lazy save last seen info
             }
 
             context.Items["session"] = session;
@@ -2645,7 +2662,7 @@ namespace DnsServerCore
                 {
                     if (!string.IsNullOrEmpty(_webServiceTlsCertificatePath))
                     {
-                        string webServiceTlsCertificatePath = ConvertToAbsolutePath(_webServiceTlsCertificatePath);
+                        string webServiceTlsCertificatePath = _log.ConvertToAbsolutePath(_webServiceTlsCertificatePath);
 
                         try
                         {
@@ -2751,11 +2768,11 @@ namespace DnsServerCore
             if (webServiceTlsCertificatePassword?.Length > 255)
                 throw new ArgumentException("Web service TLS certificate password length cannot exceed 255 characters.", nameof(webServiceTlsCertificatePassword));
 
-            webServiceTlsCertificatePath = ConvertToAbsolutePath(webServiceTlsCertificatePath);
+            webServiceTlsCertificatePath = _log.ConvertToAbsolutePath(webServiceTlsCertificatePath);
 
             LoadWebServiceTlsCertificate(webServiceTlsCertificatePath, webServiceTlsCertificatePassword);
 
-            _webServiceTlsCertificatePath = ConvertToRelativePath(webServiceTlsCertificatePath);
+            _webServiceTlsCertificatePath = _log.ConvertToRelativePath(webServiceTlsCertificatePath);
             _webServiceTlsCertificatePassword = webServiceTlsCertificatePassword;
 
             StartTlsCertificateUpdateTimer();
@@ -2769,7 +2786,7 @@ namespace DnsServerCore
             {
                 string oldSelfSignedCertificateFilePath = Path.Combine(_configFolder, "cert.pfx");
 
-                if (!oldSelfSignedCertificateFilePath.Equals(ConvertToAbsolutePath(_webServiceTlsCertificatePath), Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) && File.Exists(oldSelfSignedCertificateFilePath) && !File.Exists(selfSignedCertificateFilePath))
+                if (!oldSelfSignedCertificateFilePath.Equals(_log.ConvertToAbsolutePath(_webServiceTlsCertificatePath), Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal) && File.Exists(oldSelfSignedCertificateFilePath) && !File.Exists(selfSignedCertificateFilePath))
                     File.Move(oldSelfSignedCertificateFilePath, selfSignedCertificateFilePath);
 
                 if (forceGenerateNew || !File.Exists(selfSignedCertificateFilePath))
@@ -3005,13 +3022,16 @@ namespace DnsServerCore
         public string ConfigFolder
         { get { return _configFolder; } }
 
+        public string Version
+        { get { return GetCleanVersion(_currentVersion); } }
+
         public int WebServiceHttpPort
         { get { return _webServiceHttpPort; } }
 
         public int WebServiceTlsPort
         { get { return _webServiceTlsPort; } }
 
-        internal bool IsWebServiceTlsEnabled
+        public bool IsWebServiceTlsEnabled
         {
             get
             {

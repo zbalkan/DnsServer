@@ -326,10 +326,9 @@ namespace DnsServerCore
                 jsonWriter.WriteNumber("cacheNegativeRecordTtl", _dnsWebService._dnsServer.CacheZoneManager.NegativeRecordTtl);
                 jsonWriter.WriteNumber("cacheFailureRecordTtl", _dnsWebService._dnsServer.CacheZoneManager.FailureRecordTtl);
 
+                jsonWriter.WriteBoolean("enableCachePrefetch", _dnsWebService._dnsServer.EnableCachePrefetch);
                 jsonWriter.WriteNumber("cachePrefetchEligibility", _dnsWebService._dnsServer.CachePrefetchEligibility);
                 jsonWriter.WriteNumber("cachePrefetchTrigger", _dnsWebService._dnsServer.CachePrefetchTrigger);
-                jsonWriter.WriteNumber("cachePrefetchSampleIntervalInMinutes", _dnsWebService._dnsServer.CachePrefetchSampleIntervalMinutes);
-                jsonWriter.WriteNumber("cachePrefetchSampleEligibilityHitsPerHour", _dnsWebService._dnsServer.CachePrefetchSampleEligibilityHitsPerHour);
 
                 //blocking
                 jsonWriter.WriteBoolean("enableBlocking", _dnsWebService._dnsServer.EnableBlocking);
@@ -1469,11 +1468,8 @@ namespace DnsServerCore
                         if (request.TryGetQueryOrForm("cachePrefetchTrigger", int.Parse, out int cachePrefetchTrigger))
                             _dnsWebService._dnsServer.CachePrefetchTrigger = cachePrefetchTrigger;
 
-                        if (request.TryGetQueryOrForm("cachePrefetchSampleIntervalInMinutes", int.Parse, out int cachePrefetchSampleIntervalMinutes))
-                            _dnsWebService._dnsServer.CachePrefetchSampleIntervalMinutes = cachePrefetchSampleIntervalMinutes;
-
-                        if (request.TryGetQueryOrForm("cachePrefetchSampleEligibilityHitsPerHour", int.Parse, out int cachePrefetchSampleEligibilityHitsPerHour))
-                            _dnsWebService._dnsServer.CachePrefetchSampleEligibilityHitsPerHour = cachePrefetchSampleEligibilityHitsPerHour;
+                        if (request.TryGetQueryOrForm("enableCachePrefetch", bool.Parse, out bool enableCachePrefetch))
+                            _dnsWebService._dnsServer.EnableCachePrefetch = enableCachePrefetch;
 
                         #endregion
 

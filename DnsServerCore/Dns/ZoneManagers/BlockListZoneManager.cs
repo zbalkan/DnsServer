@@ -69,6 +69,7 @@ namespace DnsServerCore.Dns.ZoneManagers
 
         readonly Lock _saveLock = new Lock();
         bool _pendingSave;
+        bool _pendingLazySave;
         readonly Timer _saveTimer;
         const int SAVE_TIMER_INITIAL_INTERVAL = 5000;
 
@@ -97,13 +98,11 @@ namespace DnsServerCore.Dns.ZoneManagers
                         {
                             SaveConfigFileInternal();
                             _pendingSave = false;
+                            _pendingLazySave = false;
                         }
                         catch (Exception ex)
                         {
                             _dnsServer.LogManager.Write(ex);
-
-                            //set timer to retry again
-                            _saveTimer.Change(SAVE_TIMER_INITIAL_INTERVAL, Timeout.Infinite);
                         }
                     }
                 }
@@ -128,7 +127,7 @@ namespace DnsServerCore.Dns.ZoneManagers
             {
                 _saveTimer?.Dispose();
 
-                if (_pendingSave)
+                if (_pendingSave || _pendingLazySave)
                 {
                     try
                     {
@@ -141,6 +140,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                     finally
                     {
                         _pendingSave = false;
+                        _pendingLazySave = false;
                     }
                 }
             }
@@ -185,12 +185,8 @@ namespace DnsServerCore.Dns.ZoneManagers
                 ReadConfigFrom(s, isConfigTransfer);
 
                 SaveConfigFileInternal();
-
-                if (_pendingSave)
-                {
-                    _pendingSave = false;
-                    _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                }
+                _pendingSave = false;
+                _pendingLazySave = false;
             }
         }
 
@@ -199,18 +195,9 @@ namespace DnsServerCore.Dns.ZoneManagers
             string tmpBlockListConfigFile = Path.Combine(_dnsServer.ConfigFolder, "blocklist.tmp");
             string blockListConfigFile = Path.Combine(_dnsServer.ConfigFolder, "blocklist.config");
 
-            using (MemoryStream mS = new MemoryStream())
+            using (FileStream fS = new FileStream(tmpBlockListConfigFile, FileMode.Create, FileAccess.Write))
             {
-                //serialize config
-                WriteConfigTo(mS);
-
-                //write config
-                mS.Position = 0;
-
-                using (FileStream fS = new FileStream(tmpBlockListConfigFile, FileMode.Create, FileAccess.Write))
-                {
-                    mS.CopyTo(fS);
-                }
+                WriteConfigTo(fS);
             }
 
             File.Move(tmpBlockListConfigFile, blockListConfigFile, true);
@@ -227,6 +214,14 @@ namespace DnsServerCore.Dns.ZoneManagers
 
                 _pendingSave = true;
                 _saveTimer.Change(SAVE_TIMER_INITIAL_INTERVAL, Timeout.Infinite);
+            }
+        }
+
+        private void LazySaveConfigFile()
+        {
+            lock (_saveLock)
+            {
+                _pendingLazySave = true;
             }
         }
 
@@ -253,20 +248,23 @@ namespace DnsServerCore.Dns.ZoneManagers
                     if (!isConfigTransfer)
                         _blockListLastUpdatedOn = blockListLastUpdatedOn;
 
-                    if (blockListUrls.Length > 0)
+                    if (!isConfigTransfer)
                     {
-                        //load block list URLs async
-                        ThreadPool.QueueUserWorkItem(delegate (object state)
+                        if (blockListUrls.Length > 0)
                         {
-                            try
+                            //load block list URLs async
+                            ThreadPool.QueueUserWorkItem(delegate (object state)
                             {
-                                LoadBlockLists();
-                            }
-                            catch (Exception ex)
-                            {
-                                _dnsServer.LogManager.Write(ex);
-                            }
-                        });
+                                try
+                                {
+                                    LoadBlockLists();
+                                }
+                                catch (Exception ex)
+                                {
+                                    _dnsServer.LogManager.Write(ex);
+                                }
+                            });
+                        }
                     }
 
                     ApplyBlockListUrls(blockListUrls);
@@ -342,17 +340,12 @@ namespace DnsServerCore.Dns.ZoneManagers
             {
                 _dnsServer.LogManager.Write("DNS Server is reading " + (isAllowList ? "allow" : "block") + " list from: " + listUrl.AbsoluteUri);
 
-                string listFilePath = GetBlockListFilePath(listUrl);
+                string listFilePath;
 
                 if (listUrl.IsFile)
-                {
-                    if (!File.Exists(listFilePath) || (File.GetLastWriteTimeUtc(listUrl.LocalPath) > File.GetLastWriteTimeUtc(listFilePath)))
-                    {
-                        File.Copy(listUrl.LocalPath, listFilePath, true);
-
-                        _dnsServer.LogManager.Write("DNS Server successfully downloaded " + (isAllowList ? "allow" : "block") + " list (" + WebUtilities.GetFormattedSize(new FileInfo(listFilePath).Length) + "): " + listUrl.AbsoluteUri);
-                    }
-                }
+                    listFilePath = listUrl.LocalPath;
+                else
+                    listFilePath = GetBlockListFilePath(listUrl);
 
                 using (FileStream fS = new FileStream(listFilePath, FileMode.Open, FileAccess.Read))
                 {
@@ -381,7 +374,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                         if (line.StartsWith('#') || line.StartsWith('!'))
                             continue; //skip comment line
 
-                        if (line.StartsWith("||"))
+                        if (line.StartsWith("||", StringComparison.Ordinal))
                         {
                             //adblock format
                             i = line.IndexOf('^');
@@ -401,7 +394,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                                     domains.Enqueue(domain.ToLowerInvariant());
                             }
                         }
-                        else if (line.StartsWith("@@||"))
+                        else if (line.StartsWith("@@||", StringComparison.Ordinal))
                         {
                             //adblock format - exception syntax
                             i = line.IndexOf('^');
@@ -435,9 +428,16 @@ namespace DnsServerCore.Dns.ZoneManagers
                                 secondWord = PopWord(ref line);
 
                                 if ((secondWord.Length == 0) || secondWord.StartsWith('#'))
+                                {
                                     hostname = firstWord;
+                                }
                                 else
+                                {
+                                    if (!IPAddress.TryParse(firstWord, out _))
+                                        continue; //first word must be an IP address for using second word as hostname as per hosts file format
+
                                     hostname = secondWord;
+                                }
                             }
 
                             hostname = hostname.Trim('.').ToLowerInvariant();
@@ -573,6 +573,12 @@ namespace DnsServerCore.Dns.ZoneManagers
 
                     if (listUrl.IsFile)
                     {
+                        if (!File.Exists(listUrl.LocalPath))
+                        {
+                            _dnsServer.LogManager.Write("DNS Server did not find the " + (isAllowList ? "allow" : "block") + " list: " + listUrl.AbsoluteUri);
+                            return;
+                        }
+
                         if (File.Exists(listFilePath))
                         {
                             if (File.GetLastWriteTimeUtc(listUrl.LocalPath) <= File.GetLastWriteTimeUtc(listFilePath))
@@ -583,10 +589,11 @@ namespace DnsServerCore.Dns.ZoneManagers
                             }
                         }
 
-                        File.Copy(listUrl.LocalPath, listFilePath, true);
+                        //create dummy file
+                        await File.Create(listFilePath).DisposeAsync();
 
                         downloaded = true;
-                        _dnsServer.LogManager.Write("DNS Server successfully downloaded " + (isAllowList ? "allow" : "block") + " list (" + WebUtilities.GetFormattedSize(new FileInfo(listFilePath).Length) + "): " + listUrl.AbsoluteUri);
+                        _dnsServer.LogManager.Write("DNS Server found new update for the " + (isAllowList ? "allow" : "block") + " list: " + listUrl.AbsoluteUri);
                     }
                     else
                     {
@@ -666,8 +673,7 @@ namespace DnsServerCore.Dns.ZoneManagers
             {
                 LoadBlockLists();
 
-                //force GC collection to remove old zone data from memory quickly
-                GC.Collect();
+                GC.Collect(2, GCCollectionMode.Optimized, false); //do GC collection to remove old block list data from memory quickly
             }
 
             return downloaded || notModified;
@@ -682,9 +688,10 @@ namespace DnsServerCore.Dns.ZoneManagers
                     if (await UpdateBlockListsAsync(forceReload))
                     {
                         //block lists were updated
-                        //save last updated on time
                         _blockListLastUpdatedOn = DateTime.UtcNow;
-                        SaveConfigFile();
+
+                        //lazy save last updated on time
+                        LazySaveConfigFile();
                     }
                 }
                 catch (Exception ex)
@@ -710,9 +717,10 @@ namespace DnsServerCore.Dns.ZoneManagers
                             if (await UpdateBlockListsAsync(_blockListLastUpdatedOn == default))
                             {
                                 //block lists were updated
-                                //save last updated on time
                                 _blockListLastUpdatedOn = DateTime.UtcNow;
-                                SaveConfigFile();
+
+                                //lazy save last updated on time
+                                LazySaveConfigFile();
                             }
                         }
                     }
@@ -826,7 +834,8 @@ namespace DnsServerCore.Dns.ZoneManagers
                         blockListZone.Add(domain, blockLists);
                     }
 
-                    blockLists.Add(blockListQueue.Key);
+                    if (!blockLists.Contains(blockListQueue.Key))
+                        blockLists.Add(blockListQueue.Key);
                 }
             }
 
@@ -936,7 +945,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                         if (parentDomain is null)
                             parentDomain = string.Empty;
 
-                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _dnsServer.BlockingAnswerTtl, _soaRecord)], null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = responseTag };
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_dnsServer.AllowTxtBlockingReport, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _dnsServer.BlockingAnswerTtl, _soaRecord)], null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = responseTag };
 
                     default:
                         throw new InvalidOperationException();
@@ -1002,7 +1011,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                         break;
                 }
 
-                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = responseTag };
+                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_dnsServer.AllowTxtBlockingReport, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = responseTag };
             }
         }
 

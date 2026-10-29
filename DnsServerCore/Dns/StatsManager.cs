@@ -40,7 +40,7 @@ namespace DnsServerCore.Dns
     {
         #region variables
 
-        const int DAILY_STATS_FILE_TOP_LIMIT = 1000;
+        public const int STATS_TOP_LIMIT = 1000;
 
         readonly DnsServer _dnsServer;
         readonly string _statsFolder;
@@ -63,8 +63,8 @@ namespace DnsServerCore.Dns
         //dashboard stats
         readonly StatCounter[] _lastHourStatCounters = new StatCounter[60];
         readonly StatCounter[] _lastHourStatCountersCopy = new StatCounter[60];
-        readonly ConcurrentDictionary<DateTime, HourlyStats> _hourlyStatsCache = new ConcurrentDictionary<DateTime, HourlyStats>();
-        readonly ConcurrentDictionary<DateTime, StatCounter> _dailyStatsCache = new ConcurrentDictionary<DateTime, StatCounter>();
+        ConcurrentDictionary<DateTime, HourlyStats> _hourlyStatsCache = new ConcurrentDictionary<DateTime, HourlyStats>(1, 24);
+        ConcurrentDictionary<DateTime, StatCounter> _dailyStatsCache = new ConcurrentDictionary<DateTime, StatCounter>(1, 7);
 
         readonly Timer _maintenanceTimer;
         const int MAINTENANCE_TIMER_INITIAL_INTERVAL = 10000;
@@ -411,7 +411,7 @@ namespace DnsServerCore.Dns
                     if (!_enableInMemoryStats)
                     {
                         //load hourly stats data
-                        HourlyStats hourlyStats = LoadHourlyStats(lastDateTime);
+                        HourlyStats hourlyStats = LoadHourlyStats(lastDateTime, truncate: false);
 
                         //update hourly stats file
                         hourlyStats.UpdateStat(lastDateTime, lastStatCounter);
@@ -430,7 +430,7 @@ namespace DnsServerCore.Dns
 
             //remove old data from hourly stats cache
             {
-                DateTime threshold = DateTime.UtcNow.AddHours(-24);
+                DateTime threshold = currentDateTime.AddHours(-24);
                 threshold = new DateTime(threshold.Year, threshold.Month, threshold.Day, threshold.Hour, 0, 0, DateTimeKind.Utc);
 
                 List<DateTime> _keysToRemove = new List<DateTime>();
@@ -445,21 +445,24 @@ namespace DnsServerCore.Dns
                     _hourlyStatsCache.TryRemove(key, out _);
             }
 
-            //unload minute stats data from hourly stats cache for data older than last hour
+            //unload minute stats and truncate data from hourly stats cache for data older than last hour
             {
-                DateTime lastHourThreshold = DateTime.UtcNow.AddHours(-1);
+                DateTime lastHourThreshold = currentDateTime.AddHours(-1);
                 lastHourThreshold = new DateTime(lastHourThreshold.Year, lastHourThreshold.Month, lastHourThreshold.Day, lastHourThreshold.Hour, 0, 0, DateTimeKind.Utc);
 
                 foreach (KeyValuePair<DateTime, HourlyStats> item in _hourlyStatsCache)
                 {
                     if (item.Key < lastHourThreshold)
+                    {
                         item.Value.UnloadMinuteStats();
+                        item.Value.Truncate(STATS_TOP_LIMIT);
+                    }
                 }
             }
 
             //remove old data from daily stats cache
             {
-                DateTime threshold = DateTime.UtcNow.AddMonths(-12);
+                DateTime threshold = currentDateTime.AddMonths(-12);
                 threshold = new DateTime(threshold.Year, threshold.Month, 1, 0, 0, 0, DateTimeKind.Utc);
 
                 List<DateTime> _keysToRemove = new List<DateTime>();
@@ -475,14 +478,14 @@ namespace DnsServerCore.Dns
             }
         }
 
-        private HourlyStats LoadHourlyStats(DateTime dateTime, bool forceReload = false, bool ifNotExistsReturnEmptyHourlyStats = false)
+        private HourlyStats LoadHourlyStats(DateTime dateTime, bool forceReload = false, bool ifNotExistsReturnEmptyHourlyStats = false, bool truncate = true)
         {
             if (_enableInMemoryStats)
                 return HourlyStats.Empty;
 
             DateTime hourlyDateTime = new DateTime(dateTime.Year, dateTime.Month, dateTime.Day, dateTime.Hour, 0, 0, 0, DateTimeKind.Utc);
 
-            if (forceReload || !_hourlyStatsCache.TryGetValue(hourlyDateTime, out HourlyStats hourlyStats) || ReferenceEquals(hourlyStats, HourlyStats.Empty))
+            if (forceReload || !_hourlyStatsCache.TryGetValue(hourlyDateTime, out HourlyStats hourlyStats) || (hourlyStats.Truncated && !truncate) || ReferenceEquals(hourlyStats, HourlyStats.Empty))
             {
                 string hourlyStatsFile = Path.Combine(_statsFolder, dateTime.ToString("yyyyMMddHH", CultureInfo.InvariantCulture) + ".stat");
 
@@ -494,6 +497,9 @@ namespace DnsServerCore.Dns
                         {
                             hourlyStats = new HourlyStats(new BinaryReader(fS));
                         }
+
+                        if (truncate)
+                            hourlyStats.Truncate(STATS_TOP_LIMIT);
                     }
                     catch (Exception ex)
                     {
@@ -540,10 +546,10 @@ namespace DnsServerCore.Dns
                         }
 
                         //check if existing file could be truncated to avoid loading unnecessary data in memory
-                        if (dailyStats.Truncate(DAILY_STATS_FILE_TOP_LIMIT))
+                        if (dailyStats.Truncate(STATS_TOP_LIMIT))
                         {
                             SaveDailyStats(dailyDateTime, dailyStats); //save truncated file
-                            GC.Collect();
+                            GC.Collect(2, GCCollectionMode.Optimized, true); //do GC collection to remove truncated data from memory, which can be huge
                         }
                     }
                     catch (Exception ex)
@@ -559,15 +565,15 @@ namespace DnsServerCore.Dns
 
                     for (int hour = 0; hour < 24; hour++) //hours
                     {
-                        HourlyStats hourlyStats = LoadHourlyStats(dailyDateTime.AddHours(hour), ifNotExistsReturnEmptyHourlyStats: true);
+                        HourlyStats hourlyStats = LoadHourlyStats(dailyDateTime.AddHours(hour), ifNotExistsReturnEmptyHourlyStats: true, truncate: false);
                         dailyStats.Merge(hourlyStats.HourStat);
                     }
 
                     if (dailyStats.TotalQueries > 0)
                     {
-                        _ = dailyStats.Truncate(DAILY_STATS_FILE_TOP_LIMIT);
+                        _ = dailyStats.Truncate(STATS_TOP_LIMIT);
                         SaveDailyStats(dailyDateTime, dailyStats);
-                        GC.Collect();
+                        GC.Collect(2, GCCollectionMode.Optimized, true); //do GC collection to remove hourly data from memory, which can be huge
                     }
                 }
 
@@ -583,6 +589,9 @@ namespace DnsServerCore.Dns
 
         private void SaveHourlyStats(DateTime dateTime, HourlyStats hourlyStats)
         {
+            if (hourlyStats.Truncated)
+                throw new InvalidOperationException();
+
             string hourlyStatsFile = Path.Combine(_statsFolder, dateTime.ToString("yyyyMMddHH", CultureInfo.InvariantCulture) + ".stat");
 
             try
@@ -621,8 +630,8 @@ namespace DnsServerCore.Dns
             for (int i = 0; i < _lastHourStatCountersCopy.Length; i++)
                 _lastHourStatCountersCopy[i] = null;
 
-            _hourlyStatsCache.Clear();
-            _dailyStatsCache.Clear();
+            _hourlyStatsCache = new ConcurrentDictionary<DateTime, HourlyStats>(1, 24);
+            _dailyStatsCache = new ConcurrentDictionary<DateTime, StatCounter>(1, 7);
         }
 
         #endregion
@@ -979,7 +988,7 @@ namespace DnsServerCore.Dns
 
                 HourlyStats hourlyStats = LoadHourlyStats(lastDateTime, ifNotExistsReturnEmptyHourlyStats: true);
                 if (hourlyStats.MinuteStats is null)
-                    hourlyStats = LoadHourlyStats(lastDateTime, true);
+                    hourlyStats = LoadHourlyStats(lastDateTime, forceReload: true);
 
                 StatCounter minuteStatCounter = hourlyStats.MinuteStats[lastDateTime.Minute];
 
@@ -1482,7 +1491,7 @@ namespace DnsServerCore.Dns
 
                 HourlyStats hourlyStats = LoadHourlyStats(lastDateTime, ifNotExistsReturnEmptyHourlyStats: true);
                 if (hourlyStats.MinuteStats is null)
-                    hourlyStats = LoadHourlyStats(lastDateTime, true);
+                    hourlyStats = LoadHourlyStats(lastDateTime, forceReload: true);
 
                 StatCounter minuteStatCounter = hourlyStats.MinuteStats[lastDateTime.Minute];
 
@@ -1604,26 +1613,6 @@ namespace DnsServerCore.Dns
             }
         }
 
-        public List<KeyValuePair<DnsQuestionRecord, long>> GetLastHourEligibleQueries(int minimumHitsPerHour)
-        {
-            StatCounter totalStatCounter = new StatCounter();
-            totalStatCounter.Lock();
-
-            DateTime lastHourDateTime = DateTime.UtcNow.AddMinutes(-60);
-            lastHourDateTime = new DateTime(lastHourDateTime.Year, lastHourDateTime.Month, lastHourDateTime.Day, lastHourDateTime.Hour, lastHourDateTime.Minute, 0, DateTimeKind.Utc);
-
-            for (int minute = 0; minute < 60; minute++)
-            {
-                DateTime lastDateTime = lastHourDateTime.AddMinutes(minute);
-
-                StatCounter statCounter = _lastHourStatCountersCopy[lastDateTime.Minute];
-                if ((statCounter != null) && statCounter.IsLocked)
-                    totalStatCounter.Merge(statCounter);
-            }
-
-            return totalStatCounter.GetEligibleQueries(minimumHitsPerHour);
-        }
-
         public Dictionary<NetworkAddress, ValueTuple<long, long>> GetLatestClientSubnetStats(int minutes, IEnumerable<int> ipv4Prefixes, IEnumerable<int> ipv6Prefixes)
         {
             StatCounter totalStatCounter = new StatCounter();
@@ -1692,8 +1681,8 @@ namespace DnsServerCore.Dns
 
                     if (_enableInMemoryStats)
                     {
-                        _hourlyStatsCache.Clear();
-                        _dailyStatsCache.Clear();
+                        _hourlyStatsCache = new ConcurrentDictionary<DateTime, HourlyStats>(1, 1);
+                        _dailyStatsCache = new ConcurrentDictionary<DateTime, StatCounter>(1, 1);
                     }
                 }
             }
@@ -1726,6 +1715,8 @@ namespace DnsServerCore.Dns
 
             readonly StatCounter _hourStat; //calculated value
             StatCounter[] _minuteStats = new StatCounter[60];
+
+            bool _truncated;
 
             #endregion
 
@@ -1774,6 +1765,9 @@ namespace DnsServerCore.Dns
 
             public void UpdateStat(DateTime dateTime, StatCounter minuteStat)
             {
+                if (_truncated)
+                    throw new InvalidOperationException();
+
                 if (ReferenceEquals(this, Empty))
                     return;
 
@@ -1790,6 +1784,26 @@ namespace DnsServerCore.Dns
                     return;
 
                 _minuteStats = null;
+            }
+
+            public bool Truncate(int limit)
+            {
+                if (_truncated)
+                    return false;
+
+                if (_hourStat.Truncate(limit))
+                    _truncated = true;
+
+                if (_minuteStats is not null)
+                {
+                    foreach (StatCounter minuteStat in _minuteStats)
+                    {
+                        if (minuteStat.Truncate(limit))
+                            _truncated = true;
+                    }
+                }
+
+                return _truncated;
             }
 
             public void WriteTo(BinaryWriter bW)
@@ -1819,6 +1833,9 @@ namespace DnsServerCore.Dns
             public StatCounter[] MinuteStats
             { get { return _minuteStats; } }
 
+            public bool Truncated
+            { get { return _truncated; } }
+
             #endregion
         }
 
@@ -1844,12 +1861,11 @@ namespace DnsServerCore.Dns
 
             long _totalClients;
 
-            readonly ConcurrentDictionary<string, Counter> _queryDomains;
-            readonly ConcurrentDictionary<string, Counter> _queryBlockedDomains;
-            readonly ConcurrentDictionary<DnsResourceRecordType, Counter> _queryTypes;
-            readonly ConcurrentDictionary<DnsTransportProtocol, Counter> _protocolTypes;
-            readonly ConcurrentDictionary<IPAddress, (Counter, Counter)> _clientIpAddressesUdpTcp;
-            readonly ConcurrentDictionary<DnsQuestionRecord, Counter> _queries;
+            ConcurrentDictionary<string, Counter> _queryDomains; //top domains
+            ConcurrentDictionary<string, Counter> _queryBlockedDomains; //top blocked domains
+            ConcurrentDictionary<DnsResourceRecordType, Counter> _queryTypes; //query type chart
+            readonly ConcurrentDictionary<DnsTransportProtocol, Counter> _protocolTypes; //protocol type chart
+            ConcurrentDictionary<IPAddress, (Counter, Counter)> _clientIpAddressesUdpTcp; //top clients
 
             bool _truncationFoundDuringMerge;
             long _totalClientsDailyStatsSummation;
@@ -1860,12 +1876,11 @@ namespace DnsServerCore.Dns
 
             public StatCounter()
             {
-                _queryDomains = new ConcurrentDictionary<string, Counter>();
-                _queryBlockedDomains = new ConcurrentDictionary<string, Counter>();
-                _queryTypes = new ConcurrentDictionary<DnsResourceRecordType, Counter>();
-                _protocolTypes = new ConcurrentDictionary<DnsTransportProtocol, Counter>();
-                _clientIpAddressesUdpTcp = new ConcurrentDictionary<IPAddress, (Counter, Counter)>();
-                _queries = new ConcurrentDictionary<DnsQuestionRecord, Counter>();
+                _queryDomains = new ConcurrentDictionary<string, Counter>(1, 10);
+                _queryBlockedDomains = new ConcurrentDictionary<string, Counter>(1, 10);
+                _queryTypes = new ConcurrentDictionary<DnsResourceRecordType, Counter>(1, 10);
+                _protocolTypes = new ConcurrentDictionary<DnsTransportProtocol, Counter>(1, 2);
+                _clientIpAddressesUdpTcp = new ConcurrentDictionary<IPAddress, (Counter, Counter)>(1, 10);
             }
 
             public StatCounter(BinaryReader bR)
@@ -1946,14 +1961,12 @@ namespace DnsServerCore.Dns
                         if (version >= 4)
                         {
                             int count = bR.ReadInt32();
-                            _queries = new ConcurrentDictionary<DnsQuestionRecord, Counter>(1, count);
 
                             for (int i = 0; i < count; i++)
-                                _queries.TryAdd(new DnsQuestionRecord(bR.BaseStream), new Counter(bR.ReadInt32()));
-                        }
-                        else
-                        {
-                            _queries = new ConcurrentDictionary<DnsQuestionRecord, Counter>(1, 0);
+                            {
+                                _ = new DnsQuestionRecord(bR.BaseStream);
+                                _ = bR.ReadInt32();
+                            }
                         }
 
                         if (version >= 5)
@@ -1970,6 +1983,7 @@ namespace DnsServerCore.Dns
                     case 7:
                     case 8:
                     case 9:
+                    case 10:
                         _totalQueries = bR.ReadInt64();
                         _totalNoError = bR.ReadInt64();
                         _totalServerFailure = bR.ReadInt64();
@@ -2040,21 +2054,26 @@ namespace DnsServerCore.Dns
                                 _clientIpAddressesUdpTcp.TryAdd(IPAddressExtensions.ReadFrom(bR), (new Counter(bR.ReadInt64()), new Counter()));
                         }
 
+                        if (version < 10)
                         {
                             int count = bR.ReadInt32();
-                            _queries = new ConcurrentDictionary<DnsQuestionRecord, Counter>(1, count);
 
                             for (int i = 0; i < count; i++)
-                                _queries.TryAdd(new DnsQuestionRecord(bR.BaseStream), new Counter(bR.ReadInt64()));
+                            {
+                                _ = new DnsQuestionRecord(bR.BaseStream);
+                                _ = bR.ReadInt64();
+                            }
                         }
 
                         if (version <= 8)
                         {
                             int count = bR.ReadInt32();
-                            ConcurrentDictionary<IPAddress, Counter> errorIpAddresses = new ConcurrentDictionary<IPAddress, Counter>(1, count);
 
                             for (int i = 0; i < count; i++)
-                                errorIpAddresses.TryAdd(IPAddressExtensions.ReadFrom(bR), new Counter(bR.ReadInt64()));
+                            {
+                                _ = IPAddressExtensions.ReadFrom(bR);
+                                _ = bR.ReadInt64();
+                            }
                         }
 
                         break;
@@ -2143,7 +2162,6 @@ namespace DnsServerCore.Dns
 
                                     default:
                                         _queryDomains.GetOrAdd(query.Name.ToLowerInvariant(), GetNewCounter).Increment();
-                                        _queries.GetOrAdd(query, GetNewCounter).Increment();
                                         break;
                                 }
                             }
@@ -2254,9 +2272,6 @@ namespace DnsServerCore.Dns
                     counterTuple.Item2.Merge(clientIpAddress.Value.Item2);
                 }
 
-                foreach (KeyValuePair<DnsQuestionRecord, Counter> query in statCounter._queries)
-                    _queries.GetOrAdd(query.Key, GetNewCounter).Merge(query.Value);
-
                 _totalClients = _clientIpAddressesUdpTcp.Count;
                 _totalClientsDailyStatsSummation += statCounter._totalClients;
 
@@ -2270,79 +2285,80 @@ namespace DnsServerCore.Dns
 
                 if (_queryDomains.Count > limit)
                 {
-                    List<KeyValuePair<string, Counter>> topDomains = new List<KeyValuePair<string, Counter>>(_queryDomains);
+                    List<KeyValuePair<string, Counter>> topDomainsList = new List<KeyValuePair<string, Counter>>(_queryDomains);
 
-                    _queryDomains.Clear();
-
-                    topDomains.Sort(delegate (KeyValuePair<string, Counter> item1, KeyValuePair<string, Counter> item2)
+                    topDomainsList.Sort(delegate (KeyValuePair<string, Counter> item1, KeyValuePair<string, Counter> item2)
                     {
                         return item2.Value.Count.CompareTo(item1.Value.Count);
                     });
 
-                    if (topDomains.Count > limit)
-                        topDomains.RemoveRange(limit, topDomains.Count - limit);
+                    if (topDomainsList.Count > limit)
+                        topDomainsList.RemoveRange(limit, topDomainsList.Count - limit);
 
-                    foreach (KeyValuePair<string, Counter> item in topDomains)
-                        _queryDomains[item.Key] = item.Value;
+                    ConcurrentDictionary<string, Counter> queryDomains = new ConcurrentDictionary<string, Counter>(1, topDomainsList.Count);
 
+                    foreach (KeyValuePair<string, Counter> item in topDomainsList)
+                        queryDomains[item.Key] = item.Value;
+
+                    _queryDomains = queryDomains;
                     truncated = true;
                 }
 
                 if (_queryBlockedDomains.Count > limit)
                 {
-                    List<KeyValuePair<string, Counter>> topBlockedDomains = new List<KeyValuePair<string, Counter>>(_queryBlockedDomains);
+                    List<KeyValuePair<string, Counter>> topBlockedDomainsList = new List<KeyValuePair<string, Counter>>(_queryBlockedDomains);
 
-                    _queryBlockedDomains.Clear();
-
-                    topBlockedDomains.Sort(delegate (KeyValuePair<string, Counter> item1, KeyValuePair<string, Counter> item2)
+                    topBlockedDomainsList.Sort(delegate (KeyValuePair<string, Counter> item1, KeyValuePair<string, Counter> item2)
                     {
                         return item2.Value.Count.CompareTo(item1.Value.Count);
                     });
 
-                    if (topBlockedDomains.Count > limit)
-                        topBlockedDomains.RemoveRange(limit, topBlockedDomains.Count - limit);
+                    if (topBlockedDomainsList.Count > limit)
+                        topBlockedDomainsList.RemoveRange(limit, topBlockedDomainsList.Count - limit);
 
-                    foreach (KeyValuePair<string, Counter> item in topBlockedDomains)
-                        _queryBlockedDomains[item.Key] = item.Value;
+                    ConcurrentDictionary<string, Counter> queryBlockedDomains = new ConcurrentDictionary<string, Counter>(1, topBlockedDomainsList.Count);
 
+                    foreach (KeyValuePair<string, Counter> item in topBlockedDomainsList)
+                        queryBlockedDomains[item.Key] = item.Value;
+
+                    _queryBlockedDomains = queryBlockedDomains;
                     truncated = true;
                 }
 
                 if (_queryTypes.Count > limit)
                 {
-                    List<KeyValuePair<DnsResourceRecordType, Counter>> queryTypes = new List<KeyValuePair<DnsResourceRecordType, Counter>>(_queryTypes);
+                    List<KeyValuePair<DnsResourceRecordType, Counter>> queryTypesList = new List<KeyValuePair<DnsResourceRecordType, Counter>>(_queryTypes);
 
-                    _queryTypes.Clear();
-
-                    queryTypes.Sort(delegate (KeyValuePair<DnsResourceRecordType, Counter> item1, KeyValuePair<DnsResourceRecordType, Counter> item2)
+                    queryTypesList.Sort(delegate (KeyValuePair<DnsResourceRecordType, Counter> item1, KeyValuePair<DnsResourceRecordType, Counter> item2)
                     {
                         return item2.Value.Count.CompareTo(item1.Value.Count);
                     });
 
-                    if (queryTypes.Count > limit)
+                    if (queryTypesList.Count > limit)
                     {
                         long othersCount = 0;
 
-                        for (int i = limit; i < queryTypes.Count; i++)
-                            othersCount += queryTypes[i].Value.Count;
+                        for (int i = limit; i < queryTypesList.Count; i++)
+                            othersCount += queryTypesList[i].Value.Count;
 
-                        queryTypes.RemoveRange(limit - 1, queryTypes.Count - (limit - 1));
-                        queryTypes.Add(new KeyValuePair<DnsResourceRecordType, Counter>(DnsResourceRecordType.Unknown, new Counter(othersCount)));
+                        queryTypesList.RemoveRange(limit - 1, queryTypesList.Count - (limit - 1));
+                        queryTypesList.Add(new KeyValuePair<DnsResourceRecordType, Counter>(DnsResourceRecordType.Unknown, new Counter(othersCount)));
                     }
 
-                    foreach (KeyValuePair<DnsResourceRecordType, Counter> item in queryTypes)
-                        _queryTypes[item.Key] = item.Value;
+                    ConcurrentDictionary<DnsResourceRecordType, Counter> queryTypes = new ConcurrentDictionary<DnsResourceRecordType, Counter>(1, queryTypesList.Count);
 
+                    foreach (KeyValuePair<DnsResourceRecordType, Counter> item in queryTypesList)
+                        queryTypes[item.Key] = item.Value;
+
+                    _queryTypes = queryTypes;
                     truncated = true;
                 }
 
                 if (_clientIpAddressesUdpTcp.Count > limit)
                 {
-                    List<KeyValuePair<IPAddress, (Counter, Counter)>> topClients = new List<KeyValuePair<IPAddress, (Counter, Counter)>>(_clientIpAddressesUdpTcp);
+                    List<KeyValuePair<IPAddress, (Counter, Counter)>> topClientsList = new List<KeyValuePair<IPAddress, (Counter, Counter)>>(_clientIpAddressesUdpTcp);
 
-                    _clientIpAddressesUdpTcp.Clear();
-
-                    topClients.Sort(delegate (KeyValuePair<IPAddress, (Counter, Counter)> x, KeyValuePair<IPAddress, (Counter, Counter)> y)
+                    topClientsList.Sort(delegate (KeyValuePair<IPAddress, (Counter, Counter)> x, KeyValuePair<IPAddress, (Counter, Counter)> y)
                     {
                         long x1 = x.Value.Item1.Count + x.Value.Item2.Count;
                         long y1 = y.Value.Item1.Count + y.Value.Item2.Count;
@@ -2350,20 +2366,15 @@ namespace DnsServerCore.Dns
                         return y1.CompareTo(x1);
                     });
 
-                    if (topClients.Count > limit)
-                        topClients.RemoveRange(limit, topClients.Count - limit);
+                    if (topClientsList.Count > limit)
+                        topClientsList.RemoveRange(limit, topClientsList.Count - limit);
 
-                    foreach (KeyValuePair<IPAddress, (Counter, Counter)> item in topClients)
-                        _clientIpAddressesUdpTcp[item.Key] = item.Value;
+                    ConcurrentDictionary<IPAddress, (Counter, Counter)> clientIpAddressesUdpTcp = new ConcurrentDictionary<IPAddress, (Counter, Counter)>(1, topClientsList.Count);
 
-                    truncated = true;
-                }
+                    foreach (KeyValuePair<IPAddress, (Counter, Counter)> item in topClientsList)
+                        clientIpAddressesUdpTcp[item.Key] = item.Value;
 
-                if (_queries.Count > limit)
-                {
-                    //only last hour queries data is required for cache auto prefetching
-                    _queries.Clear();
-
+                    _clientIpAddressesUdpTcp = clientIpAddressesUdpTcp;
                     truncated = true;
                 }
 
@@ -2376,7 +2387,7 @@ namespace DnsServerCore.Dns
                     throw new DnsServerException("StatCounter must be locked.");
 
                 bW.Write(Encoding.ASCII.GetBytes("SC")); //format
-                bW.Write((byte)9); //version
+                bW.Write((byte)10); //version
 
                 bW.Write(_totalQueries);
                 bW.Write(_totalNoError);
@@ -2435,15 +2446,6 @@ namespace DnsServerCore.Dns
                         clientIpAddress.Key.WriteTo(bW);
                         bW.Write(clientIpAddress.Value.Item1.Count);
                         bW.Write(clientIpAddress.Value.Item2.Count);
-                    }
-                }
-
-                {
-                    bW.Write(_queries.Count);
-                    foreach (KeyValuePair<DnsQuestionRecord, Counter> query in _queries)
-                    {
-                        query.Key.WriteTo(bW.BaseStream, null);
-                        bW.Write(query.Value.Count);
                     }
                 }
             }
@@ -2615,19 +2617,6 @@ namespace DnsServerCore.Dns
                         }
                     ]
                 };
-            }
-
-            public List<KeyValuePair<DnsQuestionRecord, long>> GetEligibleQueries(int minimumHits)
-            {
-                List<KeyValuePair<DnsQuestionRecord, long>> eligibleQueries = new List<KeyValuePair<DnsQuestionRecord, long>>(Convert.ToInt32(_queries.Count * 0.1));
-
-                foreach (KeyValuePair<DnsQuestionRecord, Counter> item in _queries)
-                {
-                    if (item.Value.Count >= minimumHits)
-                        eligibleQueries.Add(new KeyValuePair<DnsQuestionRecord, long>(item.Key, item.Value.Count));
-                }
-
-                return eligibleQueries;
             }
 
             public Dictionary<NetworkAddress, (long, long)> GetClientSubnetStats(IEnumerable<int> ipv4Prefixes, IEnumerable<int> ipv6Prefixes)

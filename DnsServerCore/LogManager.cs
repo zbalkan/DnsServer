@@ -164,9 +164,6 @@ namespace DnsServerCore
                         catch (Exception ex)
                         {
                             Write(ex);
-
-                            //set timer to retry again
-                            _saveTimer.Change(SAVE_TIMER_INITIAL_INTERVAL, Timeout.Infinite);
                         }
                     }
                 }
@@ -309,12 +306,7 @@ namespace DnsServerCore
 
                 //save config file
                 SaveConfigFileInternal();
-
-                if (_pendingSave)
-                {
-                    _pendingSave = false;
-                    _saveTimer.Change(Timeout.Infinite, Timeout.Infinite);
-                }
+                _pendingSave = false;
             }
         }
 
@@ -323,18 +315,9 @@ namespace DnsServerCore
             string tmpLogConfigFile = Path.Combine(_configFolder, "log.tmp");
             string logConfigFile = Path.Combine(_configFolder, "log.config");
 
-            using (MemoryStream mS = new MemoryStream())
+            using (FileStream fS = new FileStream(tmpLogConfigFile, FileMode.Create, FileAccess.Write))
             {
-                //serialize config
-                WriteConfigTo(mS);
-
-                //write config
-                mS.Position = 0;
-
-                using (FileStream fS = new FileStream(tmpLogConfigFile, FileMode.Create, FileAccess.Write))
-                {
-                    mS.CopyTo(fS);
-                }
+                WriteConfigTo(fS);
             }
 
             File.Move(tmpLogConfigFile, logConfigFile, true);
@@ -509,7 +492,7 @@ namespace DnsServerCore
                 else if (_loggingType.HasFlag(LoggingType.File))
                 {
                     //file logging is enabled
-                    if ((_logWriter is null) || !_logFile.StartsWith(ConvertToAbsolutePath(_logFolder)))
+                    if ((_logWriter is null) || !_logFile.StartsWith(ConvertToAbsolutePath(_logFolder).TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                     {
                         //file not being logged or log folder changed; start new log file
                         lock (_logFileLock)
@@ -559,18 +542,18 @@ namespace DnsServerCore
                 _logCleanupTimer.Change(Timeout.Infinite, Timeout.Infinite);
         }
 
-        private string ConvertToRelativePath(string path)
+        internal string ConvertToRelativePath(string path)
         {
-            if (path.StartsWith(_configFolder, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+            if (path.StartsWith(_configFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                 path = path.Substring(_configFolder.Length).TrimStart(Path.DirectorySeparatorChar);
 
             return path;
         }
 
-        private string ConvertToAbsolutePath(string path)
+        internal string ConvertToAbsolutePath(string path)
         {
-            if (Path.IsPathRooted(path))
-                return path;
+            if (path is null)
+                return null;
 
             return Path.GetFullPath(Path.Combine(_configFolder, path));
         }
@@ -664,7 +647,11 @@ namespace DnsServerCore
 
         public string[] ListLogFiles()
         {
-            return Directory.GetFiles(ConvertToAbsolutePath(_logFolder), "*.log", SearchOption.TopDirectoryOnly);
+            string logFolder = ConvertToAbsolutePath(_logFolder);
+            if (Directory.Exists(logFolder))
+                return Directory.GetFiles(ConvertToAbsolutePath(_logFolder), "*.log", SearchOption.TopDirectoryOnly);
+
+            return [];
         }
 
         public async Task DownloadLogFileAsync(HttpContext context, string logName, long limit)
@@ -673,7 +660,7 @@ namespace DnsServerCore
             string logFolder = ConvertToAbsolutePath(_logFolder);
 
             string logFilePath = Path.GetFullPath(Path.Combine(logFolder, logFileName));
-            if (!logFilePath.StartsWith(logFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar))
+            if (!logFilePath.StartsWith(logFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
                 throw new ArgumentException("Invalid log file name.", nameof(logName));
 
             using (FileStream fS = new FileStream(logFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, 64 * 1024, true))
@@ -732,12 +719,17 @@ namespace DnsServerCore
 
         public void DeleteLogFile(string logName)
         {
-            string logFile = Path.Combine(ConvertToAbsolutePath(_logFolder), logName + ".log");
+            string logFileName = logName + ".log";
+            string logFolder = ConvertToAbsolutePath(_logFolder);
 
-            if (logFile.Equals(_logFile, StringComparison.OrdinalIgnoreCase))
+            string logFilePath = Path.GetFullPath(Path.Combine(logFolder, logFileName));
+            if (!logFilePath.StartsWith(logFolder.TrimEnd(['/', '\\']) + Path.DirectorySeparatorChar, Environment.OSVersion.Platform == PlatformID.Win32NT ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+                throw new ArgumentException("Invalid log file name.", nameof(logName));
+
+            if (logFilePath.Equals(_logFile, StringComparison.OrdinalIgnoreCase))
                 DeleteCurrentLogFile();
             else
-                File.Delete(logFile);
+                File.Delete(logFilePath);
         }
 
         public void DeleteAllLogFiles()

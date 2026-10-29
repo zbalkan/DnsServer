@@ -1,5 +1,67 @@
 # Technitium DNS Server Change Log
 
+## Version 15.6.2
+Release Date: 17 October 2026
+
+- Fixed multiple issues with config sync in a Cluster deployment.
+- Fixed issue with missing boundary check for zones reported by Adam Korczynski from ADA Logics, and Anthropic. This allowed a user with write access to a zone to be able to manipulate records on a subdomain zone for the same domain name on the same DNS server.
+- Fixed issue with UDP socket receive packet implementation reported by TaoFei Guo from Peking University, Yang Luo and JianJun Chen from Tsinghua University. This allowed an attacker to keep the receive call looping by sending a stream of empty UDP packets, causing resource exhaustion.
+- Dashboard stats items are now clickable and shows Query Logs with a relevant filter when clicked.
+- Multiple other minor bug fixes and improvements.
+
+## Version 15.6.1
+Release Date: 11 October 2026
+
+- Fixed issues with StartTLS and LDAPS options for LDAP authentication implementation on both Windows and Linux deployments. Thanks to Roy Hagland (@Hemsby) for the PR #2171.
+- Fixed bug in DNS Cache that caused negative answer for CNAME to be returned when it was present in cache.
+- Fixed issue with IXFR that caused inconsistent records in secondary zone due to cases where Microsoft DNS Server would include duplicate delete entries in IXFR response.
+- Fixed issue with NOTIFY implementation that prevents case of missed NOTIFY to secondary name servers when one of them is down or not responding.
+- Multiple other minor bug fixes and improvements.
+
+## Version 15.6
+Release Date: 3 October 2026
+
+- Added a new explicit option in Settings to enable/disable Cache Prefetch feature.
+- Fixed recursive resolution issues when using Prefer IPv6 mode that caused resolution failures due to hitting Max Outbound Requests limit.
+- Fixed bug in DNS Cache that caused a failure record entry to shadow CNAME record in cache causing cache misses and resolution errors in certain scenarios.
+- Fixed session token prefix oracle vulnerability reported by Elias Hasas from Brickell Technologies LLC. This allowed an authenticated user to recover full session token for all active sessions on the DNS server using delete sessions API.
+- Fixed DoS issue with change password iterations count reported by Robert Cronin. This allowed an authenticated user to set arbitrary iterations value to cause high CPU usage on the server.
+- Fixed DoS issue with zone name filtering feature reported by Robert Cronin. This allowed an authenticated user to abuse the filter to inject regex pattern that could cause high CPU usage on the server.
+- Fixed log injection vulnerability in login API call reported by Phillip Hernandez, independent researcher. This allowed an unauthenticated attacker to inject text in log file by abusing username parameter in the login API call.
+- Multiple other minor bug fixes and improvements.
+
+## Version 15.5.1
+Release Date: 26 September 2026
+
+- Fixed issues with recursive resolver limits causing issues with resolution for some domain names.
+- Fixed session token prefix oracle vulnerability reported by Elias Hasas from Brickell Technologies LLC, that allowed an low privilege user to recover full session token for any user's active session.
+- Fixed XSS vulnerability in Logs view reported by Yutthavuth Kak from Karpia Cyber that can be triggered by an attacker who can independently create file with arbitrary name on the server and has DNS Administrator privilege.
+- Multiple other minor bug fixes and improvements.
+
+## Version 15.5
+Release Date: 19 September 2026
+
+- Added support for LDAP authentication. Thanks to Roy Hagland (@Hemsby) for the PR #1869.
+- Implemented support for [draft-farrokhi-dnsop-ede-nta](https://datatracker.ietf.org/doc/html/draft-farrokhi-dnsop-ede-nta). NTA can be added by creating a Conditional Forwarder zone for the domain name with DNSSEC validation disabled. The FWD record's comments are used with the Extended DNS Error (EDE) included in the response.
+- Added Zone File Editor option for Primary and Conditional Forwarder zones.
+- Added support for predefined static API sessions that are configured using new `DNS_SERVER_AUTH_STATIC_SESSIONS` environment variable.
+- Added new `DNS_SERVER_WEB_SERVICE_WWW_FOLDER_PATH` environment variable that allows changing the web service www root folder to allow using custom web service GUI. Thanks to Adrián García (@byGarcia) for PR #2138.
+- Updated docker compose to add health check option that uses the Health Check API call.
+- Updated Health Check API to be allowed to be called from loopback addresses without requiring authentication to support Docker health check.
+- Fixed multi-hop amplification vulnerability reported by Qifan Zhang from Palo Alto Networks, that used multiple CNAME and delegation hops achieving a 4,096:1 packet amplification factor.
+- Fixed cache poisoning vulnerability reported by Qifan Zhang from Palo Alto Networks, that allowed caching out-of-bailiwick DNAME record received from an attacker controlled zone targeting any domain name.
+- Fixed DNSSEC validation bypass vulnerability reported by Qifan Zhang from Palo Alto Networks, that allowed an attacker controlled zone to inject out-of-bailiwick DS (Delegation Signer) records in referral responses to poison the resolver cache and disable DNSSEC validation for arbitrary signed zones.
+- Fixed Denial of Service (DoS) vulnerability reported by Xuanchao Xie, that allowed an attacker to exploit DNS-over-HTTPS/3 (DoH/3) protocol service implementation to cause the DNS server to buffer large amount of data in memory causing the server to crash with Out Of Memory (OOM) error.
+- Fixed authorization bypass vulnerability reported by Tao Pan (@pant0m), that allowed using `ptr` option feature in Add Record and Update Record API calls, and Delete Record API call to add/overwrite/delete PTR record in arbitrary reverse zone that the current user did not have modify permissions to.
+- Fixed persistent Denial of Service (DoS) vulnerability affecting attacker selected victim domain name reported by Abdullah Al Ishtiaq, Kai Tu, Matthew Carter, Xiaotian Zhou, Ananna Rahman, Yilu Dong, Tianwei Yu, Ali Ranjbar, and Syed Rafiul Hussain from SyNSec Lab, The Pennsylvania State University. This vulnerability caused the attacker to add victim domain name to the background resolver task which fails to execute and requires the DNS Server to restart to recover.
+- Fixed off-path cache poisoning vulnerability reported by Lior Shafir, Ameer Saleh, Prof. Raja Giryes, and Prof. Avishai Wool from Tel-Aviv University, that allowed an attacker to inject CNAME record in cache that caused all queries for the victim domain name to get redirected to the attacker's domain name that the CNAME specified.
+- Fixed multiple stored XSS vulnerabilities reported by Yuqi Qiu and Xiang Li from AOSP Lab, Nankai University.
+- Fixed zone name validation bypass vulnerability in Clone Zone and DNS Client Import API calls reported by Yuqi Qiu and Xiang Li from AOSP Lab, Nankai University.
+- Fixed severe bug in DNS Client response sanitization function that caused Out Of Memory (OOM) exception resulting the DNS server to crash when specific types of response was received.
+- Removed Auto Prefetch feature since it was not really effective while requiring too many system resources to function. Note that basic Prefetch feature is still available.
+- Wild IP App: Updated app to add hex string support for IPv4. Thanks to Marty Cannon (@swimlane-marty) for the PR #2056.
+- Multiple other minor bug fixes and improvements.
+
 ## Version 15.4
 Release Date: 11 July 2026
 

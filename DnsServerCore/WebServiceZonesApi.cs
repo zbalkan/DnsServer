@@ -1471,7 +1471,10 @@ namespace DnsServerCore
 
                 if (filterName is not null)
                 {
-                    string pattern = filterName.Trim().Replace(".", "\\.").Replace("*", ".*").Replace("?", ".{1}");
+                    if (filterName.Length > 255)
+                        throw new DnsWebServiceException("Parameter 'filterName' length cannot exceed 255 characters.");
+
+                    string pattern = System.Text.RegularExpressions.Regex.Escape(filterName.Trim()).Replace("\\*", ".*").Replace("\\?", ".{1}");
 
                     if (filterName.Contains('*'))
                     {
@@ -1482,7 +1485,7 @@ namespace DnsServerCore
                             pattern += "$";
                     }
 
-                    filterRegex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.Compiled);
+                    filterRegex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Singleline | System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(250));
                 }
 
                 Utf8JsonWriter jsonWriter = context.GetCurrentJsonWriter();
@@ -1601,18 +1604,11 @@ namespace DnsServerCore
                         zoneName = zoneName.Trim('.');
                     }
 
-                    if (zoneName.Contains('*'))
-                        throw new DnsWebServiceException("Domain name for a zone cannot contain wildcard character.");
-
-                    foreach (char invalidChar in Path.GetInvalidFileNameChars())
-                    {
-                        if (zoneName.Contains(invalidChar))
-                            throw new DnsWebServiceException("The zone name contains an invalid character: " + invalidChar);
-                    }
-
                     if (DnsClient.IsDomainNameUnicode(zoneName))
                         zoneName = DnsClient.ConvertDomainNameToAscii(zoneName);
                 }
+
+                DnsClient.IsDomainNameValid(zoneName, true);
 
                 AuthZoneType type = request.GetQueryOrFormEnum("type", AuthZoneType.Primary);
                 string catalogZoneName = request.GetQueryOrForm("catalog", null);
@@ -3816,9 +3812,9 @@ namespace DnsServerCore
                         zoneName = DnsClient.ConvertDomainNameToAscii(zoneName);
                 }
 
-                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(string.IsNullOrEmpty(zoneName) ? domain : zoneName);
+                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(zoneName ?? domain);
                 if (zoneInfo is null)
-                    throw new DnsWebServiceException("No such zone was found: " + domain);
+                    throw new DnsWebServiceException("No such zone was found for: " + domain);
 
                 User sessionUser = _dnsWebService.GetSessionUser(context);
 
@@ -3872,6 +3868,9 @@ namespace DnsServerCore
                                     if (!createPtrZone)
                                         throw new DnsWebServiceException("No reverse zone available to add PTR record.");
 
+                                    if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, sessionUser, PermissionFlag.Modify))
+                                        throw new DnsWebServiceException("Cannot create reverse zone to add PTR record: access was denied.");
+
                                     string ptrZone = Zone.GetReverseZone(ipAddress, type == DnsResourceRecordType.A ? 24 : 64);
 
                                     reverseZoneInfo = _dnsWebService._dnsServer.AuthZoneManager.CreatePrimaryZone(ptrZone);
@@ -3883,6 +3882,11 @@ namespace DnsServerCore
                                     _dnsWebService._authManager.SetPermission(PermissionSection.Zones, reverseZoneInfo.Name, _dnsWebService._authManager.GetGroup(Group.ADMINISTRATORS), PermissionFlag.ViewModifyDelete);
                                     _dnsWebService._authManager.SetPermission(PermissionSection.Zones, reverseZoneInfo.Name, _dnsWebService._authManager.GetGroup(Group.DNS_ADMINISTRATORS), PermissionFlag.ViewModifyDelete);
                                     _dnsWebService._authManager.SaveConfigFile();
+                                }
+                                else
+                                {
+                                    if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, reverseZoneInfo.Name, sessionUser, PermissionFlag.Modify))
+                                        throw new DnsWebServiceException("Cannot update reverse zone to add PTR record: access was denied.");
                                 }
 
                                 if ((reverseZoneInfo.Type != AuthZoneType.Primary) && (reverseZoneInfo.Type != AuthZoneType.Forwarder))
@@ -4269,9 +4273,9 @@ namespace DnsServerCore
                         zoneName = DnsClient.ConvertDomainNameToAscii(zoneName);
                 }
 
-                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(string.IsNullOrEmpty(zoneName) ? domain : zoneName);
+                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(zoneName ?? domain);
                 if (zoneInfo is null)
-                    throw new DnsWebServiceException("No such zone was found: " + domain);
+                    throw new DnsWebServiceException("No such zone was found for: " + domain);
 
                 User sessionUser = _dnsWebService.GetSessionUser(context);
 
@@ -4313,9 +4317,9 @@ namespace DnsServerCore
                         zoneName = DnsClient.ConvertDomainNameToAscii(zoneName);
                 }
 
-                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(string.IsNullOrEmpty(zoneName) ? domain : zoneName);
+                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(zoneName ?? domain);
                 if (zoneInfo is null)
-                    throw new DnsWebServiceException("No such zone was found: " + domain);
+                    throw new DnsWebServiceException("No such zone was found for: " + domain);
 
                 User sessionUser = _dnsWebService.GetSessionUser(context);
 
@@ -4352,9 +4356,12 @@ namespace DnsServerCore
                                     {
                                         if ((ptrRecord.RDATA as DnsPTRRecordData).Domain.Equals(domain, StringComparison.OrdinalIgnoreCase))
                                         {
-                                            //delete PTR record and save reverse zone
-                                            _dnsWebService._dnsServer.AuthZoneManager.DeleteRecord(reverseZoneInfo.Name, ptrDomain, DnsResourceRecordType.PTR, ptrRecord.RDATA);
-                                            _dnsWebService._dnsServer.AuthZoneManager.SaveZoneFile(reverseZoneInfo.Name);
+                                            if (_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, reverseZoneInfo.Name, sessionUser, PermissionFlag.Delete))
+                                            {
+                                                //delete PTR record and save reverse zone
+                                                _dnsWebService._dnsServer.AuthZoneManager.DeleteRecord(reverseZoneInfo.Name, ptrDomain, DnsResourceRecordType.PTR, ptrRecord.RDATA);
+                                                _dnsWebService._dnsServer.AuthZoneManager.SaveZoneFile(reverseZoneInfo.Name);
+                                            }
                                             break;
                                         }
                                     }
@@ -4621,9 +4628,9 @@ namespace DnsServerCore
                         zoneName = DnsClient.ConvertDomainNameToAscii(zoneName);
                 }
 
-                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(string.IsNullOrEmpty(zoneName) ? domain : zoneName);
+                AuthZoneInfo zoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(zoneName ?? domain);
                 if (zoneInfo is null)
-                    throw new DnsWebServiceException("No such zone was found: " + domain);
+                    throw new DnsWebServiceException("No such zone was found for: " + domain);
 
                 User sessionUser = _dnsWebService.GetSessionUser(context);
 
@@ -4680,6 +4687,9 @@ namespace DnsServerCore
                                     if (!createPtrZone)
                                         throw new DnsWebServiceException("No reverse zone available to add PTR record.");
 
+                                    if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, sessionUser, PermissionFlag.Modify))
+                                        throw new DnsWebServiceException("Cannot create reverse zone to add PTR record: access was denied.");
+
                                     string ptrZone = Zone.GetReverseZone(newIpAddress, type == DnsResourceRecordType.A ? 24 : 64);
 
                                     newReverseZoneInfo = _dnsWebService._dnsServer.AuthZoneManager.CreatePrimaryZone(ptrZone);
@@ -4692,6 +4702,11 @@ namespace DnsServerCore
                                     _dnsWebService._authManager.SetPermission(PermissionSection.Zones, newReverseZoneInfo.Name, _dnsWebService._authManager.GetGroup(Group.DNS_ADMINISTRATORS), PermissionFlag.ViewModifyDelete);
                                     _dnsWebService._authManager.SaveConfigFile();
                                 }
+                                else
+                                {
+                                    if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, newReverseZoneInfo.Name, sessionUser, PermissionFlag.Modify))
+                                        throw new DnsWebServiceException("Cannot update reverse zone to add PTR record: access was denied.");
+                                }
 
                                 if ((newReverseZoneInfo.Type != AuthZoneType.Primary) && (newReverseZoneInfo.Type != AuthZoneType.Forwarder))
                                     throw new DnsWebServiceException("Reverse zone '" + newReverseZoneInfo.DisplayName + "' is not a primary or forwarder zone.");
@@ -4701,6 +4716,9 @@ namespace DnsServerCore
                                 AuthZoneInfo oldReverseZoneInfo = _dnsWebService._dnsServer.AuthZoneManager.FindAuthZoneInfo(oldPtrDomain);
                                 if ((oldReverseZoneInfo is not null) && ((oldReverseZoneInfo.Type == AuthZoneType.Primary) || (oldReverseZoneInfo.Type == AuthZoneType.Forwarder)))
                                 {
+                                    if (!_dnsWebService._authManager.IsPermitted(PermissionSection.Zones, oldReverseZoneInfo.Name, sessionUser, PermissionFlag.Delete))
+                                        throw new DnsWebServiceException("Cannot update reverse zone to delete existing PTR record: access was denied.");
+
                                     //delete old PTR record if any and save old reverse zone
                                     _dnsWebService._dnsServer.AuthZoneManager.DeleteRecords(oldReverseZoneInfo.Name, oldPtrDomain, DnsResourceRecordType.PTR);
                                     _dnsWebService._dnsServer.AuthZoneManager.SaveZoneFile(oldReverseZoneInfo.Name);
