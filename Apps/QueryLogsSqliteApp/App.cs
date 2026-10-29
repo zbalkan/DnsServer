@@ -457,7 +457,7 @@ CREATE TABLE IF NOT EXISTS dns_logs
                         await command.ExecuteNonQueryAsync();
                     }
                 }
-                catch
+                catch (SqliteException ex) when (ex.SqliteErrorCode == 1 && ex.Message.Contains("duplicate column name", StringComparison.OrdinalIgnoreCase))
                 { }
 
                 await using (SqliteCommand command = connection.CreateCommand())

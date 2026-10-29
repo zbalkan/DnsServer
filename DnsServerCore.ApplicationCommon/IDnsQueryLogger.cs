@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Runtime.CompilerServices;
 using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
@@ -30,7 +32,7 @@ namespace DnsServerCore.ApplicationCommon
     {
         public DnsQueryLogMetadata(IReadOnlyDictionary<string, string>? values = null)
         {
-            Values = values is null ? new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase) : new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase);
+            Values = new ReadOnlyDictionary<string, string>(values is null ? new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase) : new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase));
         }
 
         /// <summary>
@@ -89,30 +91,23 @@ namespace DnsServerCore.ApplicationCommon
         }
     }
 
-    public sealed class DnsServerResponseMetadata
-    {
-        public DnsServerResponseMetadata(DnsServerResponseType responseType, DnsQueryLogMetadata? logMetadata = null)
-        {
-            ResponseType = responseType;
-            LogMetadata = logMetadata;
-        }
-
-        public DnsServerResponseType ResponseType { get; }
-        public DnsQueryLogMetadata? LogMetadata { get; }
-    }
-
     public static class DnsServerResponseTag
     {
+        // Associate metadata with the boxed enum instance, not the datagram itself. This keeps the
+        // historical Tag runtime type intact and preserves metadata when DNS Apps copy response.Tag.
+        private static readonly ConditionalWeakTable<object, DnsQueryLogMetadata> _metadataByTag = new();
         /// <summary>
-        /// Creates the value to be stored in <see cref="DnsDatagram.Tag"/>. When no log metadata is available, a plain
-        /// <see cref="DnsServerResponseType"/> is returned so that DNS Apps which read the tag directly keep working.
+        /// Returns a boxed <see cref="DnsServerResponseType"/> while associating optional metadata
+        /// with the same tag object. Existing DNS Apps can safely cast the Tag to the enum.
         /// </summary>
         public static object CreateTag(DnsServerResponseType responseType, DnsQueryLogMetadata? logMetadata)
         {
-            if ((logMetadata is null) || (logMetadata.Values.Count < 1))
-                return responseType;
+            object tag = responseType;
 
-            return new DnsServerResponseMetadata(responseType, logMetadata);
+            if ((logMetadata is not null) && (logMetadata.Values.Count > 0))
+                _metadataByTag.Add(tag, logMetadata);
+
+            return tag;
         }
 
         public static DnsServerResponseType GetResponseType(object? tag)
@@ -123,18 +118,15 @@ namespace DnsServerCore.ApplicationCommon
             if (tag is DnsServerResponseType responseType)
                 return responseType;
 
-            if (tag is DnsServerResponseMetadata responseMetadata)
-                return responseMetadata.ResponseType;
-
             return DnsServerResponseType.Recursive;
         }
 
         public static DnsQueryLogMetadata? GetLogMetadata(object? tag)
         {
-            if (tag is DnsServerResponseMetadata responseMetadata)
-                return responseMetadata.LogMetadata;
+            if (tag is null)
+                return null;
 
-            return null;
+            return _metadataByTag.TryGetValue(tag, out DnsQueryLogMetadata? metadata) ? metadata : null;
         }
     }
 

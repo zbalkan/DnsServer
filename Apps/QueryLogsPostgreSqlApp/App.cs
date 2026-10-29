@@ -36,7 +36,7 @@ using TechnitiumLibrary.Net.Dns.ResourceRecords;
 
 namespace QueryLogsPostgreSql
 {
-    public sealed class App : IDnsApplication, IDnsQueryLogger, IDnsQueryLogs
+    public sealed class App : IDnsApplication, IDnsQueryLoggerEx, IDnsQueryLogs
     {
         #region variables
 
@@ -236,14 +236,14 @@ namespace QueryLogsPostgreSql
                     await using (NpgsqlCommand command = connection.CreateCommand())
                     {
                         sb.Length = 0;
-                        sb.Append("INSERT INTO dns_logs (server, timestamp, client_ip, protocol, response_type, response_rtt, rcode, qname, qtype, qclass, answer) VALUES ");
+                        sb.Append("INSERT INTO dns_logs (server, timestamp, client_ip, protocol, response_type, response_rtt, rcode, qname, qtype, qclass, answer, blocking_metadata) VALUES ");
 
                         for (int i = 0; i < logs.Count; i++)
                         {
                             if (i == 0)
-                                sb.Append($"(@server{i}, @timestamp{i}, @client_ip{i}, @protocol{i}, @response_type{i}, @response_rtt{i}, @rcode{i}, @qname{i}, @qtype{i}, @qclass{i}, @answer{i})");
+                                sb.Append($"(@server{i}, @timestamp{i}, @client_ip{i}, @protocol{i}, @response_type{i}, @response_rtt{i}, @rcode{i}, @qname{i}, @qtype{i}, @qclass{i}, @answer{i}, @blocking_metadata{i})");
                             else
-                                sb.Append($", (@server{i}, @timestamp{i}, @client_ip{i}, @protocol{i}, @response_type{i}, @response_rtt{i}, @rcode{i}, @qname{i}, @qtype{i}, @qclass{i}, @answer{i})");
+                                sb.Append($", (@server{i}, @timestamp{i}, @client_ip{i}, @protocol{i}, @response_type{i}, @response_rtt{i}, @rcode{i}, @qname{i}, @qtype{i}, @qclass{i}, @answer{i}, @blocking_metadata{i})");
                         }
 
                         command.CommandText = sb.ToString();
@@ -263,6 +263,7 @@ namespace QueryLogsPostgreSql
                             NpgsqlParameter paramQtype = command.Parameters.Add("@qtype" + i, NpgsqlDbType.Integer);
                             NpgsqlParameter paramQclass = command.Parameters.Add("@qclass" + i, NpgsqlDbType.Smallint);
                             NpgsqlParameter paramAnswer = command.Parameters.Add("@answer" + i, NpgsqlDbType.Varchar);
+                            NpgsqlParameter paramBlockingMetadata = command.Parameters.Add("@blocking_metadata" + i, NpgsqlDbType.Jsonb);
 
                             paramServer.Value = _dnsServer?.ServerDomain;
                             paramTimestamp.Value = log.Timestamp;
@@ -323,6 +324,8 @@ namespace QueryLogsPostgreSql
 
                                 paramAnswer.Value = answer?.Replace("\0", "");
                             }
+
+                            paramBlockingMetadata.Value = log.Metadata is null ? DBNull.Value : JsonSerializer.Serialize(log.Metadata.Values);
                         }
 
                         await command.ExecuteNonQueryAsync();
@@ -393,10 +396,17 @@ CREATE TABLE IF NOT EXISTS dns_logs
     qname VARCHAR(255),
     qtype INTEGER,
     qclass SMALLINT,
-    answer VARCHAR(4000)
+    answer VARCHAR(4000),
+    blocking_metadata JSONB
 );
 ";
 
+                                await command.ExecuteNonQueryAsync();
+                            }
+
+                            await using (NpgsqlCommand command = connection.CreateCommand())
+                            {
+                                command.CommandText = "ALTER TABLE dns_logs ADD COLUMN IF NOT EXISTS blocking_metadata JSONB;";
                                 await command.ExecuteNonQueryAsync();
                             }
 
@@ -676,8 +686,13 @@ CREATE TABLE IF NOT EXISTS dns_logs
 
         public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response)
         {
+            return InsertLogAsync(timestamp, request, remoteEP, protocol, response, null);
+        }
+
+        public Task InsertLogAsync(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata)
+        {
             if (_enableLogging)
-                _channelWriter?.TryWrite(new LogEntry(timestamp, request, remoteEP, protocol, response));
+                _channelWriter?.TryWrite(new LogEntry(timestamp, request, remoteEP, protocol, response, metadata));
 
             return Task.CompletedTask;
         }
@@ -892,18 +907,20 @@ LIMIT @limit OFFSET @offset";
             public readonly IPEndPoint RemoteEP;
             public readonly DnsTransportProtocol Protocol;
             public readonly DnsDatagram Response;
+            public readonly DnsQueryLogMetadata? Metadata;
 
             #endregion
 
             #region constructor
 
-            public LogEntry(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response)
+            public LogEntry(DateTime timestamp, DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, DnsQueryLogMetadata? metadata = null)
             {
                 Timestamp = timestamp;
                 Request = request;
                 RemoteEP = remoteEP;
                 Protocol = protocol;
                 Response = response;
+                Metadata = metadata ?? DnsServerResponseTag.GetLogMetadata(response.Tag);
             }
 
             #endregion

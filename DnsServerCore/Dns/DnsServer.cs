@@ -1224,7 +1224,7 @@ namespace DnsServerCore.Dns
                 _statsManager.MaxStatFileDays = maxStatFileDays;
 
             //log extended query metadata for DNS Apps
-            //this optional field is appended after the last field of the config version 3 layout and is read only when
+            //this optional field is appended after the last field of the config version 5 layout and is read only when
             //available so that the config version does not need to be incremented. this keeps the config file readable
             //by older versions which simply ignore the trailing byte.
             //note: ReadByte() returns -1 when there is no data left; the stream may not be seekable during config transfer.
@@ -4688,7 +4688,7 @@ namespace DnsServerCore.Dns
                         string blockedDomain = GetBlockedDomain();
                         DnsQueryLogMetadata logMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase) { ["source"] = "blocked-zone", ["domain"] = blockedDomain });
 
-                        IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData(logMetadata.ToReportString()))];
+                        IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData("source=blocked-zone; domain=" + blockedDomain))];
 
                         return new BlockedQueryResult(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = DnsServerResponseTag.CreateTag(DnsServerResponseType.Blocked, _logQueryMetadata ? logMetadata : null) });
                     }
@@ -4700,7 +4700,7 @@ namespace DnsServerCore.Dns
 
                         if (_allowTxtBlockingReport && (request.EDNS is not null))
                         {
-                            options = [new EDnsOption(EDnsOptionCode.EXTENDED_DNS_ERROR, new EDnsExtendedDnsErrorOptionData(EDnsExtendedDnsErrorCode.Blocked, logMetadata.ToReportString()))];
+                            options = [new EDnsOption(EDnsOptionCode.EXTENDED_DNS_ERROR, new EDnsExtendedDnsErrorOptionData(EDnsExtendedDnsErrorCode.Blocked, "source=blocked-zone; domain=" + blockedDomain))];
                         }
 
                         IReadOnlyCollection<DnsARecordData> aRecords;

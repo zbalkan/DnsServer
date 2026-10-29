@@ -886,16 +886,9 @@ namespace DnsServerCore.Dns.ZoneManagers
             {
                 metadataValues["blockListUrl"] = blockLists[0].AbsoluteUri;
                 metadataValues["blockListCount"] = blockLists.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
-            }
 
-            DnsQueryLogMetadata CreateLogMetadata(Uri? blockList = null)
-            {
-                Dictionary<string, string> values = new Dictionary<string, string>(metadataValues, StringComparer.OrdinalIgnoreCase);
-
-                if (blockList is not null)
-                    values["blockListUrl"] = blockList.AbsoluteUri;
-
-                return new DnsQueryLogMetadata(values);
+                if (blockLists.Count > 1)
+                    metadataValues["blockListUrls"] = System.Text.Json.JsonSerializer.Serialize(blockLists);
             }
 
             DnsQueryLogMetadata responseLogMetadata = new DnsQueryLogMetadata(metadataValues);
@@ -909,7 +902,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                 DnsResourceRecord[] answer = new DnsResourceRecord[blockLists.Count];
 
                 for (int i = 0; i < answer.Length; i++)
-                    answer[i] = new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _dnsServer.BlockingAnswerTtl, new DnsTXTRecordData(CreateLogMetadata(blockLists[i]).ToReportString()));
+                    answer[i] = new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _dnsServer.BlockingAnswerTtl, new DnsTXTRecordData("source=block-list-zone; blockListUrl=" + blockLists[i].AbsoluteUri + "; domain=" + blockedDomain));
 
                 return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = responseTag };
             }
@@ -922,7 +915,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                     options = new EDnsOption[blockLists.Count];
 
                     for (int i = 0; i < options.Length; i++)
-                        options[i] = new EDnsOption(EDnsOptionCode.EXTENDED_DNS_ERROR, new EDnsExtendedDnsErrorOptionData(EDnsExtendedDnsErrorCode.Blocked, CreateLogMetadata(blockLists[i]).ToReportString()));
+                        options[i] = new EDnsOption(EDnsOptionCode.EXTENDED_DNS_ERROR, new EDnsExtendedDnsErrorOptionData(EDnsExtendedDnsErrorCode.Blocked, "source=block-list-zone; blockListUrl=" + blockLists[i].AbsoluteUri + "; domain=" + blockedDomain));
                 }
 
                 IReadOnlyCollection<DnsARecordData> aRecords;

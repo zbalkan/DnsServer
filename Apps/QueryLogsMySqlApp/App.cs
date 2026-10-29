@@ -455,7 +455,7 @@ CREATE TABLE IF NOT EXISTS dns_logs
                                 {
                                     await command.ExecuteNonQueryAsync();
                                 }
-                                catch
+                                catch (MySqlException ex) when (ex.Number == 1060) //duplicate column
                                 { }
                             }
 

@@ -620,7 +620,7 @@ namespace AdvancedBlocking
                 };
 
                 if (blockListUrl?.Uri is not null)
-                    values["blockListUrl"] = blockListUrl.Uri.AbsoluteUri;
+                    values[blockedRegex is null ? "blockListUrl" : "regexBlockListUrl"] = blockListUrl.Uri.AbsoluteUri;
 
                 if (blockedRegex is null)
                     values["domain"] = blockedDomain ?? question.Name;
@@ -631,7 +631,7 @@ namespace AdvancedBlocking
             }
 
             DnsQueryLogMetadata logMetadata = GetLogMetadata();
-            DnsServerResponseMetadata responseMetadata = new DnsServerResponseMetadata(DnsServerResponseType.Blocked, logMetadata);
+            object responseMetadata = DnsServerResponseTag.CreateTag(DnsServerResponseType.Blocked, logMetadata);
 
             if (group.AllowTxtBlockingReport && (question.Type == DnsResourceRecordType.TXT))
             {
