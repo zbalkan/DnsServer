@@ -42,7 +42,7 @@ namespace LogExporter
             // Extract client information
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
-            ResponseType = response.Tag is null ? DnsServerResponseType.Recursive : (DnsServerResponseType)response.Tag;
+            ResponseType = response.Tag == null ? DnsServerResponseType.Recursive : (DnsServerResponseType)response.Tag;
             BlockingMetadata = metadata?.Values;
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
@@ -87,6 +87,7 @@ namespace LogExporter
             foreach (EDnsOption extendedErrorLog in response.EDNS.Options.Where(o => o.Code == EDnsOptionCode.EXTENDED_DNS_ERROR))
             {
                 string[] extractedData = extendedErrorLog.Data.ToString().Replace("[", string.Empty).Replace("]", string.Empty).Split(":", StringSplitOptions.TrimEntries);
+
                 EDNS.Add(new EDNSLog
                 {
                     ErrType = extractedData[0],
