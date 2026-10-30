@@ -4658,20 +4658,23 @@ namespace DnsServerCore.Dns
                             return question.Name;
                     }
 
-                    if (logContext is not null)
+                    void CaptureBlockingMetadata(string domain)
                     {
-                        string domain = GetBlockedDomain();
-                        logContext.BlockingMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase)
+                        if (logContext is not null)
                         {
-                            ["source"] = "blocked-zone",
-                            ["domain"] = domain
-                        });
+                            logContext.BlockingMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase)
+                            {
+                                ["source"] = "blocked-zone",
+                                ["domain"] = domain
+                            });
+                        }
                     }
 
                     if (_allowTxtBlockingReport && (question.Type == DnsResourceRecordType.TXT))
                     {
                         //return meta data
                         string blockedDomain = GetBlockedDomain();
+                        CaptureBlockingMetadata(blockedDomain);
 
                         IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData("source=blocked-zone; domain=" + blockedDomain))];
 
@@ -4679,12 +4682,21 @@ namespace DnsServerCore.Dns
                     }
                     else
                     {
-                        string blockedDomain = GetBlockedDomain();
+                        string blockedDomain = null;
                         EDnsOption[] options = null;
 
                         if (_allowTxtBlockingReport && (request.EDNS is not null))
                         {
+                            blockedDomain = GetBlockedDomain();
                             options = [new EDnsOption(EDnsOptionCode.EXTENDED_DNS_ERROR, new EDnsExtendedDnsErrorOptionData(EDnsExtendedDnsErrorCode.Blocked, "source=blocked-zone; domain=" + blockedDomain))];
+                        }
+
+                        if (logContext is not null)
+                        {
+                            if (blockedDomain is null)
+                                blockedDomain = GetBlockedDomain();
+
+                            CaptureBlockingMetadata(blockedDomain);
                         }
 
                         IReadOnlyCollection<DnsARecordData> aRecords;
@@ -4781,6 +4793,7 @@ namespace DnsServerCore.Dns
                     {
                         if (appBlockedResponse.Tag is null)
                             appBlockedResponse.Tag = DnsServerResponseType.Blocked;
+
                         return appBlockedResponse;
                     }
                 }
@@ -4861,10 +4874,7 @@ namespace DnsServerCore.Dns
                             answer.AddRange(blockedResponse.Answer);
 
                             //include blocked response additional section to pass on Extended DNS Errors
-                            return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, true, true, false, false, blockedResponse.RCODE, request.Question, answer, blockedResponse.Authority, blockedResponse.Additional)
-                            {
-                                Tag = blockedResponse.Tag
-                            };
+                            return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, true, true, false, false, blockedResponse.RCODE, request.Question, answer, blockedResponse.Authority, blockedResponse.Additional) { Tag = blockedResponse.Tag };
                         }
                     }
                 }
