@@ -163,7 +163,7 @@ namespace DnsServerCore.Dns
                             continue; //skip dropped requests for apps to prevent DoS
 
                         bool logQueryMetadata = _dnsServer.LogQueryMetadata;
-                        DnsQueryLogMetadata logMetadata = logQueryMetadata ? DnsServerResponseTag.GetLogMetadata(item._response.Tag) : null;
+                        DnsQueryLogMetadata logMetadata = logQueryMetadata && (responseType == DnsServerResponseType.Blocked) ? item._blockingMetadata : null;
 
                         foreach (IDnsQueryLogger logger in _dnsServer.DnsApplicationManager.DnsQueryLoggers)
                         {
@@ -659,9 +659,9 @@ namespace DnsServerCore.Dns
             Flush();
         }
 
-        public void QueueUpdate(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, bool rateLimited)
+        public void QueueUpdate(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, bool rateLimited, DnsQueryLogMetadata blockingMetadata = null)
         {
-            _channelWriter.TryWrite(new StatsQueueItem(request, remoteEP, protocol, response, rateLimited));
+            _channelWriter.TryWrite(new StatsQueueItem(request, remoteEP, protocol, response, rateLimited, blockingMetadata));
         }
 
         public DashboardStats GetLastHourMinuteWiseStats(bool utcFormat)
@@ -2768,12 +2768,13 @@ namespace DnsServerCore.Dns
             public readonly DnsTransportProtocol _protocol;
             public readonly DnsDatagram _response;
             public readonly bool _rateLimited;
+            public readonly DnsQueryLogMetadata _blockingMetadata;
 
             #endregion
 
             #region constructor
 
-            public StatsQueueItem(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, bool rateLimited)
+            public StatsQueueItem(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram response, bool rateLimited, DnsQueryLogMetadata blockingMetadata)
             {
                 _timestamp = DateTime.UtcNow;
 
@@ -2782,6 +2783,7 @@ namespace DnsServerCore.Dns
                 _protocol = protocol;
                 _response = response;
                 _rateLimited = rateLimited;
+                _blockingMetadata = blockingMetadata;
             }
 
             #endregion

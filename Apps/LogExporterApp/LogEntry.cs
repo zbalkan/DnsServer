@@ -34,7 +34,7 @@ namespace LogExporter
 {
     public class LogEntry
     {
-        public LogEntry(DateTime timestamp, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response, bool ednsLogging = false, DnsQueryLogMetadata? metadata = null)
+        public LogEntry(DateTime timestamp, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response, bool ednsLogging = false, DnsQueryLogMetadata? metadata = null, IReadOnlyDictionary<string, string>? labels = null)
         {
             // Assign timestamp and ensure it's in UTC
             Timestamp = timestamp.Kind == DateTimeKind.Utc ? timestamp : timestamp.ToUniversalTime();
@@ -43,8 +43,8 @@ namespace LogExporter
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
             ResponseType = DnsServerResponseTag.GetResponseType(response.Tag);
-            DnsQueryLogMetadata? logMetadata = metadata ?? DnsServerResponseTag.GetLogMetadata(response.Tag);
-            BlockingMetadata = logMetadata?.Values;
+            BlockingMetadata = metadata?.Values;
+            Labels = labels;
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
                 ResponseRtt = response.Metadata.RoundTripTime;
@@ -108,6 +108,7 @@ namespace LogExporter
         public List<DnsResourceRecord> Answers { get; private set; }
         public string ClientIp { get; private set; }
         public IReadOnlyDictionary<string, string>? BlockingMetadata { get; private set; }
+        public IReadOnlyDictionary<string, string>? Labels { get; private set; }
         public List<EDNSLog> EDNS { get; private set; }
         public DnsTransportProtocol Protocol { get; private set; }
         public DnsQuestion? Question { get; private set; }

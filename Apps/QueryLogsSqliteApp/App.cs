@@ -817,7 +817,7 @@ LIMIT @limit OFFSET @offset";
                 RemoteEP = remoteEP;
                 Protocol = protocol;
                 Response = response;
-                Metadata = metadata ?? DnsServerResponseTag.GetLogMetadata(response.Tag);
+                Metadata = metadata;
             }
 
             #endregion

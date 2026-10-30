@@ -44,4 +44,13 @@ namespace DnsServerCore.ApplicationCommon
         /// <returns>The blocked DNS response for the DNS request or <c>null</c> to let the DNS server core process the request as usual.</returns>
         Task<DnsDatagram?> ProcessRequestAsync(DnsDatagram request, IPEndPoint remoteEP);
     }
+    /// <summary>
+    /// Optional extension for blocking apps that can provide server-side query log metadata.
+    /// Existing IDnsRequestBlockingHandler implementations remain supported.
+    /// </summary>
+    public interface IDnsRequestBlockingHandlerEx : IDnsRequestBlockingHandler
+    {
+        Task<DnsDatagram?> ProcessRequestAsync(DnsDatagram request, IPEndPoint remoteEP, DnsQueryLogContext logContext);
+    }
+
 }

@@ -2028,6 +2028,7 @@ namespace DnsServerCore.Dns
             {
                 bool recursionAllowed = IsRecursionAllowed(remoteEP.Address);
                 DnsDatagram response;
+                DnsQueryLogContext logContext = _logQueryMetadata ? new DnsQueryLogContext() : null;
 
                 if (sendTruncationResponse)
                 {
@@ -2035,7 +2036,7 @@ namespace DnsServerCore.Dns
                 }
                 else
                 {
-                    response = await ProcessRequestAsync(request, remoteEP, protocol, recursionAllowed);
+                    response = await ProcessRequestAsync(request, remoteEP, protocol, recursionAllowed, logContext);
                     if (response is null)
                     {
                         _statsManager.QueueUpdate(null, remoteEP, protocol, null, false);
@@ -2111,7 +2112,7 @@ namespace DnsServerCore.Dns
                 }
 
                 _queryLog?.Write(remoteEP, protocol, request, response);
-                _statsManager.QueueUpdate(request, remoteEP, protocol, response, false);
+                _statsManager.QueueUpdate(request, remoteEP, protocol, response, false, logContext?.BlockingMetadata);
             }
             catch (ObjectDisposedException)
             {
@@ -2332,9 +2333,10 @@ namespace DnsServerCore.Dns
 
         private async Task ProcessStreamRequestAsync(Stream stream, MemoryStream writeBuffer, SemaphoreSlim writeSemaphore, IPEndPoint remoteEP, DnsDatagram request, DnsTransportProtocol protocol)
         {
+            DnsQueryLogContext logContext = _logQueryMetadata ? new DnsQueryLogContext() : null;
             try
             {
-                DnsDatagram response = await ProcessRequestAsync(request, remoteEP, protocol, IsRecursionAllowed(remoteEP.Address));
+                DnsDatagram response = await ProcessRequestAsync(request, remoteEP, protocol, IsRecursionAllowed(remoteEP.Address), logContext);
                 if (response is null)
                 {
                     await stream.DisposeAsync();
@@ -2360,7 +2362,7 @@ namespace DnsServerCore.Dns
                 }, _tcpSendTimeout);
 
                 _queryLog?.Write(remoteEP, protocol, request, response);
-                _statsManager.QueueUpdate(request, remoteEP, protocol, response, false);
+                _statsManager.QueueUpdate(request, remoteEP, protocol, response, false, logContext?.BlockingMetadata);
             }
             catch (ObjectDisposedException)
             {
@@ -2503,7 +2505,8 @@ namespace DnsServerCore.Dns
                 }
 
                 //process request async
-                DnsDatagram response = await ProcessRequestAsync(request, remoteEP, DnsTransportProtocol.Quic, IsRecursionAllowed(remoteEP.Address));
+                DnsQueryLogContext logContext = _logQueryMetadata ? new DnsQueryLogContext() : null;
+                DnsDatagram response = await ProcessRequestAsync(request, remoteEP, DnsTransportProtocol.Quic, IsRecursionAllowed(remoteEP.Address), logContext);
                 if (response is null)
                 {
                     _statsManager.QueueUpdate(null, remoteEP, DnsTransportProtocol.Quic, null, false);
@@ -2514,7 +2517,7 @@ namespace DnsServerCore.Dns
                 await response.WriteToTcpAsync(quicStream, sharedBuffer);
 
                 _queryLog?.Write(remoteEP, DnsTransportProtocol.Quic, request, response);
-                _statsManager.QueueUpdate(request, remoteEP, DnsTransportProtocol.Quic, response, false);
+                _statsManager.QueueUpdate(request, remoteEP, DnsTransportProtocol.Quic, response, false, logContext?.BlockingMetadata);
             }
             catch (IOException)
             {
@@ -2700,7 +2703,8 @@ namespace DnsServerCore.Dns
                         throw new InvalidOperationException();
                 }
 
-                DnsDatagram dnsResponse = await ProcessRequestAsync(dnsRequest, remoteEP, DnsTransportProtocol.Https, IsRecursionAllowed(remoteEP.Address));
+                DnsQueryLogContext logContext = _logQueryMetadata ? new DnsQueryLogContext() : null;
+                DnsDatagram dnsResponse = await ProcessRequestAsync(dnsRequest, remoteEP, DnsTransportProtocol.Https, IsRecursionAllowed(remoteEP.Address), logContext);
                 if (dnsResponse is null)
                 {
                     //drop request
@@ -2736,7 +2740,7 @@ namespace DnsServerCore.Dns
                 }
 
                 _queryLog?.Write(remoteEP, DnsTransportProtocol.Https, dnsRequest, dnsResponse);
-                _statsManager.QueueUpdate(dnsRequest, remoteEP, DnsTransportProtocol.Https, dnsResponse, false);
+                _statsManager.QueueUpdate(dnsRequest, remoteEP, DnsTransportProtocol.Https, dnsResponse, false, logContext?.BlockingMetadata);
             }
             catch (IOException)
             {
@@ -2777,7 +2781,7 @@ namespace DnsServerCore.Dns
             }
         }
 
-        private async Task<DnsDatagram> ProcessRequestAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, bool isRecursionAllowed)
+        private async Task<DnsDatagram> ProcessRequestAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, bool isRecursionAllowed, DnsQueryLogContext logContext = null)
         {
             foreach (IDnsRequestController requestController in _dnsApplicationManager.DnsRequestControllers)
             {
@@ -2826,7 +2830,7 @@ namespace DnsServerCore.Dns
                     return errorResponse;
                 }
 
-                DnsDatagram unsignedResponse = await ProcessQueryAsync(unsignedRequest, remoteEP, protocol, isRecursionAllowed, false, _clientTimeout, request.TsigKeyName);
+                DnsDatagram unsignedResponse = await ProcessQueryAsync(unsignedRequest, remoteEP, protocol, isRecursionAllowed, false, _clientTimeout, request.TsigKeyName, logContext);
                 if (unsignedResponse is null)
                     return null;
 
@@ -2843,7 +2847,7 @@ namespace DnsServerCore.Dns
                     return new DnsDatagram(request.Identifier, true, request.OPCODE, false, false, request.RecursionDesired, isRecursionAllowed, false, request.CheckingDisabled, DnsResponseCode.BADVERS, request.Question, null, null, null, _udpPayloadSize, _dnssecValidation && request.DnssecOk ? EDnsHeaderFlags.DNSSEC_OK : EDnsHeaderFlags.None) { Tag = DnsServerResponseType.Authoritative };
             }
 
-            DnsDatagram response = await ProcessQueryAsync(request, remoteEP, protocol, isRecursionAllowed, false, _clientTimeout, null);
+            DnsDatagram response = await ProcessQueryAsync(request, remoteEP, protocol, isRecursionAllowed, false, _clientTimeout, null, logContext);
             if (response is null)
                 return null;
 
@@ -2899,7 +2903,7 @@ namespace DnsServerCore.Dns
             return response.Clone(null, null, newAdditional);
         }
 
-        private async Task<DnsDatagram> ProcessQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, bool isRecursionAllowed, bool skipDnsAppAuthoritativeRequestHandlers, int clientTimeout, string tsigAuthenticatedKeyName)
+        private async Task<DnsDatagram> ProcessQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, bool isRecursionAllowed, bool skipDnsAppAuthoritativeRequestHandlers, int clientTimeout, string tsigAuthenticatedKeyName, DnsQueryLogContext logContext = null)
         {
             if (request.IsResponse)
                 return null; //drop response datagram to avoid loops in rare scenarios
@@ -2942,7 +2946,7 @@ namespace DnsServerCore.Dns
                         }
 
                         //query authoritative zone
-                        DnsDatagram response = await ProcessAuthoritativeQueryAsync(request, remoteEP, protocol, isRecursionAllowed, skipDnsAppAuthoritativeRequestHandlers);
+                        DnsDatagram response = await ProcessAuthoritativeQueryAsync(request, remoteEP, protocol, isRecursionAllowed, skipDnsAppAuthoritativeRequestHandlers, logContext);
                         if (response is not null)
                         {
                             if ((question.Type == DnsResourceRecordType.ANY) && (protocol == DnsTransportProtocol.Udp)) //force TCP for ANY request
@@ -2958,7 +2962,7 @@ namespace DnsServerCore.Dns
                         if ((question.Type == DnsResourceRecordType.ANY) && (protocol == DnsTransportProtocol.Udp)) //force TCP for ANY request
                             return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, true, request.RecursionDesired, isRecursionAllowed, false, request.CheckingDisabled, DnsResponseCode.NoError, request.Question, null, null, null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, _dnssecValidation && request.DnssecOk ? EDnsHeaderFlags.DNSSEC_OK : EDnsHeaderFlags.None) { Tag = DnsServerResponseType.Authoritative };
 
-                        return await ProcessRecursiveQueryAsync(request, remoteEP, protocol, null, _dnssecValidation, skipDnsAppAuthoritativeRequestHandlers, clientTimeout);
+                        return await ProcessRecursiveQueryAsync(request, remoteEP, protocol, null, _dnssecValidation, skipDnsAppAuthoritativeRequestHandlers, clientTimeout, logContext);
                     }
                     catch (InvalidDomainNameException)
                     {
@@ -3846,7 +3850,7 @@ namespace DnsServerCore.Dns
             return xfrResponse;
         }
 
-        private async Task<DnsDatagram> ProcessAuthoritativeQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, bool isRecursionAllowed, bool skipDnsAppAuthoritativeRequestHandlers)
+        private async Task<DnsDatagram> ProcessAuthoritativeQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, bool isRecursionAllowed, bool skipDnsAppAuthoritativeRequestHandlers, DnsQueryLogContext logContext = null)
         {
             DnsDatagram response = await AuthoritativeQueryAsync(request, protocol, isRecursionAllowed, skipDnsAppAuthoritativeRequestHandlers, remoteEP);
             if (response is null)
@@ -3888,14 +3892,14 @@ namespace DnsServerCore.Dns
                                 if (request.RecursionDesired && isRecursionAllowed)
                                 {
                                     //do forced recursive resolution (with blocking support) using empty conditional forwarders; name servers will be provided via ResolverDnsCache
-                                    return await ProcessRecursiveQueryAsync(request, remoteEP, protocol, [], _dnssecValidation, skipDnsAppAuthoritativeRequestHandlers, _clientTimeout);
+                                    return await ProcessRecursiveQueryAsync(request, remoteEP, protocol, [], _dnssecValidation, skipDnsAppAuthoritativeRequestHandlers, _clientTimeout, logContext);
                                 }
 
                                 break;
 
                             case DnsResourceRecordType.FWD:
                                 //do conditional forwarding (with blocking support)
-                                response = await ProcessRecursiveQueryAsync(request, remoteEP, protocol, response.Authority, _dnssecValidation, skipDnsAppAuthoritativeRequestHandlers, _clientTimeout);
+                                response = await ProcessRecursiveQueryAsync(request, remoteEP, protocol, response.Authority, _dnssecValidation, skipDnsAppAuthoritativeRequestHandlers, _clientTimeout, logContext);
 
                                 if (_dnssecValidation && (response.EDNS is not null) && firstAuthority.RDATA is DnsForwarderRecordData fwd && !fwd.DnssecValidation)
                                 {
@@ -4623,18 +4627,7 @@ namespace DnsServerCore.Dns
             return false;
         }
 
-        sealed class BlockedQueryResult
-        {
-            public BlockedQueryResult(DnsDatagram response)
-            {
-                Response = response;
-            }
-
-            public DnsDatagram Response { get; }
-            public DnsQueryLogMetadata? LogMetadata => DnsServerResponseTag.GetLogMetadata(Response.Tag);
-        }
-
-        private async Task<BlockedQueryResult> ProcessBlockedQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol)
+        private async Task<DnsDatagram> ProcessBlockedQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsQueryLogContext logContext)
         {
             if (_enableBlocking)
             {
@@ -4642,28 +4635,14 @@ namespace DnsServerCore.Dns
                 if (response is null)
                 {
                     //domain not blocked in blocked zone
-                    response = _blockListZoneManager.Query(request, out _); //check in block list zone
+                    response = _blockListZoneManager.Query(request, out DnsQueryLogMetadata blockListMetadata);
                     if (response is not null)
                     {
-                        //domain is blocked in block list zone
-                        if (response.Tag is null)
-                        {
-                            DnsQueryLogMetadata blockListLogMetadata = null;
+                        response.Tag = DnsServerResponseType.Blocked;
+                        if (logContext is not null)
+                            logContext.BlockingMetadata = blockListMetadata;
 
-                            if (_logQueryMetadata)
-                            {
-                                string blockedDomain = request.Question[0].Name;
-                                DnsResourceRecord firstAuthority = response.FindFirstAuthorityRecord();
-                                if ((firstAuthority is not null) && (firstAuthority.Type == DnsResourceRecordType.SOA))
-                                    blockedDomain = firstAuthority.Name;
-
-                                blockListLogMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase) { ["source"] = "block-list-zone", ["domain"] = blockedDomain });
-                            }
-
-                            response.Tag = DnsServerResponseTag.CreateTag(DnsServerResponseType.Blocked, blockListLogMetadata);
-                        }
-
-                        return new BlockedQueryResult(response);
+                        return response;
                     }
 
                     //domain not blocked in block list zone; continue to check app blocking handlers
@@ -4682,21 +4661,29 @@ namespace DnsServerCore.Dns
                             return question.Name;
                     }
 
+                    if (logContext is not null)
+                    {
+                        string domain = GetBlockedDomain();
+                        logContext.BlockingMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase)
+                        {
+                            ["source"] = "blocked-zone",
+                            ["domain"] = domain
+                        });
+                    }
+
                     if (_allowTxtBlockingReport && (question.Type == DnsResourceRecordType.TXT))
                     {
                         //return meta data
                         string blockedDomain = GetBlockedDomain();
-                        DnsQueryLogMetadata logMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase) { ["source"] = "blocked-zone", ["domain"] = blockedDomain });
 
                         IReadOnlyList<DnsResourceRecord> answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData("source=blocked-zone; domain=" + blockedDomain))];
 
-                        return new BlockedQueryResult(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = DnsServerResponseTag.CreateTag(DnsServerResponseType.Blocked, _logQueryMetadata ? logMetadata : null) });
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = DnsServerResponseType.Blocked };
                     }
                     else
                     {
                         string blockedDomain = GetBlockedDomain();
                         EDnsOption[] options = null;
-                        DnsQueryLogMetadata logMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(2, StringComparer.OrdinalIgnoreCase) { ["source"] = "blocked-zone", ["domain"] = blockedDomain });
 
                         if (_allowTxtBlockingReport && (request.EDNS is not null))
                         {
@@ -4726,7 +4713,7 @@ namespace DnsServerCore.Dns
                                 if (parentDomain is null)
                                     parentDomain = string.Empty;
 
-                                return new BlockedQueryResult(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_allowTxtBlockingReport, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _blockingAnswerTtl, _blockedZoneManager.DnsSOARecord)], null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseTag.CreateTag(DnsServerResponseType.Blocked, _logQueryMetadata ? logMetadata : null) });
+                                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_allowTxtBlockingReport, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _blockingAnswerTtl, _blockedZoneManager.DnsSOARecord)], null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseType.Blocked };
 
                             default:
                                 throw new InvalidOperationException();
@@ -4783,7 +4770,7 @@ namespace DnsServerCore.Dns
                                 break;
                         }
 
-                        return new BlockedQueryResult(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_allowTxtBlockingReport, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseTag.CreateTag(DnsServerResponseType.Blocked, _logQueryMetadata ? logMetadata : null) });
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_allowTxtBlockingReport, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _udpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseType.Blocked };
                     }
                 }
             }
@@ -4792,15 +4779,14 @@ namespace DnsServerCore.Dns
             {
                 try
                 {
-                    DnsDatagram appBlockedResponse = await blockingHandler.ProcessRequestAsync(request, remoteEP);
+                    DnsDatagram appBlockedResponse = (logContext is not null) && (blockingHandler is IDnsRequestBlockingHandlerEx blockingHandlerEx)
+                        ? await blockingHandlerEx.ProcessRequestAsync(request, remoteEP, logContext)
+                        : await blockingHandler.ProcessRequestAsync(request, remoteEP);
                     if (appBlockedResponse is not null)
                     {
                         if (appBlockedResponse.Tag is null)
                             appBlockedResponse.Tag = DnsServerResponseType.Blocked;
-                        else if (!_logQueryMetadata)
-                            appBlockedResponse.Tag = DnsServerResponseTag.GetResponseType(appBlockedResponse.Tag); //strip metadata since logging metadata is disabled
-
-                        return new BlockedQueryResult(appBlockedResponse);
+                        return appBlockedResponse;
                     }
                 }
                 catch (Exception ex)
@@ -4812,14 +4798,14 @@ namespace DnsServerCore.Dns
             return null;
         }
 
-        private async Task<DnsDatagram> ProcessRecursiveQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, IReadOnlyList<DnsResourceRecord> conditionalForwarders, bool dnssecValidation, bool skipDnsAppAuthoritativeRequestHandlers, int clientTimeout)
+        private async Task<DnsDatagram> ProcessRecursiveQueryAsync(DnsDatagram request, IPEndPoint remoteEP, DnsTransportProtocol protocol, IReadOnlyList<DnsResourceRecord> conditionalForwarders, bool dnssecValidation, bool skipDnsAppAuthoritativeRequestHandlers, int clientTimeout, DnsQueryLogContext logContext = null)
         {
             bool isAllowed = await IsAllowedAsync(request, remoteEP, protocol);
             if (!isAllowed)
             {
-                BlockedQueryResult blockedResponse = await ProcessBlockedQueryAsync(request, remoteEP, protocol);
+                DnsDatagram blockedResponse = await ProcessBlockedQueryAsync(request, remoteEP, protocol, logContext);
                 if (blockedResponse is not null)
-                    return blockedResponse.Response;
+                    return blockedResponse;
             }
 
             DnsClient.ResolverContext context = new DnsClient.ResolverContext();
@@ -4866,23 +4852,23 @@ namespace DnsServerCore.Dns
                             break; //CNAME is in allowed zone
 
                         //check blocked zone and block list zone
-                        BlockedQueryResult blockedResponse = await ProcessBlockedQueryAsync(newRequest, remoteEP, protocol);
+                        DnsDatagram blockedResponse = await ProcessBlockedQueryAsync(newRequest, remoteEP, protocol, logContext);
                         if (blockedResponse is not null)
                         {
                             //found cname cloaking
-                            List<DnsResourceRecord> answer = new List<DnsResourceRecord>(i + 1 + blockedResponse.Response.Answer.Count);
+                            List<DnsResourceRecord> answer = new List<DnsResourceRecord>(i + 1 + blockedResponse.Answer.Count);
 
                             //copy current and previous CNAME records
                             for (int j = 0; j <= i; j++)
                                 answer.Add(response.Answer[j]);
 
                             //copy last response answers
-                            answer.AddRange(blockedResponse.Response.Answer);
+                            answer.AddRange(blockedResponse.Answer);
 
                             //include blocked response additional section to pass on Extended DNS Errors
-                            return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, true, true, false, false, blockedResponse.Response.RCODE, request.Question, answer, blockedResponse.Response.Authority, blockedResponse.Response.Additional)
+                            return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, true, true, false, false, blockedResponse.RCODE, request.Question, answer, blockedResponse.Authority, blockedResponse.Additional)
                             {
-                                Tag = DnsServerResponseTag.CreateTag(DnsServerResponseTag.GetResponseType(blockedResponse.Response.Tag), _logQueryMetadata ? blockedResponse.LogMetadata : null)
+                                Tag = blockedResponse.Tag
                             };
                         }
                     }

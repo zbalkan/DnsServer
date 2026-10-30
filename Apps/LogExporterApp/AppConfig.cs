@@ -32,6 +32,9 @@ namespace LogExporter
         [JsonPropertyName("enableEdnsLogging")]
         public bool EnableEdnsLogging { get; set; }
 
+        [JsonPropertyName("labels")]
+        public Dictionary<string, string>? Labels { get; set; }
+
         [JsonPropertyName("file")]
         public FileTarget? FileTarget { get; set; }
 

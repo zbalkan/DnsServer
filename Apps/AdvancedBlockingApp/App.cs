@@ -40,7 +40,7 @@ using TechnitiumLibrary.Net.Http.Client;
 
 namespace AdvancedBlocking
 {
-    public sealed class App : IDnsApplication, IDnsRequestBlockingHandler
+    public sealed class App : IDnsApplication, IDnsRequestBlockingHandlerEx
     {
         #region variables
 
@@ -577,6 +577,11 @@ namespace AdvancedBlocking
 
         public Task<DnsDatagram?> ProcessRequestAsync(DnsDatagram request, IPEndPoint remoteEP)
         {
+            return ProcessRequestAsync(request, remoteEP, null);
+        }
+
+        public Task<DnsDatagram?> ProcessRequestAsync(DnsDatagram request, IPEndPoint remoteEP, DnsQueryLogContext? logContext)
+        {
             if (!_enableBlocking)
                 return Task.FromResult<DnsDatagram?>(null);
 
@@ -620,7 +625,7 @@ namespace AdvancedBlocking
                 };
 
                 if (blockListUrl?.Uri is not null)
-                    values[blockedRegex is null ? "blockListUrl" : "regexBlockListUrl"] = blockListUrl.Uri.AbsoluteUri;
+                    values[blockedRegex is null ? "blockListUrl" : "regexBlockListUrl"] = DnsQueryLogMetadata.SanitizeUrl(blockListUrl.Uri);
 
                 if (blockedRegex is null)
                     values["domain"] = blockedDomain ?? question.Name;
@@ -630,8 +635,8 @@ namespace AdvancedBlocking
                 return new DnsQueryLogMetadata(values);
             }
 
-            DnsQueryLogMetadata logMetadata = GetLogMetadata();
-            object responseMetadata = DnsServerResponseTag.CreateTag(DnsServerResponseType.Blocked, logMetadata);
+            if (logContext is not null)
+                logContext.BlockingMetadata = GetLogMetadata();
 
             if (group.AllowTxtBlockingReport && (question.Type == DnsResourceRecordType.TXT))
             {
@@ -640,7 +645,7 @@ namespace AdvancedBlocking
 
                 DnsResourceRecord[] answer = [new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _blockingAnswerTtl, new DnsTXTRecordData(blockingReport))];
 
-                return Task.FromResult<DnsDatagram?>(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = responseMetadata });
+                return Task.FromResult<DnsDatagram?>(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = DnsServerResponseType.Blocked });
             }
             else
             {
@@ -725,7 +730,7 @@ namespace AdvancedBlocking
                     }
                 }
 
-                return Task.FromResult<DnsDatagram?>(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !group.AllowTxtBlockingReport, false, false, rcode, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer!.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = responseMetadata });
+                return Task.FromResult<DnsDatagram?>(new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !group.AllowTxtBlockingReport, false, false, rcode, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer!.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseType.Blocked });
             }
         }
 

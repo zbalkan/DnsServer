@@ -20,8 +20,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Runtime.CompilerServices;
-using System.Linq;
 using System.Net;
 using System.Threading.Tasks;
 using TechnitiumLibrary.Net.Dns;
@@ -40,93 +38,38 @@ namespace DnsServerCore.ApplicationCommon
         /// </summary>
         public IReadOnlyDictionary<string, string> Values { get; }
 
-        public string ToReportString()
+        /// <summary>
+        /// Remove user info, query parameters, and fragments before storing a list URL in telemetry.
+        /// </summary>
+        public static string SanitizeUrl(Uri url)
         {
-            if (Values.Count < 1)
-                return string.Empty;
-
-            return string.Join("; ", Values.Select(kv => Uri.EscapeDataString(kv.Key) + "=" + Uri.EscapeDataString(kv.Value)));
-        }
-
-        public static DnsQueryLogMetadata? ParseReportString(string? report)
-        {
-            if (string.IsNullOrWhiteSpace(report))
-                return null;
-
-            string[] parts = report.Split(';', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length < 1)
-                return null;
-
-            Dictionary<string, string> values = new Dictionary<string, string>(parts.Length, StringComparer.OrdinalIgnoreCase);
-
-            foreach (string part in parts)
+            UriBuilder sanitized = new UriBuilder(url)
             {
-                int separatorIndex = part.IndexOf('=');
-                if ((separatorIndex < 1) || (separatorIndex >= (part.Length - 1)))
-                    continue;
+                UserName = string.Empty,
+                Password = string.Empty,
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
 
-                string key = part[..separatorIndex].Trim();
-                string value = part[(separatorIndex + 1)..].Trim();
-
-                try
-                {
-                    key = Uri.UnescapeDataString(key);
-                    value = Uri.UnescapeDataString(value);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                if ((key.Length < 1) || (value.Length < 1))
-                    continue;
-
-                values[key] = value;
-            }
-
-            if (values.Count < 1)
-                return null;
-
-            return new DnsQueryLogMetadata(values);
+            return sanitized.Uri.AbsoluteUri;
         }
+
+    }
+
+    /// <summary>
+    /// Carries optional decision metadata during processing of one incoming DNS query.
+    /// This is internal logging state; it must never be stored in DnsDatagram.Tag or sent on the wire.
+    /// </summary>
+    public sealed class DnsQueryLogContext
+    {
+        public DnsQueryLogMetadata? BlockingMetadata { get; set; }
     }
 
     public static class DnsServerResponseTag
     {
-        // Associate metadata with the boxed enum instance, not the datagram itself. This keeps the
-        // historical Tag runtime type intact and preserves metadata when DNS Apps copy response.Tag.
-        private static readonly ConditionalWeakTable<object, DnsQueryLogMetadata> _metadataByTag = new();
-        /// <summary>
-        /// Returns a boxed <see cref="DnsServerResponseType"/> while associating optional metadata
-        /// with the same tag object. Existing DNS Apps can safely cast the Tag to the enum.
-        /// </summary>
-        public static object CreateTag(DnsServerResponseType responseType, DnsQueryLogMetadata? logMetadata)
-        {
-            object tag = responseType;
-
-            if ((logMetadata is not null) && (logMetadata.Values.Count > 0))
-                _metadataByTag.Add(tag, logMetadata);
-
-            return tag;
-        }
-
         public static DnsServerResponseType GetResponseType(object? tag)
         {
-            if (tag is null)
-                return DnsServerResponseType.Recursive;
-
-            if (tag is DnsServerResponseType responseType)
-                return responseType;
-
-            return DnsServerResponseType.Recursive;
-        }
-
-        public static DnsQueryLogMetadata? GetLogMetadata(object? tag)
-        {
-            if (tag is null)
-                return null;
-
-            return _metadataByTag.TryGetValue(tag, out DnsQueryLogMetadata? metadata) ? metadata : null;
+            return tag is DnsServerResponseType responseType ? responseType : DnsServerResponseType.Recursive;
         }
     }
 
