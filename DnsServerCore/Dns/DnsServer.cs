@@ -4779,9 +4779,7 @@ namespace DnsServerCore.Dns
             {
                 try
                 {
-                    DnsDatagram appBlockedResponse = (logContext is not null) && (blockingHandler is IDnsRequestBlockingHandlerEx blockingHandlerEx)
-                        ? await blockingHandlerEx.ProcessRequestAsync(request, remoteEP, logContext)
-                        : await blockingHandler.ProcessRequestAsync(request, remoteEP);
+                    DnsDatagram appBlockedResponse = await blockingHandler.ProcessRequestAsync(request, remoteEP);
                     if (appBlockedResponse is not null)
                     {
                         if (appBlockedResponse.Tag is null)
@@ -4875,14 +4873,12 @@ namespace DnsServerCore.Dns
                 }
             }
 
-            DnsServerResponseType responseType = DnsServerResponseClassifier.GetResponseType(response.Tag);
-
             if (response.Tag is null)
             {
                 if (response.IsBlockedResponse())
                     response.Tag = DnsServerResponseType.UpstreamBlocked;
             }
-            else if (responseType == DnsServerResponseType.Cached)
+            else if ((DnsServerResponseType)response.Tag == DnsServerResponseType.Cached)
             {
                 if (response.IsBlockedResponse())
                     response.Tag = DnsServerResponseType.UpstreamBlockedCached;

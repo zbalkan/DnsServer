@@ -141,8 +141,10 @@ namespace DnsServerCore.Dns
 
                         if (item._response is null)
                             responseType = DnsServerResponseType.Dropped;
+                        else if (item._response.Tag is null)
+                            responseType = DnsServerResponseType.Recursive;
                         else
-                            responseType = DnsServerResponseClassifier.GetResponseType(item._response.Tag);
+                            responseType = (DnsServerResponseType)item._response.Tag;
 
                         UpdateLifetimeCounters(responseCode, responseType, item._remoteEP.Address);
 

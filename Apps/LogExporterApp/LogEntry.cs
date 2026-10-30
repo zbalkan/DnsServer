@@ -42,7 +42,7 @@ namespace LogExporter
             // Extract client information
             ClientIp = remoteEP.Address.ToString();
             Protocol = protocol;
-            ResponseType = DnsServerResponseClassifier.GetResponseType(response.Tag);
+            ResponseType = response.Tag is null ? DnsServerResponseType.Recursive : (DnsServerResponseType)response.Tag;
             BlockingMetadata = metadata?.Values;
             Labels = labels;
 

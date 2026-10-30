@@ -65,14 +65,6 @@ namespace DnsServerCore.ApplicationCommon
         public DnsQueryLogMetadata? BlockingMetadata { get; set; }
     }
 
-    public static class DnsServerResponseClassifier
-    {
-        public static DnsServerResponseType GetResponseType(object? tag)
-        {
-            return tag is DnsServerResponseType responseType ? responseType : DnsServerResponseType.Recursive;
-        }
-    }
-
     public enum DnsServerResponseType : byte
     {
         Authoritative = 1,
