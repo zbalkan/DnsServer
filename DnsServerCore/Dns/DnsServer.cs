@@ -658,7 +658,7 @@ namespace DnsServerCore.Dns
             BinaryReader bR = new BinaryReader(s);
 
             int version = bR.ReadByte();
-            if ((version < 1) || (version > 7))
+            if ((version < 1) || (version > 8))
                 throw new InvalidDataException("DNS Server config version not supported.");
 
             //general
@@ -1223,14 +1223,11 @@ namespace DnsServerCore.Dns
             if (!isConfigTransfer)
                 _statsManager.MaxStatFileDays = maxStatFileDays;
 
-            //log extended query metadata for DNS Apps
-            //this optional field is appended after the last field of the config version 5 layout and is read only when
-            //available so that the config version does not need to be incremented. this keeps the config file readable
-            //by older versions which simply ignore the trailing byte.
-            //note: ReadByte() returns -1 when there is no data left; the stream may not be seekable during config transfer.
-            int logQueryMetadata = s.ReadByte();
+            //Extended query metadata is node-local and must not be overwritten during config transfer.
+            //Version 7 and earlier do not contain this field.
+            bool logQueryMetadata = version >= 8 && bR.ReadBoolean();
             if (!isConfigTransfer)
-                _logQueryMetadata = logQueryMetadata == 1;
+                _logQueryMetadata = logQueryMetadata;
         }
 
         private void WriteConfigTo(Stream s)
@@ -1238,7 +1235,7 @@ namespace DnsServerCore.Dns
             BinaryWriter bW = new BinaryWriter(s);
 
             bW.Write(Encoding.ASCII.GetBytes("DC")); //format
-            bW.Write((byte)7); //version
+            bW.Write((byte)8); //version
 
             //general
             s.WriteShortString(_serverDomain);
@@ -1522,7 +1519,7 @@ namespace DnsServerCore.Dns
             bW.Write(_queryLog is not null); //log all queries
             bW.Write(_statsManager.EnableInMemoryStats);
             bW.Write(_statsManager.MaxStatFileDays);
-            bW.Write(_logQueryMetadata); //log extended query metadata for DNS Apps; optional trailing field, see ReadConfigFrom()
+            bW.Write(_logQueryMetadata); //extended query metadata; version 8, node-local
         }
 
         #endregion
