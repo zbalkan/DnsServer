@@ -51,6 +51,7 @@ namespace DnsServerCore.Dns.ZoneManagers
 
         Dictionary<string, object> _allowListZone = new Dictionary<string, object>();
         Dictionary<string, List<Uri>> _blockListZone = new Dictionary<string, List<Uri>>();
+        Dictionary<Uri, string> _sanitizedBlockListUrls = new Dictionary<Uri, string>();
 
         DnsSOARecordData _soaRecord;
         DnsNSRecordData _nsRecord;
@@ -852,7 +853,13 @@ namespace DnsServerCore.Dns.ZoneManagers
                 }
             }
 
+            //Precompute the safe source URL once per list reload, not per blocked query.
+            Dictionary<Uri, string> sanitizedBlockListUrls = new Dictionary<Uri, string>(blockListQueues.Count);
+            foreach (Uri listUrl in blockListQueues.Keys)
+                sanitizedBlockListUrls[listUrl] = SanitizeUrl(listUrl);
+
             //set new allowed and blocked zones
+            _sanitizedBlockListUrls = sanitizedBlockListUrls;
             _allowListZone = allowListZone;
             _blockListZone = blockListZone;
 
@@ -891,22 +898,18 @@ namespace DnsServerCore.Dns.ZoneManagers
 
             if (_dnsServer.LogQueryMetadata)
             {
-                Dictionary<string, string> metadataValues = new Dictionary<string, string>(4, StringComparer.OrdinalIgnoreCase)
+                //IsZoneBlocked returns a nonempty list for a matched zone.
+                Uri firstList = blockLists[0];
+                if (!_sanitizedBlockListUrls.TryGetValue(firstList, out string sanitizedUrl))
+                    sanitizedUrl = SanitizeUrl(firstList); //a concurrent reload may replace the lookup table
+
+                logMetadata = new DnsQueryLogMetadata(new Dictionary<string, string>(4, StringComparer.OrdinalIgnoreCase)
                 {
                     ["source"] = "block-list-zone",
-                    ["domain"] = blockedDomain
-                };
-
-                if (blockLists.Count > 0)
-                {
-                    metadataValues["blockListUrl"] = SanitizeUrl(blockLists[0]);
-                    metadataValues["blockListCount"] = blockLists.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
-
-                    if (blockLists.Count > 1)
-                        metadataValues["blockListUrls"] = System.Text.Json.JsonSerializer.Serialize(blockLists.ConvertAll(SanitizeUrl));
-                }
-
-                logMetadata = new DnsQueryLogMetadata(metadataValues);
+                    ["domain"] = blockedDomain,
+                    ["blockListUrl"] = sanitizedUrl,
+                    ["blockListCount"] = blockLists.Count.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                });
             }
 
             //zone is blocked
@@ -918,7 +921,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                 for (int i = 0; i < answer.Length; i++)
                     answer[i] = new DnsResourceRecord(question.Name, DnsResourceRecordType.TXT, question.Class, _dnsServer.BlockingAnswerTtl, new DnsTXTRecordData("source=block-list-zone; blockListUrl=" + blockLists[i].AbsoluteUri + "; domain=" + blockedDomain));
 
-                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer) { Tag = DnsServerResponseType.Blocked };
+                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, false, false, false, DnsResponseCode.NoError, request.Question, answer);
             }
             else
             {
@@ -952,7 +955,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                         if (parentDomain is null)
                             parentDomain = string.Empty;
 
-                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_dnsServer.AllowTxtBlockingReport, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _dnsServer.BlockingAnswerTtl, _soaRecord)], null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseType.Blocked };
+                        return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_dnsServer.AllowTxtBlockingReport, false, false, DnsResponseCode.NxDomain, request.Question, null, [new DnsResourceRecord(parentDomain, DnsResourceRecordType.SOA, question.Class, _dnsServer.BlockingAnswerTtl, _soaRecord)], null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options);
 
                     default:
                         throw new InvalidOperationException();
@@ -1018,7 +1021,7 @@ namespace DnsServerCore.Dns.ZoneManagers
                         break;
                 }
 
-                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_dnsServer.AllowTxtBlockingReport, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options) { Tag = DnsServerResponseType.Blocked };
+                return new DnsDatagram(request.Identifier, true, DnsOpcode.StandardQuery, false, false, request.RecursionDesired, !_dnsServer.AllowTxtBlockingReport, false, false, DnsResponseCode.NoError, request.Question, answer, authority, null, request.EDNS is null ? ushort.MinValue : _dnsServer.UdpPayloadSize, EDnsHeaderFlags.None, options);
             }
         }
 
