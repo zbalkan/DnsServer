@@ -302,6 +302,19 @@ namespace DnsServerCore.Dns.ZoneManagers
             _nsRecord = new DnsNSRecordData(_dnsServer.ServerDomain);
         }
 
+        private static string SanitizeUrl(Uri url)
+        {
+            UriBuilder sanitized = new UriBuilder(url)
+            {
+                UserName = string.Empty,
+                Password = string.Empty,
+                Query = string.Empty,
+                Fragment = string.Empty
+            };
+
+            return sanitized.Uri.AbsoluteUri;
+        }
+
         private string GetBlockListFilePath(Uri blockListUrl)
         {
             return Path.Combine(_localCacheFolder, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(blockListUrl.AbsoluteUri))).ToLowerInvariant());
@@ -863,7 +876,7 @@ namespace DnsServerCore.Dns.ZoneManagers
             return Query(request, out _);
         }
 
-        public DnsDatagram Query(DnsDatagram request, out DnsQueryLogMetadata? logMetadata)
+        public DnsDatagram Query(DnsDatagram request, out DnsQueryLogMetadata logMetadata)
         {
             logMetadata = null;
 
@@ -886,11 +899,11 @@ namespace DnsServerCore.Dns.ZoneManagers
 
                 if (blockLists.Count > 0)
                 {
-                    metadataValues["blockListUrl"] = DnsQueryLogMetadata.SanitizeUrl(blockLists[0]);
+                    metadataValues["blockListUrl"] = SanitizeUrl(blockLists[0]);
                     metadataValues["blockListCount"] = blockLists.Count.ToString(System.Globalization.CultureInfo.InvariantCulture);
 
                     if (blockLists.Count > 1)
-                        metadataValues["blockListUrls"] = System.Text.Json.JsonSerializer.Serialize(blockLists.ConvertAll(DnsQueryLogMetadata.SanitizeUrl));
+                        metadataValues["blockListUrls"] = System.Text.Json.JsonSerializer.Serialize(blockLists.ConvertAll(SanitizeUrl));
                 }
 
                 logMetadata = new DnsQueryLogMetadata(metadataValues);

@@ -28,9 +28,13 @@ namespace DnsServerCore.ApplicationCommon
 {
     public sealed class DnsQueryLogMetadata
     {
-        public DnsQueryLogMetadata(IReadOnlyDictionary<string, string>? values = null)
+        /// <summary>
+        /// Takes ownership of the supplied dictionary. Callers must not mutate it afterwards.
+        /// </summary>
+        public DnsQueryLogMetadata(IDictionary<string, string> values)
         {
-            Values = new ReadOnlyDictionary<string, string>(values is null ? new Dictionary<string, string>(0, StringComparer.OrdinalIgnoreCase) : new Dictionary<string, string>(values, StringComparer.OrdinalIgnoreCase));
+            ArgumentNullException.ThrowIfNull(values);
+            Values = new ReadOnlyDictionary<string, string>(values);
         }
 
         /// <summary>
@@ -38,31 +42,6 @@ namespace DnsServerCore.ApplicationCommon
         /// </summary>
         public IReadOnlyDictionary<string, string> Values { get; }
 
-        /// <summary>
-        /// Remove user info, query parameters, and fragments before storing a list URL in telemetry.
-        /// </summary>
-        public static string SanitizeUrl(Uri url)
-        {
-            UriBuilder sanitized = new UriBuilder(url)
-            {
-                UserName = string.Empty,
-                Password = string.Empty,
-                Query = string.Empty,
-                Fragment = string.Empty
-            };
-
-            return sanitized.Uri.AbsoluteUri;
-        }
-
-    }
-
-    /// <summary>
-    /// Carries optional decision metadata during processing of one incoming DNS query.
-    /// This is internal logging state; it must never be stored in DnsDatagram.Tag or sent on the wire.
-    /// </summary>
-    public sealed class DnsQueryLogContext
-    {
-        public DnsQueryLogMetadata? BlockingMetadata { get; set; }
     }
 
     public enum DnsServerResponseType : byte
