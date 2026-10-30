@@ -23,7 +23,6 @@ using LogExporter.Strategy;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
-using System.Collections.ObjectModel;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -38,7 +37,6 @@ namespace LogExporter
 
         IDnsServer? _dnsServer;
         AppConfig? _config;
-        IReadOnlyDictionary<string, string>? _labels;
 
         readonly ExportManager _exportManager = new ExportManager();
 
@@ -103,8 +101,6 @@ namespace LogExporter
             if (_config is null)
                 throw new DnsClientException("Invalid application configuration.");
 
-            _labels = _config.Labels is { Count: > 0 } ? new ReadOnlyDictionary<string, string>(new Dictionary<string, string>(_config.Labels, StringComparer.Ordinal)) : null;
-
             if (_config.FileTarget!.Enabled)
             {
                 _exportManager.RemoveStrategy(typeof(FileExportStrategy));
@@ -155,7 +151,7 @@ namespace LogExporter
             if (_enableLogging)
             {
                 if (_queuedLogs.Count < _config!.MaxQueueSize)
-                    _queuedLogs.Enqueue(new LogEntry(timestamp, remoteEP, protocol, request, response, _config.EnableEdnsLogging, metadata, _labels));
+                    _queuedLogs.Enqueue(new LogEntry(timestamp, remoteEP, protocol, request, response, _config.EnableEdnsLogging, metadata));
             }
 
             return Task.CompletedTask;

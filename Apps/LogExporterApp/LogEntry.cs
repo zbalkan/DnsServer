@@ -34,7 +34,7 @@ namespace LogExporter
 {
     public class LogEntry
     {
-        public LogEntry(DateTime timestamp, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response, bool ednsLogging = false, DnsQueryLogMetadata? metadata = null, IReadOnlyDictionary<string, string>? labels = null)
+        public LogEntry(DateTime timestamp, IPEndPoint remoteEP, DnsTransportProtocol protocol, DnsDatagram request, DnsDatagram response, bool ednsLogging = false, DnsQueryLogMetadata? metadata = null)
         {
             // Assign timestamp and ensure it's in UTC
             Timestamp = timestamp.Kind == DateTimeKind.Utc ? timestamp : timestamp.ToUniversalTime();
@@ -44,7 +44,6 @@ namespace LogExporter
             Protocol = protocol;
             ResponseType = response.Tag is null ? DnsServerResponseType.Recursive : (DnsServerResponseType)response.Tag;
             BlockingMetadata = metadata?.Values;
-            Labels = labels;
 
             if ((ResponseType == DnsServerResponseType.Recursive) && (response.Metadata is not null))
                 ResponseRtt = response.Metadata.RoundTripTime;
@@ -87,20 +86,11 @@ namespace LogExporter
 
             foreach (EDnsOption extendedErrorLog in response.EDNS.Options.Where(o => o.Code == EDnsOptionCode.EXTENDED_DNS_ERROR))
             {
-                string[] extractedData = extendedErrorLog.Data.ToString().Replace("[", string.Empty).Replace("]", string.Empty).Split(":", 2, StringSplitOptions.TrimEntries);
-                string? errType = null;
-                string? message = null;
-
-                if (extractedData.Length > 0)
-                    errType = extractedData[0];
-
-                if (extractedData.Length > 1)
-                    message = extractedData[1];
-
+                string[] extractedData = extendedErrorLog.Data.ToString().Replace("[", string.Empty).Replace("]", string.Empty).Split(":", StringSplitOptions.TrimEntries);
                 EDNS.Add(new EDNSLog
                 {
-                    ErrType = errType,
-                    Message = message
+                    ErrType = extractedData[0],
+                    Message = extractedData[1]
                 });
             }
         }
@@ -108,7 +98,6 @@ namespace LogExporter
         public List<DnsResourceRecord> Answers { get; private set; }
         public string ClientIp { get; private set; }
         public IReadOnlyDictionary<string, string>? BlockingMetadata { get; private set; }
-        public IReadOnlyDictionary<string, string>? Labels { get; private set; }
         public List<EDNSLog> EDNS { get; private set; }
         public DnsTransportProtocol Protocol { get; private set; }
         public DnsQuestion? Question { get; private set; }

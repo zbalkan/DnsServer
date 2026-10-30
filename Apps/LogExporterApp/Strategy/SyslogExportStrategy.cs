@@ -164,13 +164,6 @@ namespace LogExporter.Strategy
                 }
             }
 
-            // Static configured enrichment labels
-            if ((log.Labels is not null) && (log.Labels.Count > 0))
-            {
-                foreach (KeyValuePair<string, string> label in log.Labels)
-                    properties.Add(new LogEventProperty("label_" + label.Key, new ScalarValue(label.Value)));
-            }
-
             // Add blocking metadata
             if ((log.BlockingMetadata is not null) && (log.BlockingMetadata.Count > 0))
             {
