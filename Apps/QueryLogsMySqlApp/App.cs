@@ -270,7 +270,7 @@ namespace QueryLogsMySql
                             paramClientIp.Value = log.RemoteEP.Address.ToString();
                             paramProtocol.Value = (byte)log.Protocol;
 
-                            DnsServerResponseType responseType = DnsServerResponseTag.GetResponseType(log.Response.Tag);
+                            DnsServerResponseType responseType = DnsServerResponseClassifier.GetResponseType(log.Response.Tag);
 
                             paramResponseType.Value = (byte)responseType;
 

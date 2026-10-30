@@ -4875,7 +4875,7 @@ namespace DnsServerCore.Dns
                 }
             }
 
-            DnsServerResponseType responseType = DnsServerResponseTag.GetResponseType(response.Tag);
+            DnsServerResponseType responseType = DnsServerResponseClassifier.GetResponseType(response.Tag);
 
             if (response.Tag is null)
             {

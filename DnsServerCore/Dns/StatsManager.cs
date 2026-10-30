@@ -142,7 +142,7 @@ namespace DnsServerCore.Dns
                         if (item._response is null)
                             responseType = DnsServerResponseType.Dropped;
                         else
-                            responseType = DnsServerResponseTag.GetResponseType(item._response.Tag);
+                            responseType = DnsServerResponseClassifier.GetResponseType(item._response.Tag);
 
                         UpdateLifetimeCounters(responseCode, responseType, item._remoteEP.Address);
 

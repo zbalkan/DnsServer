@@ -65,7 +65,7 @@ namespace DnsServerCore.ApplicationCommon
         public DnsQueryLogMetadata? BlockingMetadata { get; set; }
     }
 
-    public static class DnsServerResponseTag
+    public static class DnsServerResponseClassifier
     {
         public static DnsServerResponseType GetResponseType(object? tag)
         {

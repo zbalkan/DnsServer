@@ -177,7 +177,7 @@ namespace DnsRebindingProtection
             if (!_enableProtection || response.AuthoritativeAnswer)
                 return Task.FromResult(response);
 
-            if (DnsServerResponseTag.GetResponseType(response.Tag) == DnsServerResponseType.Blocked)
+            if (DnsServerResponseClassifier.GetResponseType(response.Tag) == DnsServerResponseType.Blocked)
                 return Task.FromResult(response); //allow blocked responses
 
             IPAddress remoteIP = remoteEP.Address;
