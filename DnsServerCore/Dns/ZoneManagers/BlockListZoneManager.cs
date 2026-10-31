@@ -570,6 +570,7 @@ namespace DnsServerCore.Dns.ZoneManagers
         {
             _allowListZone = new Dictionary<string, object>();
             _blockListZone = new Dictionary<string, List<Uri>>();
+            _sanitizedBlockListUrls = new Dictionary<Uri, string>();
         }
 
         private async Task<bool> UpdateBlockListsAsync(bool forceReload)
