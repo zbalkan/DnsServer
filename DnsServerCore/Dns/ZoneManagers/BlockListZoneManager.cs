@@ -880,10 +880,10 @@ namespace DnsServerCore.Dns.ZoneManagers
 
         public DnsDatagram Query(DnsDatagram request)
         {
-            return Query(request, out _);
+            return Query(request, false, out _);
         }
 
-        public DnsDatagram Query(DnsDatagram request, out DnsQueryLogMetadata logMetadata)
+        internal DnsDatagram Query(DnsDatagram request, bool collectLogMetadata, out DnsQueryLogMetadata logMetadata)
         {
             logMetadata = null;
 
@@ -896,7 +896,7 @@ namespace DnsServerCore.Dns.ZoneManagers
             if (blockLists is null)
                 return null; //zone not blocked
 
-            if (_dnsServer.LogQueryMetadata)
+            if (collectLogMetadata)
             {
                 //IsZoneBlocked returns a nonempty list for a matched zone.
                 Uri firstList = blockLists[0];

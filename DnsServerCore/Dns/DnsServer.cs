@@ -4632,7 +4632,7 @@ namespace DnsServerCore.Dns
                 if (response is null)
                 {
                     //domain not blocked in blocked zone
-                    response = _blockListZoneManager.Query(request, out DnsQueryLogMetadata blockListMetadata);
+                    response = _blockListZoneManager.Query(request, logContext is not null, out DnsQueryLogMetadata blockListMetadata);
                     if (response is not null)
                     {
                         response.Tag = DnsServerResponseType.Blocked;
