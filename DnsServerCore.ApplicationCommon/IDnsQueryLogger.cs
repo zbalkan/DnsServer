@@ -38,7 +38,11 @@ namespace DnsServerCore.ApplicationCommon
         }
 
         /// <summary>
-        /// Structured metadata key/value pairs (example keys: <c>source</c>, <c>domain</c>, <c>blockListUrl</c>).
+        /// Structured metadata with stable, case-sensitive lower-camel-case key names.
+        /// Built-in blocked-zone decisions use <c>source</c> and <c>domain</c>.
+        /// Built-in block-list decisions also use <c>blockListUrl</c> and <c>blockListCount</c>.
+        /// Values are strings. <c>source</c> identifies the producer; future producers
+        /// may define additional source-specific keys in separate SDK extensions.
         /// </summary>
         public IReadOnlyDictionary<string, string> Values { get; }
 
